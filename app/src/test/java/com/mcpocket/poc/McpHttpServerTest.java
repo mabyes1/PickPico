@@ -60,6 +60,14 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject phoneLock(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("locked", true)
+                        .put("adminActive", true)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject phoneEcho(String text, long callCount) throws org.json.JSONException {
                 echoed.set(text);
                 return new JSONObject().put("echo", text).put("toolCallCount", callCount);
@@ -158,8 +166,9 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(5, listed.getInt("count"));
+        assertEquals(6, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.run"));
 
         HttpResult run = post(
@@ -200,6 +209,21 @@ public final class McpHttpServerTest {
         assertTrue(new JSONObject(rejected.body)
                 .getJSONObject("result")
                 .getBoolean("isError"));
+    }
+
+    @Test
+    public void commandRuntimeCanInvokeRemoteLockCapability() throws Exception {
+        HttpResult lock = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":24,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"phone.lock\",\"arguments\":{}}}}",
+                authorizedHeaders());
+        assertEquals(200, lock.status);
+        JSONObject execution = new JSONObject(lock.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals("phone.lock", execution.getString("commandId"));
+        assertTrue(execution.getJSONObject("result").getBoolean("locked"));
     }
 
     @Test

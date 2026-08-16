@@ -2,8 +2,10 @@ package com.mcpocket.poc;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.admin.DevicePolicyManager;
 import android.content.ClipboardManager;
 import android.content.ClipData;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -31,8 +33,10 @@ public final class MainActivity extends Activity {
     private TextView endpointView;
     private TextView tokenView;
     private TextView recentView;
+    private TextView remoteLockView;
     private Button startButton;
     private Button stopButton;
+    private Button enableRemoteLockButton;
 
     private final Runnable refreshTask = new Runnable() {
         @Override
@@ -81,6 +85,7 @@ public final class MainActivity extends Activity {
         endpointView = valueView();
         tokenView = valueView();
         recentView = valueView();
+        remoteLockView = valueView();
 
         root.addView(label("STATUS"));
         root.addView(statusView);
@@ -88,6 +93,15 @@ public final class MainActivity extends Activity {
         root.addView(endpointView);
         root.addView(label("BEARER TOKEN"));
         root.addView(tokenView);
+
+        root.addView(label("REMOTE LOCK"));
+        root.addView(remoteLockView);
+
+        enableRemoteLockButton = new Button(this);
+        enableRemoteLockButton.setText(R.string.enable_remote_lock);
+        enableRemoteLockButton.setOnClickListener(v -> requestDeviceAdmin());
+        root.addView(enableRemoteLockButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -162,6 +176,22 @@ public final class MainActivity extends Activity {
         Toast.makeText(this, "Connection JSON copied", Toast.LENGTH_SHORT).show();
     }
 
+    private void requestDeviceAdmin() {
+        DevicePolicyManager policy = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        ComponentName admin = new ComponentName(this, McpDeviceAdminReceiver.class);
+        if (policy != null && policy.isAdminActive(admin)) {
+            Toast.makeText(this, "Remote lock is already enabled", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                .putExtra(
+                        DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                        "MCPocket can lock this phone when you explicitly request it through the authenticated node.");
+        startActivity(intent);
+    }
+
     private void refreshStatus() {
         SharedPreferences prefs = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE);
         boolean running = McpNodeService.isNodeRunning();
@@ -180,6 +210,12 @@ public final class MainActivity extends Activity {
         String recent = prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet");
         long calls = prefs.getLong(McpNodeService.KEY_CALL_COUNT, 0L);
         recentView.setText(getString(R.string.tool_calls_format, recent, calls));
+        DevicePolicyManager policy = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        ComponentName admin = new ComponentName(this, McpDeviceAdminReceiver.class);
+        boolean remoteLockEnabled = policy != null && policy.isAdminActive(admin);
+        remoteLockView.setText(remoteLockEnabled ? "ENABLED" : "NOT ENABLED");
+        remoteLockView.setTextColor(remoteLockEnabled ? Color.rgb(0, 120, 60) : Color.rgb(170, 35, 35));
+        enableRemoteLockButton.setEnabled(!remoteLockEnabled);
         startButton.setEnabled(!running);
         stopButton.setEnabled(running);
     }

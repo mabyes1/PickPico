@@ -5,6 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
@@ -145,7 +147,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.5.0")
+                .put("version", "0.6.0")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
@@ -302,6 +304,30 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("playing", true)
                 .put("durationSeconds", durationSeconds)
                 .put("volume", "alarm_max_temporarily")
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
+    public JSONObject phoneLock(long callCount) throws JSONException {
+        DevicePolicyManager policy = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+        ComponentName admin = new ComponentName(this, McpDeviceAdminReceiver.class);
+        boolean adminActive = policy != null && policy.isAdminActive(admin);
+        if (!adminActive) {
+            return new JSONObject()
+                    .put("locked", false)
+                    .put("adminActive", false)
+                    .put("requiresSetup", true)
+                    .put("setupAction", "enable_device_admin")
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        }
+
+        policy.lockNow();
+        return new JSONObject()
+                .put("locked", true)
+                .put("adminActive", true)
+                .put("requiresSetup", false)
                 .put("timestamp", Instant.now().toString())
                 .put("toolCallCount", callCount);
     }

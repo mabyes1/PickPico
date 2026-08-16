@@ -114,6 +114,15 @@ final class CommandRuntime {
                 });
 
         register(
+                "phone.lock",
+                "Immediately lock the phone when MCPocket has been explicitly enabled as a device administrator.",
+                "phone",
+                "security_action",
+                true,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.phoneLock(callCount));
+
+        register(
                 "phone.echo",
                 "Show an observable message through vibration and the foreground notification.",
                 "phone",

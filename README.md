@@ -17,6 +17,7 @@ Current command IDs:
 - `node.info`
 - `phone.status`
 - `phone.ring`
+- `phone.lock` (requires one-time Device Admin opt-in)
 - `phone.echo`
 - `process.run` (predefined diagnostics only)
 
@@ -26,7 +27,10 @@ directly into the HTTP/MCP transport layer.
 
 `phone_exec` only accepts predefined diagnostic command IDs; it does not accept a shell string or arbitrary arguments.
 
-Arbitrary shell execution, ADB, FYT, Git, SSH, discovery, TLS, and UI polish are not implemented yet.
+`phone.lock` never attempts to elevate itself. Until the user explicitly enables MCPocket's
+force-lock Device Admin policy in the Android system UI, the command returns `requiresSetup=true`.
+
+Arbitrary shell execution, ADB, FYT, Git, SSH, discovery, remote relay, TLS, and UI polish are not implemented yet.
 
 ## Build
 
