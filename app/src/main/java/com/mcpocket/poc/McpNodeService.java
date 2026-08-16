@@ -8,12 +8,18 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.BatteryManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.StatFs;
 import android.os.SystemClock;
@@ -56,6 +62,9 @@ public final class McpNodeService extends Service implements McpToolActions {
     private McpHttpServer server;
     private String endpoint = "";
     private long startedElapsed;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Ringtone activeRing;
+    private int previousAlarmVolume = -1;
 
     @Override
     public void onCreate() {
@@ -113,6 +122,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public void onDestroy() {
         nodeActive = false;
+        stopAlertSound();
         if (server != null) {
             server.stop();
             server = null;
@@ -135,7 +145,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.3.0")
+                .put("version", "0.4.0")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
@@ -243,6 +253,60 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    public synchronized JSONObject phoneRing(String action, int durationSeconds, long callCount) throws JSONException {
+        if ("stop".equals(action)) {
+            boolean wasPlaying = activeRing != null && activeRing.isPlaying();
+            stopAlertSound();
+            recordRing(callCount, "stopped");
+            return new JSONObject()
+                    .put("action", "stop")
+                    .put("wasPlaying", wasPlaying)
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        }
+
+        stopAlertSound();
+        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (audio != null) {
+            previousAlarmVolume = audio.getStreamVolume(AudioManager.STREAM_ALARM);
+            audio.setStreamVolume(
+                    AudioManager.STREAM_ALARM,
+                    audio.getStreamMaxVolume(AudioManager.STREAM_ALARM),
+                    0);
+        }
+
+        android.net.Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        if (uri == null) {
+            uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+        }
+        activeRing = uri == null ? null : RingtoneManager.getRingtone(this, uri);
+        if (activeRing == null) {
+            restoreAlarmVolume();
+            return new JSONObject()
+                    .put("action", "start")
+                    .put("playing", false)
+                    .put("error", "No system alarm or ringtone is available")
+                    .put("toolCallCount", callCount);
+        }
+
+        activeRing.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build());
+        activeRing.play();
+        mainHandler.postDelayed(this::stopAlertSound, durationSeconds * 1000L);
+        vibrate();
+        recordRing(callCount, "playing for " + durationSeconds + "s");
+        return new JSONObject()
+                .put("action", "start")
+                .put("playing", true)
+                .put("durationSeconds", durationSeconds)
+                .put("volume", "alarm_max_temporarily")
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
     public JSONObject phoneEcho(String text, long callCount) throws JSONException {
         vibrate();
         String summary = "phone_echo #" + callCount + ": " + abbreviate(text, 80);
@@ -261,6 +325,7 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     private void stopNode() {
         nodeActive = false;
+        stopAlertSound();
         if (server != null) {
             server.stop();
             server = null;
@@ -330,6 +395,38 @@ public final class McpNodeService extends Service implements McpToolActions {
         if (vibrator != null && vibrator.hasVibrator()) {
             vibrator.vibrate(VibrationEffect.createOneShot(120L, VibrationEffect.DEFAULT_AMPLITUDE));
         }
+    }
+
+    private synchronized void stopAlertSound() {
+        mainHandler.removeCallbacksAndMessages(null);
+        if (activeRing != null) {
+            try {
+                activeRing.stop();
+            } catch (Exception ignored) {
+            }
+            activeRing = null;
+        }
+        restoreAlarmVolume();
+    }
+
+    private void restoreAlarmVolume() {
+        if (previousAlarmVolume < 0) {
+            return;
+        }
+        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (audio != null) {
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, previousAlarmVolume, 0);
+        }
+        previousAlarmVolume = -1;
+    }
+
+    private void recordRing(long callCount, String state) {
+        String summary = "phone_ring #" + callCount + ": " + state;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(KEY_RECENT, summary + "\n" + Instant.now())
+                .putLong(KEY_CALL_COUNT, callCount)
+                .apply();
+        updateNotification(summary);
     }
 
     private static String findLanAddress() {

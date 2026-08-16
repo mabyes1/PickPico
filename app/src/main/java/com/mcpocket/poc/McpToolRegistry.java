@@ -80,6 +80,34 @@ final class McpToolRegistry {
                 });
 
         register(
+                "phone_ring",
+                "Play a temporary audible ring on the Android phone, or stop it early.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("action", new JSONObject()
+                                        .put("type", "string")
+                                        .put("enum", new JSONArray().put("start").put("stop"))
+                                        .put("default", "start"))
+                                .put("durationSeconds", new JSONObject()
+                                        .put("type", "integer")
+                                        .put("minimum", 5)
+                                        .put("maximum", 60)
+                                        .put("default", 20)))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> {
+                    String action = arguments.optString("action", "start");
+                    if (!"start".equals(action) && !"stop".equals(action)) {
+                        throw new ToolInputException("phone_ring action must be start or stop");
+                    }
+                    int durationSeconds = arguments.optInt("durationSeconds", 20);
+                    if (durationSeconds < 5 || durationSeconds > 60) {
+                        throw new ToolInputException("phone_ring durationSeconds must be between 5 and 60");
+                    }
+                    return actions.phoneRing(action, durationSeconds, callCount);
+                });
+
+        register(
                 "phone_echo",
                 "Echo text on the Android node, vibrate the phone briefly, and update its foreground notification.",
                 new JSONObject()

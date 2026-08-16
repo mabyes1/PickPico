@@ -52,6 +52,14 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject phoneRing(String action, int durationSeconds, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("action", action)
+                        .put("durationSeconds", durationSeconds)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject phoneEcho(String text, long callCount) throws org.json.JSONException {
                 echoed.set(text);
                 return new JSONObject().put("echo", text).put("toolCallCount", callCount);
