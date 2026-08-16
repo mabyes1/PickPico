@@ -44,6 +44,14 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject phoneExec(String command, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("command", command)
+                        .put("exitCode", 0)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject phoneEcho(String text, long callCount) throws org.json.JSONException {
                 echoed.set(text);
                 return new JSONObject().put("echo", text).put("toolCallCount", callCount);
@@ -108,6 +116,28 @@ public final class McpHttpServerTest {
                 .getJSONObject("structuredContent")
                 .getJSONObject("battery")
                 .getInt("percent"));
+    }
+
+    @Test
+    public void phoneExecOnlyAcceptsAllowlistedCommandIds() throws Exception {
+        HttpResult accepted = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"phone_exec\",\"arguments\":{\"command\":\"identity\"}}}",
+                authorizedHeaders());
+        assertEquals(200, accepted.status);
+        assertEquals("identity", new JSONObject(accepted.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getString("command"));
+
+        HttpResult rejected = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"phone_exec\",\"arguments\":{\"command\":\"rm_everything\"}}}",
+                authorizedHeaders());
+        assertEquals(200, rejected.status);
+        assertTrue(new JSONObject(rejected.body)
+                .getJSONObject("result")
+                .getBoolean("isError"));
     }
 
     @Test

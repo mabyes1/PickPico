@@ -4,11 +4,17 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** Pure-Java registry for MCP tool metadata, validation, and dispatch. */
 final class McpToolRegistry {
+    private static final Set<String> PHONE_EXEC_COMMANDS = new HashSet<>(Arrays.asList(
+            "identity", "kernel", "model_property", "data_disk"));
+
     private interface Handler {
         JSONObject call(JSONObject arguments, long callCount) throws JSONException;
     }
@@ -48,6 +54,30 @@ final class McpToolRegistry {
                 "Return a live Android phone snapshot including battery, network, storage, and node state.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> actions.phoneStatus(callCount));
+
+        register(
+                "phone_exec",
+                "Run one predefined diagnostic process on the Android phone. Free-form shell and arguments are not accepted.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("command", new JSONObject()
+                                        .put("type", "string")
+                                        .put("enum", new JSONArray()
+                                                .put("identity")
+                                                .put("kernel")
+                                                .put("model_property")
+                                                .put("data_disk"))
+                                        .put("description", "Predefined diagnostic command to execute.")))
+                        .put("required", new JSONArray().put("command"))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> {
+                    String command = arguments.optString("command", "");
+                    if (!PHONE_EXEC_COMMANDS.contains(command)) {
+                        throw new ToolInputException("phone_exec command is not allowlisted: " + command);
+                    }
+                    return actions.phoneExec(command, callCount);
+                });
 
         register(
                 "phone_echo",

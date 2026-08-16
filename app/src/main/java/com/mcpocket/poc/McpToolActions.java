@@ -9,5 +9,7 @@ interface McpToolActions {
 
     JSONObject phoneStatus(long callCount) throws JSONException;
 
+    JSONObject phoneExec(String command, long callCount) throws JSONException;
+
     JSONObject phoneEcho(String text, long callCount) throws JSONException;
 }

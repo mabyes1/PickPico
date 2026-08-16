@@ -24,10 +24,16 @@ import android.text.TextUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
@@ -129,7 +135,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.2.0")
+                .put("version", "0.3.0")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
@@ -175,6 +181,65 @@ public final class McpNodeService extends Service implements McpToolActions {
                         .put("endpoint", endpoint)
                         .put("uptimeSeconds", uptimeMs / 1000L)
                         .put("toolCallCount", callCount));
+    }
+
+    @Override
+    public JSONObject phoneExec(String command, long callCount) throws JSONException {
+        List<String> argv = commandArgv(command);
+        if (argv == null) {
+            return new JSONObject()
+                    .put("command", command)
+                    .put("executed", false)
+                    .put("error", "Command is not allowlisted")
+                    .put("toolCallCount", callCount);
+        }
+
+        long started = SystemClock.elapsedRealtime();
+        Process process = null;
+        try {
+            process = new ProcessBuilder(argv)
+                    .redirectErrorStream(true)
+                    .start();
+            boolean finished = process.waitFor(3, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                recordExec(command, callCount, "timed out");
+                return new JSONObject()
+                        .put("command", command)
+                        .put("argv", new org.json.JSONArray(argv))
+                        .put("executed", true)
+                        .put("timedOut", true)
+                        .put("durationMs", SystemClock.elapsedRealtime() - started)
+                        .put("toolCallCount", callCount);
+            }
+
+            String output = readProcessOutput(process.getInputStream(), 32 * 1024);
+            int exitCode = process.exitValue();
+            recordExec(command, callCount, "exit " + exitCode);
+            return new JSONObject()
+                    .put("command", command)
+                    .put("argv", new org.json.JSONArray(argv))
+                    .put("executed", true)
+                    .put("timedOut", false)
+                    .put("exitCode", exitCode)
+                    .put("stdout", output)
+                    .put("durationMs", SystemClock.elapsedRealtime() - started)
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        } catch (Exception error) {
+            recordExec(command, callCount, error.getClass().getSimpleName());
+            return new JSONObject()
+                    .put("command", command)
+                    .put("argv", new org.json.JSONArray(argv))
+                    .put("executed", false)
+                    .put("error", error.getClass().getSimpleName() + ": " + error.getMessage())
+                    .put("durationMs", SystemClock.elapsedRealtime() - started)
+                    .put("toolCallCount", callCount);
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+        }
     }
 
     @Override
@@ -320,6 +385,49 @@ public final class McpNodeService extends Service implements McpToolActions {
             return "bluetooth";
         }
         return "other";
+    }
+
+    private static List<String> commandArgv(String command) {
+        switch (command) {
+            case "identity":
+                return Collections.singletonList("/system/bin/id");
+            case "kernel":
+                return Arrays.asList("/system/bin/uname", "-a");
+            case "model_property":
+                return Arrays.asList("/system/bin/getprop", "ro.product.model");
+            case "data_disk":
+                return Arrays.asList("/system/bin/df", "-h", "/data");
+            default:
+                return null;
+        }
+    }
+
+    private void recordExec(String command, long callCount, String result) {
+        String summary = "phone_exec #" + callCount + ": " + command + " (" + result + ")";
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(KEY_RECENT, summary + "\n" + Instant.now())
+                .putLong(KEY_CALL_COUNT, callCount)
+                .apply();
+        updateNotification(summary);
+    }
+
+    private static String readProcessOutput(InputStream input, int maxBytes) throws Exception {
+        try (InputStream closeable = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int total = 0;
+            int read;
+            while ((read = closeable.read(buffer)) >= 0) {
+                int accepted = Math.min(read, maxBytes - total);
+                if (accepted > 0) {
+                    output.write(buffer, 0, accepted);
+                    total += accepted;
+                }
+                if (total >= maxBytes) {
+                    break;
+                }
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
+        }
     }
 
     private static String abbreviate(String value, int maxLength) {
