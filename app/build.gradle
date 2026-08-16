@@ -6,12 +6,18 @@ android {
     namespace 'com.mcpocket.poc'
     compileSdk 35
 
+    signingConfigs {
+        debug {
+            storeFile file('C:/Users/ken/.android/debug.keystore')
+        }
+    }
+
     defaultConfig {
         applicationId 'com.mcpocket.poc'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '0.4.0'
+        versionCode 6
+        versionName '0.4.2'
     }
 
     buildTypes {

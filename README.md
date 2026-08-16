@@ -36,3 +36,16 @@ Debug APK:
 4. List tools, call `server_info`, then call `phone_echo` with `{ "text": "hello phone" }`.
 
 The node rejects requests without its bearer token and rejects non-loopback browser origins.
+
+## ADB development bridge
+
+Debug builds expose a tiny smoke-test bridge protected by Android's `DUMP` permission. Ordinary
+third-party apps cannot invoke it, release builds ignore it, and the MCP HTTP authentication path
+is unchanged. It exists so local development tools can trigger observable actions without copying
+the node credential through terminal arguments.
+
+```powershell
+pwsh scripts/phone-find.ps1
+pwsh scripts/phone-find.ps1 -DurationSeconds 30
+pwsh scripts/phone-find.ps1 -Stop
+```
