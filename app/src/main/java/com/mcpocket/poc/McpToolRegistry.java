@@ -4,17 +4,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /** Pure-Java registry for MCP tool metadata, validation, and dispatch. */
 final class McpToolRegistry {
-    private static final Set<String> PHONE_EXEC_COMMANDS = new HashSet<>(Arrays.asList(
-            "identity", "kernel", "model_property", "data_disk"));
-
     private interface Handler {
         JSONObject call(JSONObject arguments, long callCount) throws JSONException;
     }
@@ -43,17 +37,54 @@ final class McpToolRegistry {
     private final Map<String, Tool> tools = new LinkedHashMap<>();
 
     McpToolRegistry(McpToolActions actions) throws JSONException {
+        CommandRuntime runtime = new CommandRuntime(actions);
+
+        register(
+                "command_list",
+                "List capability-oriented commands exposed by the MCPocket command runtime.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> runtime.list());
+
+        register(
+                "command_run",
+                "Run one MCPocket command by capability ID with structured JSON arguments.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("commandId", new JSONObject()
+                                        .put("type", "string")
+                                        .put("enum", runtime.commandIds()))
+                                .put("arguments", new JSONObject()
+                                        .put("type", "object")
+                                        .put("default", new JSONObject())))
+                        .put("required", new JSONArray().put("commandId"))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> runtime.run(
+                        arguments.optString("commandId", ""),
+                        arguments.optJSONObject("arguments"),
+                        callCount));
+
+        register(
+                "command_status",
+                "Return one command execution by ID, or the recent in-memory execution history.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("executionId", new JSONObject().put("type", "string")))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> runtime.status(arguments.optString("executionId", "")));
+
         register(
                 "server_info",
                 "Return safe MCPocket node, Android device, endpoint, uptime, and call-count information.",
                 noArgumentsSchema(),
-                (arguments, callCount) -> actions.serverInfo(callCount));
+                (arguments, callCount) -> runtime.execute("node.info", arguments, callCount));
 
         register(
                 "phone_status",
                 "Return a live Android phone snapshot including battery, network, storage, and node state.",
                 noArgumentsSchema(),
-                (arguments, callCount) -> actions.phoneStatus(callCount));
+                (arguments, callCount) -> runtime.execute("phone.status", arguments, callCount));
 
         register(
                 "phone_exec",
@@ -72,11 +103,7 @@ final class McpToolRegistry {
                         .put("required", new JSONArray().put("command"))
                         .put("additionalProperties", false),
                 (arguments, callCount) -> {
-                    String command = arguments.optString("command", "");
-                    if (!PHONE_EXEC_COMMANDS.contains(command)) {
-                        throw new ToolInputException("phone_exec command is not allowlisted: " + command);
-                    }
-                    return actions.phoneExec(command, callCount);
+                    return runtime.execute("process.run", arguments, callCount);
                 });
 
         register(
@@ -96,15 +123,7 @@ final class McpToolRegistry {
                                         .put("default", 20)))
                         .put("additionalProperties", false),
                 (arguments, callCount) -> {
-                    String action = arguments.optString("action", "start");
-                    if (!"start".equals(action) && !"stop".equals(action)) {
-                        throw new ToolInputException("phone_ring action must be start or stop");
-                    }
-                    int durationSeconds = arguments.optInt("durationSeconds", 20);
-                    if (durationSeconds < 5 || durationSeconds > 60) {
-                        throw new ToolInputException("phone_ring durationSeconds must be between 5 and 60");
-                    }
-                    return actions.phoneRing(action, durationSeconds, callCount);
+                    return runtime.execute("phone.ring", arguments, callCount);
                 });
 
         register(
@@ -121,14 +140,7 @@ final class McpToolRegistry {
                         .put("required", new JSONArray().put("text"))
                         .put("additionalProperties", false),
                 (arguments, callCount) -> {
-                    String text = arguments.optString("text", "");
-                    if (text.isEmpty()) {
-                        throw new ToolInputException("phone_echo requires a non-empty text argument");
-                    }
-                    if (text.length() > 512) {
-                        throw new ToolInputException("phone_echo text is limited to 512 characters");
-                    }
-                    return actions.phoneEcho(text, callCount);
+                    return runtime.execute("phone.echo", arguments, callCount);
                 });
     }
 
@@ -165,7 +177,7 @@ final class McpToolRegistry {
                             .put("text", structured.toString(2))))
                     .put("structuredContent", structured)
                     .put("isError", false);
-        } catch (ToolInputException error) {
+        } catch (ToolInputException | CommandRuntime.CommandInputException error) {
             return toolError(error.getMessage(), modern);
         }
     }

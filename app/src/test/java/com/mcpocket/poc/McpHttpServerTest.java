@@ -149,6 +149,60 @@ public final class McpHttpServerTest {
     }
 
     @Test
+    public void commandRuntimeListsRunsAndTracksExecutions() throws Exception {
+        HttpResult list = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":20,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_list\",\"arguments\":{}}}",
+                authorizedHeaders());
+        assertEquals(200, list.status);
+        JSONObject listed = new JSONObject(list.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(5, listed.getInt("count"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("process.run"));
+
+        HttpResult run = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":21,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"phone.ring\",\"arguments\":{\"durationSeconds\":10}}}}",
+                authorizedHeaders());
+        assertEquals(200, run.status);
+        JSONObject execution = new JSONObject(run.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals("phone.ring", execution.getString("commandId"));
+        assertEquals("completed", execution.getString("status"));
+        assertEquals("start", execution.getJSONObject("result").getString("action"));
+        String executionId = execution.getString("executionId");
+
+        HttpResult status = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":22,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_status\",\"arguments\":{" +
+                        "\"executionId\":\"" + executionId + "\"}}}",
+                authorizedHeaders());
+        assertEquals(200, status.status);
+        JSONObject tracked = new JSONObject(status.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(executionId, tracked.getString("executionId"));
+        assertEquals("completed", tracked.getString("status"));
+    }
+
+    @Test
+    public void commandRuntimeRejectsUnknownCommands() throws Exception {
+        HttpResult rejected = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":23,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"phone.explode\",\"arguments\":{}}}}",
+                authorizedHeaders());
+        assertEquals(200, rejected.status);
+        assertTrue(new JSONObject(rejected.body)
+                .getJSONObject("result")
+                .getBoolean("isError"));
+    }
+
+    @Test
     public void enforcesModernRoutingHeadersAndDiscoversServer() throws Exception {
         Map<String, String> missingMethod = authorizedHeaders();
         missingMethod.put("MCP-Protocol-Version", "2026-07-28");

@@ -13,7 +13,7 @@ final class McpProtocol {
     static final String MODERN_VERSION = "2026-07-28";
     private static final String DEFAULT_LEGACY_VERSION = "2025-11-25";
     private static final String SERVER_NAME = "MCPocket";
-    private static final String SERVER_VERSION = "0.4.2";
+    private static final String SERVER_VERSION = "0.5.0";
     private static final String SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
     private static final Set<String> LEGACY_VERSIONS = new HashSet<>(Arrays.asList(
             "2025-11-25", "2025-06-18", "2025-03-26"));
