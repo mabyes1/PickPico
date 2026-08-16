@@ -21,12 +21,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 final class McpHttpServer {
-    interface ToolActions {
-        JSONObject serverInfo(long callCount) throws JSONException;
-
-        JSONObject phoneEcho(String text, long callCount) throws JSONException;
-    }
-
     private static final int MAX_BODY_BYTES = 64 * 1024;
     private static final int MAX_LINE_BYTES = 8 * 1024;
     private static final int SOCKET_TIMEOUT_MS = 10_000;
@@ -40,7 +34,7 @@ final class McpHttpServer {
     private ServerSocket serverSocket;
     private Thread acceptThread;
 
-    McpHttpServer(int port, String token, ToolActions actions) {
+    McpHttpServer(int port, String token, McpToolActions actions) throws JSONException {
         this.port = port;
         this.token = token;
         this.protocol = new McpProtocol(actions, callCount);

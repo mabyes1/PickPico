@@ -70,7 +70,7 @@ public final class MainActivity extends Activity {
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
 
-        TextView title = text("MCPocket POC", 28, Typeface.BOLD);
+        TextView title = text("MCPocket", 28, Typeface.BOLD);
         root.addView(title);
         TextView subtitle = text("Android as a portable MCP execution node", 15, Typeface.NORMAL);
         subtitle.setTextColor(Color.DKGRAY);
@@ -116,8 +116,8 @@ public final class MainActivity extends Activity {
         root.addView(recentView);
 
         TextView note = text(
-                "phone_echo is intentionally allowlisted: it returns text, vibrates the phone, " +
-                        "and updates the foreground notification. No arbitrary shell is exposed.",
+                "This build exposes only explicit phone capabilities. phone_status is read-only; " +
+                        "phone_echo is observable and allowlisted. No arbitrary shell is exposed yet.",
                 13,
                 Typeface.NORMAL);
         note.setTextColor(Color.DKGRAY);

@@ -30,10 +30,17 @@ public final class McpHttpServerTest {
         try (ServerSocket reservation = new ServerSocket(0)) {
             port = reservation.getLocalPort();
         }
-        server = new McpHttpServer(port, TOKEN, new McpHttpServer.ToolActions() {
+        server = new McpHttpServer(port, TOKEN, new McpToolActions() {
             @Override
             public JSONObject serverInfo(long callCount) throws org.json.JSONException {
                 return new JSONObject().put("name", "test-node").put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject phoneStatus(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("battery", new JSONObject().put("percent", 80))
+                        .put("toolCallCount", callCount);
             }
 
             @Override
@@ -77,6 +84,30 @@ public final class McpHttpServerTest {
                 .getJSONObject("result")
                 .getJSONObject("structuredContent")
                 .getString("echo"));
+    }
+
+    @Test
+    public void listsAndCallsPhoneStatus() throws Exception {
+        HttpResult list = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/list\"}",
+                authorizedHeaders());
+        assertEquals(200, list.status);
+        assertTrue(new JSONObject(list.body)
+                .getJSONObject("result")
+                .getJSONArray("tools")
+                .toString()
+                .contains("phone_status"));
+
+        HttpResult status = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"phone_status\",\"arguments\":{}}}",
+                authorizedHeaders());
+        assertEquals(200, status.status);
+        assertEquals(80, new JSONObject(status.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getJSONObject("battery")
+                .getInt("percent"));
     }
 
     @Test

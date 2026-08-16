@@ -1,16 +1,17 @@
-# MCPocket POC
+# MCPocket
 
 MCPocket turns an Android phone into a manually controlled MCP execution node.
 
-## Scope
+## Current milestone
 
 - Start and stop a foreground MCP node from the app.
 - Serve Streamable HTTP on `http://<phone-ip>:8765/mcp`.
 - Authenticate every MCP POST with a per-start bearer token.
-- Expose `server_info` and the observable, allowlisted `phone_echo` action.
+- Expose `server_info`, read-only `phone_status`, and the observable, allowlisted `phone_echo` action.
 - Support the legacy initialize flow and the MCP `2026-07-28` stateless discovery flow.
+- Keep MCP protocol/transport separate from Android tool implementations through a tool registry.
 
-Arbitrary shell execution, ADB, FYT, Git, SSH, discovery, TLS, and UI polish are intentionally out of scope.
+Arbitrary shell execution, ADB, FYT, Git, SSH, discovery, TLS, and UI polish are not implemented yet.
 
 ## Build
 

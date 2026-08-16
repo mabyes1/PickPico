@@ -13,16 +13,16 @@ final class McpProtocol {
     static final String MODERN_VERSION = "2026-07-28";
     private static final String DEFAULT_LEGACY_VERSION = "2025-11-25";
     private static final String SERVER_NAME = "MCPocket";
-    private static final String SERVER_VERSION = "0.1.0";
+    private static final String SERVER_VERSION = "0.2.0";
     private static final String SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
     private static final Set<String> LEGACY_VERSIONS = new HashSet<>(Arrays.asList(
             "2025-11-25", "2025-06-18", "2025-03-26"));
 
-    private final McpHttpServer.ToolActions actions;
+    private final McpToolRegistry tools;
     private final AtomicLong callCount;
 
-    McpProtocol(McpHttpServer.ToolActions actions, AtomicLong callCount) {
-        this.actions = actions;
+    McpProtocol(McpToolActions actions, AtomicLong callCount) throws JSONException {
+        this.tools = new McpToolRegistry(actions);
         this.callCount = callCount;
     }
 
@@ -98,78 +98,12 @@ final class McpProtocol {
     }
 
     private JSONObject listTools(boolean modern) throws JSONException {
-        JSONArray tools = new JSONArray()
-                .put(new JSONObject()
-                        .put("name", "server_info")
-                        .put("description", "Return safe MCPocket node, Android device, endpoint, uptime, and call-count information.")
-                        .put("inputSchema", new JSONObject()
-                                .put("type", "object")
-                                .put("properties", new JSONObject())
-                                .put("additionalProperties", false)))
-                .put(new JSONObject()
-                        .put("name", "phone_echo")
-                        .put("description",
-                                "Echo text on the Android node, vibrate the phone briefly, and update its foreground notification.")
-                        .put("inputSchema", new JSONObject()
-                                .put("type", "object")
-                                .put("properties", new JSONObject()
-                                        .put("text", new JSONObject()
-                                                .put("type", "string")
-                                                .put("minLength", 1)
-                                                .put("maxLength", 512)
-                                                .put("description", "Text to echo on the phone.")))
-                                .put("required", new JSONArray().put("text"))
-                                .put("additionalProperties", false)));
-        JSONObject result = new JSONObject().put("tools", tools);
-        if (modern) {
-            result.put("ttlMs", 0).put("cacheScope", "private");
-        }
-        return result;
+        return tools.list(modern);
     }
 
     private JSONObject callTool(JSONObject params, boolean modern) throws JSONException {
-        if (params == null) {
-            return toolError("Missing tool parameters", modern);
-        }
-        String name = params.optString("name", "");
-        JSONObject arguments = params.optJSONObject("arguments");
-        if (arguments == null) {
-            arguments = new JSONObject();
-        }
         long currentCall = callCount.incrementAndGet();
-        JSONObject structured;
-        if ("server_info".equals(name)) {
-            structured = actions.serverInfo(currentCall);
-        } else if ("phone_echo".equals(name)) {
-            String text = arguments.optString("text", "");
-            if (text.isEmpty()) {
-                return toolError("phone_echo requires a non-empty text argument", modern);
-            }
-            if (text.length() > 512) {
-                return toolError("phone_echo text is limited to 512 characters", modern);
-            }
-            structured = actions.phoneEcho(text, currentCall);
-        } else {
-            return toolError("Unknown tool: " + name, modern);
-        }
-        return new JSONObject()
-                .put("content", new JSONArray().put(new JSONObject()
-                        .put("type", "text")
-                        .put("text", structured.toString(2))))
-                .put("structuredContent", structured)
-                .put("isError", false);
-    }
-
-    private static JSONObject toolError(String message, boolean modern) throws JSONException {
-        JSONObject result = new JSONObject()
-                .put("content", new JSONArray().put(new JSONObject()
-                        .put("type", "text")
-                        .put("text", message)))
-                .put("isError", true);
-        if (modern) {
-            decorateModern(result);
-        }
-        return result;
+        return tools.call(params, modern, currentCall);
     }
 
     private static JSONObject capabilities() throws JSONException {
@@ -180,7 +114,7 @@ final class McpProtocol {
         return new JSONObject().put("name", SERVER_NAME).put("version", SERVER_VERSION);
     }
 
-    private static void decorateModern(JSONObject result) throws JSONException {
+    static void decorateModern(JSONObject result) throws JSONException {
         if (!result.has("resultType")) {
             result.put("resultType", "complete");
         }

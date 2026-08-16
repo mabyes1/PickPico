@@ -8,8 +8,14 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
+import android.os.StatFs;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -23,7 +29,7 @@ import java.net.NetworkInterface;
 import java.time.Instant;
 import java.util.Collections;
 
-public final class McpNodeService extends Service implements McpHttpServer.ToolActions {
+public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String EXTRA_TOKEN = "token";
@@ -123,13 +129,52 @@ public final class McpNodeService extends Service implements McpHttpServer.ToolA
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.1.0")
+                .put("version", "0.2.0")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
                 .put("endpoint", endpoint)
                 .put("uptimeSeconds", uptimeMs / 1000L)
                 .put("toolCallCount", callCount);
+    }
+
+    @Override
+    public JSONObject phoneStatus(long callCount) throws JSONException {
+        long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
+        BatteryManager battery = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        int batteryPercent = battery == null
+                ? -1
+                : battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        ConnectivityManager connectivity = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        Network activeNetwork = connectivity == null ? null : connectivity.getActiveNetwork();
+        NetworkCapabilities capabilities = connectivity == null || activeNetwork == null
+                ? null
+                : connectivity.getNetworkCapabilities(activeNetwork);
+
+        StatFs storage = new StatFs(getFilesDir().getAbsolutePath());
+        return new JSONObject()
+                .put("device", new JSONObject()
+                        .put("manufacturer", Build.MANUFACTURER)
+                        .put("model", Build.MODEL)
+                        .put("androidRelease", Build.VERSION.RELEASE)
+                        .put("apiLevel", Build.VERSION.SDK_INT))
+                .put("battery", new JSONObject()
+                        .put("percent", batteryPercent)
+                        .put("charging", battery != null && battery.isCharging())
+                        .put("powerSaveMode", power != null && power.isPowerSaveMode()))
+                .put("network", new JSONObject()
+                        .put("transport", activeTransport(capabilities))
+                        .put("ipv4", findLanAddress())
+                        .put("metered", connectivity != null && connectivity.isActiveNetworkMetered()))
+                .put("storage", new JSONObject()
+                        .put("appDataFreeBytes", storage.getAvailableBytes())
+                        .put("appDataTotalBytes", storage.getTotalBytes()))
+                .put("node", new JSONObject()
+                        .put("endpoint", endpoint)
+                        .put("uptimeSeconds", uptimeMs / 1000L)
+                        .put("toolCallCount", callCount));
     }
 
     @Override
@@ -253,6 +298,28 @@ public final class McpNodeService extends Service implements McpHttpServer.ToolA
             return siteLocalFallback;
         }
         return publicFallback == null ? "127.0.0.1" : publicFallback;
+    }
+
+    private static String activeTransport(NetworkCapabilities capabilities) {
+        if (capabilities == null) {
+            return "none";
+        }
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            return "wifi";
+        }
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+            return "ethernet";
+        }
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+            return "cellular";
+        }
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+            return "vpn";
+        }
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)) {
+            return "bluetooth";
+        }
+        return "other";
     }
 
     private static String abbreviate(String value, int maxLength) {
