@@ -75,6 +75,12 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.status(arguments.optString("executionId", "")));
 
         register(
+                "exec_command",
+                "Execute a Linux shell command inside MCPocket's Android app sandbox with optional cwd, env, stdin, timeout, and output limits.",
+                CommandRuntime.execCommandSchema(),
+                (arguments, callCount) -> runtime.execute("process.exec", arguments, callCount));
+
+        register(
                 "server_info",
                 "Return safe MCPocket node, Android device, endpoint, uptime, and call-count information.",
                 noArgumentsSchema(),

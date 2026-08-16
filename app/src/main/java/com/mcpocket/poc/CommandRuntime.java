@@ -6,6 +6,7 @@ import org.json.JSONObject;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
@@ -176,6 +177,18 @@ final class CommandRuntime {
                     }
                     return actions.phoneExec(command, callCount);
                 });
+
+        register(
+                "process.exec",
+                "Execute a Linux shell command inside MCPocket's Android app sandbox.",
+                "process",
+                "arbitrary_process",
+                true,
+                execCommandSchema(),
+                (arguments, callCount) -> {
+                    validateExecArguments(arguments);
+                    return actions.execCommand(arguments, callCount);
+                });
     }
 
     JSONObject list() throws JSONException {
@@ -286,6 +299,92 @@ final class CommandRuntime {
                 .put("type", "object")
                 .put("properties", new JSONObject())
                 .put("additionalProperties", false);
+    }
+
+    static JSONObject execCommandSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("command", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 8192)
+                                .put("description", "Shell command executed by /system/bin/sh -c."))
+                        .put("cwd", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 1024)
+                                .put("description", "Optional working directory visible to the MCPocket app sandbox."))
+                        .put("env", new JSONObject()
+                                .put("type", "object")
+                                .put("additionalProperties", new JSONObject().put("type", "string"))
+                                .put("description", "Optional environment variables added or overridden for the process."))
+                        .put("stdin", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 65536)
+                                .put("description", "Optional UTF-8 stdin payload."))
+                        .put("timeoutMs", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 100)
+                                .put("maximum", 120000)
+                                .put("default", 30000))
+                        .put("maxOutputBytes", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1024)
+                                .put("maximum", 262144)
+                                .put("default", 65536)))
+                .put("required", new JSONArray().put("command"))
+                .put("additionalProperties", false);
+    }
+
+    private static void validateExecArguments(JSONObject arguments) {
+        String command = arguments.optString("command", "");
+        if (command.isEmpty()) {
+            throw new CommandInputException("process.exec requires a non-empty command");
+        }
+        if (command.length() > 8192) {
+            throw new CommandInputException("process.exec command is limited to 8192 characters");
+        }
+
+        String cwd = arguments.optString("cwd", "");
+        if (cwd.length() > 1024) {
+            throw new CommandInputException("process.exec cwd is limited to 1024 characters");
+        }
+
+        String stdin = arguments.optString("stdin", "");
+        if (stdin.length() > 65536) {
+            throw new CommandInputException("process.exec stdin is limited to 65536 characters");
+        }
+
+        int timeoutMs = arguments.optInt("timeoutMs", 30000);
+        if (timeoutMs < 100 || timeoutMs > 120000) {
+            throw new CommandInputException("process.exec timeoutMs must be between 100 and 120000");
+        }
+
+        int maxOutputBytes = arguments.optInt("maxOutputBytes", 65536);
+        if (maxOutputBytes < 1024 || maxOutputBytes > 262144) {
+            throw new CommandInputException("process.exec maxOutputBytes must be between 1024 and 262144");
+        }
+
+        JSONObject env = arguments.optJSONObject("env");
+        if (env != null) {
+            if (env.length() > 64) {
+                throw new CommandInputException("process.exec env is limited to 64 variables");
+            }
+            Iterator<String> keys = env.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                Object value = env.opt(key);
+                if (key.isEmpty() || key.length() > 128) {
+                    throw new CommandInputException("process.exec env keys must be 1-128 characters");
+                }
+                if (!(value instanceof String)) {
+                    throw new CommandInputException("process.exec env values must be strings");
+                }
+                if (((String) value).length() > 4096) {
+                    throw new CommandInputException("process.exec env values are limited to 4096 characters");
+                }
+            }
+        }
     }
 
     static final class CommandInputException extends RuntimeException {

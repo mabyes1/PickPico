@@ -11,6 +11,8 @@ interface McpToolActions {
 
     JSONObject phoneExec(String command, long callCount) throws JSONException;
 
+    JSONObject execCommand(JSONObject arguments, long callCount) throws JSONException;
+
     JSONObject phoneRing(String action, int durationSeconds, long callCount) throws JSONException;
 
     JSONObject phoneLock(long callCount) throws JSONException;

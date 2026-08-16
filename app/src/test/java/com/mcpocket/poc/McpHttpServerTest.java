@@ -52,6 +52,15 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject execCommand(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("command", arguments.optString("command", ""))
+                        .put("stdout", "stub-output")
+                        .put("exitCode", 0)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject phoneRing(String action, int durationSeconds, long callCount) throws org.json.JSONException {
                 return new JSONObject()
                         .put("action", action)
@@ -166,10 +175,11 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(6, listed.getInt("count"));
+        assertEquals(7, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.run"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("process.exec"));
 
         HttpResult run = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":21,\"method\":\"tools/call\"," +
@@ -224,6 +234,37 @@ public final class McpHttpServerTest {
                 .getJSONObject("structuredContent");
         assertEquals("phone.lock", execution.getString("commandId"));
         assertTrue(execution.getJSONObject("result").getBoolean("locked"));
+    }
+
+    @Test
+    public void execCommandToolDelegatesToGeneralProcessExec() throws Exception {
+        HttpResult exec = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"exec_command\",\"arguments\":{" +
+                        "\"command\":\"printf hello\",\"timeoutMs\":5000," +
+                        "\"env\":{\"MCP_TEST\":\"yes\"}}}}",
+                authorizedHeaders());
+        assertEquals(200, exec.status);
+        JSONObject result = new JSONObject(exec.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals("printf hello", result.getString("command"));
+        assertEquals("stub-output", result.getString("stdout"));
+        assertEquals(0, result.getInt("exitCode"));
+    }
+
+    @Test
+    public void processExecRejectsInvalidExecutionLimits() throws Exception {
+        HttpResult rejected = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":26,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"process.exec\",\"arguments\":{" +
+                        "\"command\":\"echo nope\",\"timeoutMs\":999999}}}}",
+                authorizedHeaders());
+        assertEquals(200, rejected.status);
+        assertTrue(new JSONObject(rejected.body)
+                .getJSONObject("result")
+                .getBoolean("isError"));
     }
 
     @Test

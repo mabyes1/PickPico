@@ -20,17 +20,26 @@ Current command IDs:
 - `phone.lock` (requires one-time Device Admin opt-in)
 - `phone.echo`
 - `process.run` (predefined diagnostics only)
+- `process.exec` (general Linux shell execution inside the MCPocket app sandbox)
+
+MCP also exposes `exec_command` as a direct convenience tool for `process.exec`. It executes through
+`/system/bin/sh -c` and supports optional `cwd`, `env`, `stdin`, `timeoutMs`, and `maxOutputBytes`.
+Results keep `stdout` and `stderr` separate and report exit code, timeout, duration, and output truncation.
+
+`process.exec` is intentionally powerful but it does not escape Android's app sandbox. Commands run
+as the MCPocket app UID, not as ADB shell, root, or the Android system user.
 
 The older phone-specific MCP tools remain available for compatibility, but they execute through the
 same command runtime. New capabilities should be added as commands rather than wiring new behavior
 directly into the HTTP/MCP transport layer.
 
-`phone_exec` only accepts predefined diagnostic command IDs; it does not accept a shell string or arbitrary arguments.
+`phone_exec` remains the legacy restricted diagnostic tool. New general Linux command execution should
+use `exec_command` or `command_run` with `process.exec`.
 
 `phone.lock` never attempts to elevate itself. Until the user explicitly enables MCPocket's
 force-lock Device Admin policy in the Android system UI, the command returns `requiresSetup=true`.
 
-Arbitrary shell execution, ADB, FYT, Git, SSH, discovery, remote relay, TLS, and UI polish are not implemented yet.
+ADB, FYT, Git tooling, SSH, discovery, remote relay, TLS, and UI polish are not implemented yet.
 
 ## Build
 

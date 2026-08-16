@@ -33,13 +33,17 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -147,7 +151,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.6.0")
+                .put("version", "0.7.0")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
@@ -250,6 +254,111 @@ public final class McpNodeService extends Service implements McpToolActions {
         } finally {
             if (process != null) {
                 process.destroy();
+            }
+        }
+    }
+
+    @Override
+    public JSONObject execCommand(JSONObject arguments, long callCount) throws JSONException {
+        String command = arguments.optString("command", "");
+        String cwd = arguments.optString("cwd", "");
+        String stdin = arguments.optString("stdin", "");
+        int timeoutMs = arguments.optInt("timeoutMs", 30000);
+        int maxOutputBytes = arguments.optInt("maxOutputBytes", 65536);
+        JSONObject env = arguments.optJSONObject("env");
+
+        long started = SystemClock.elapsedRealtime();
+        Process process = null;
+        StreamCapture stdoutCapture = null;
+        StreamCapture stderrCapture = null;
+        Thread stdoutThread = null;
+        Thread stderrThread = null;
+        try {
+            ProcessBuilder builder = new ProcessBuilder("/system/bin/sh", "-c", command);
+            if (!cwd.isEmpty()) {
+                File directory = new File(cwd);
+                if (!directory.isDirectory()) {
+                    return execFailure(
+                            command,
+                            cwd,
+                            "Working directory does not exist or is not a directory",
+                            started,
+                            callCount);
+                }
+                builder.directory(directory);
+            }
+
+            if (env != null) {
+                Iterator<String> keys = env.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    builder.environment().put(key, env.getString(key));
+                }
+            }
+
+            process = builder.start();
+            stdoutCapture = new StreamCapture(process.getInputStream(), maxOutputBytes);
+            stderrCapture = new StreamCapture(process.getErrorStream(), maxOutputBytes);
+            stdoutThread = new Thread(stdoutCapture, "mcpocket-exec-stdout");
+            stderrThread = new Thread(stderrCapture, "mcpocket-exec-stderr");
+            stdoutThread.setDaemon(true);
+            stderrThread.setDaemon(true);
+            stdoutThread.start();
+            stderrThread.start();
+
+            try (OutputStream processInput = process.getOutputStream()) {
+                if (!stdin.isEmpty()) {
+                    processInput.write(stdin.getBytes(StandardCharsets.UTF_8));
+                    processInput.flush();
+                }
+            }
+
+            boolean finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
+            boolean timedOut = !finished;
+            if (timedOut) {
+                process.destroyForcibly();
+                process.waitFor(200, TimeUnit.MILLISECONDS);
+                closeQuietly(process.getInputStream());
+                closeQuietly(process.getErrorStream());
+            }
+
+            joinCapture(stdoutThread);
+            joinCapture(stderrThread);
+
+            int exitCode = process.isAlive() ? -1 : process.exitValue();
+            String resultLabel = timedOut ? "timed out" : "exit " + exitCode;
+            recordExec(command, callCount, resultLabel);
+
+            return new JSONObject()
+                    .put("command", command)
+                    .put("shell", "/system/bin/sh")
+                    .put("cwd", cwd.isEmpty() ? JSONObject.NULL : cwd)
+                    .put("executed", true)
+                    .put("timedOut", timedOut)
+                    .put("exitCode", exitCode)
+                    .put("stdout", stdoutCapture == null ? "" : stdoutCapture.text())
+                    .put("stderr", stderrCapture == null ? "" : stderrCapture.text())
+                    .put("stdoutTruncated", stdoutCapture != null && stdoutCapture.truncated())
+                    .put("stderrTruncated", stderrCapture != null && stderrCapture.truncated())
+                    .put("durationMs", SystemClock.elapsedRealtime() - started)
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        } catch (Exception error) {
+            recordExec(command, callCount, error.getClass().getSimpleName());
+            return execFailure(
+                    command,
+                    cwd,
+                    error.getClass().getSimpleName() + ": " + error.getMessage(),
+                    started,
+                    callCount);
+        } finally {
+            if (process != null) {
+                closeQuietly(process.getInputStream());
+                closeQuietly(process.getErrorStream());
+                closeQuietly(process.getOutputStream());
+                if (process.isAlive()) {
+                    process.destroyForcibly();
+                }
             }
         }
     }
@@ -526,12 +635,87 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     private void recordExec(String command, long callCount, String result) {
-        String summary = "phone_exec #" + callCount + ": " + command + " (" + result + ")";
+        String summary = "exec #" + callCount + ": " + abbreviate(command, 80) + " (" + result + ")";
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(KEY_RECENT, summary + "\n" + Instant.now())
                 .putLong(KEY_CALL_COUNT, callCount)
                 .apply();
         updateNotification(summary);
+    }
+
+    private static JSONObject execFailure(
+            String command,
+            String cwd,
+            String error,
+            long started,
+            long callCount) throws JSONException {
+        return new JSONObject()
+                .put("command", command)
+                .put("shell", "/system/bin/sh")
+                .put("cwd", cwd.isEmpty() ? JSONObject.NULL : cwd)
+                .put("executed", false)
+                .put("timedOut", false)
+                .put("error", error)
+                .put("durationMs", SystemClock.elapsedRealtime() - started)
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    private static void joinCapture(Thread thread) throws InterruptedException {
+        if (thread != null) {
+            thread.join(250L);
+        }
+    }
+
+    private static void closeQuietly(java.io.Closeable closeable) {
+        if (closeable == null) {
+            return;
+        }
+        try {
+            closeable.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static final class StreamCapture implements Runnable {
+        private final InputStream input;
+        private final int maxBytes;
+        private final ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        private volatile boolean truncated;
+
+        StreamCapture(InputStream input, int maxBytes) {
+            this.input = input;
+            this.maxBytes = maxBytes;
+        }
+
+        @Override
+        public void run() {
+            byte[] buffer = new byte[4096];
+            try {
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    int remaining = maxBytes - captured.size();
+                    if (remaining > 0) {
+                        int accepted = Math.min(read, remaining);
+                        captured.write(buffer, 0, accepted);
+                        if (accepted < read) {
+                            truncated = true;
+                        }
+                    } else if (read > 0) {
+                        truncated = true;
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }
+
+        String text() {
+            return new String(captured.toByteArray(), StandardCharsets.UTF_8);
+        }
+
+        boolean truncated() {
+            return truncated;
+        }
     }
 
     private static String readProcessOutput(InputStream input, int maxBytes) throws Exception {

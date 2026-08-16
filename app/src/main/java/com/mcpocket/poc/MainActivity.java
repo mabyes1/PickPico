@@ -131,8 +131,8 @@ public final class MainActivity extends Activity {
 
         TextView note = text(
                 "This build exposes only explicit phone capabilities. phone_status is read-only; " +
-                        "phone_exec runs predefined diagnostics only; phone_echo is observable. " +
-                        "No arbitrary shell is exposed yet.",
+                        "phone_exec remains a restricted compatibility tool; exec_command runs Linux shell " +
+                        "commands inside the MCPocket app sandbox; phone_echo is observable.",
                 13,
                 Typeface.NORMAL);
         note.setTextColor(Color.DKGRAY);
