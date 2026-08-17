@@ -27,6 +27,8 @@ import android.os.StatFs;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.system.Os;
+import android.system.OsConstants;
 import android.text.TextUtils;
 
 import org.json.JSONException;
@@ -285,8 +287,9 @@ public final class McpNodeService extends Service implements McpToolActions {
         Thread stdoutThread = null;
         Thread stderrThread = null;
         boolean keepAlive = false;
+        File pidFile = null;
+        int processGroupId = -1;
         try {
-            ProcessBuilder builder = new ProcessBuilder("/system/bin/sh", "-c", command);
             File directory = resolveExecDirectory(cwd);
             if (!directory.isDirectory()) {
                 return execFailure(
@@ -296,6 +299,18 @@ public final class McpNodeService extends Service implements McpToolActions {
                         started,
                         callCount);
             }
+
+            pidFile = File.createTempFile("mcpocket-proc-", ".pid", getCacheDir());
+            String wrappedCommand = "printf '%s' $$ > "
+                    + shellQuote(pidFile.getAbsolutePath())
+                    + "; "
+                    + command;
+            ProcessBuilder builder = new ProcessBuilder(
+                    "/system/bin/toybox",
+                    "setsid",
+                    "/system/bin/sh",
+                    "-c",
+                    wrappedCommand);
             builder.directory(directory);
 
             if (env != null) {
@@ -307,6 +322,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             }
 
             process = builder.start();
+            processGroupId = waitForProcessGroupId(pidFile, 750L);
             stdoutCapture = new StreamCapture(process.getInputStream(), maxOutputBytes);
             stderrCapture = new StreamCapture(process.getErrorStream(), maxOutputBytes);
             stdoutThread = new Thread(stdoutCapture, "mcpocket-exec-stdout");
@@ -329,6 +345,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                         sessionId,
                         command,
                         directory.getAbsolutePath(),
+                        processGroupId,
                         process,
                         stdoutCapture,
                         stderrCapture,
@@ -344,8 +361,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             boolean finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
             boolean timedOut = !finished;
             if (timedOut) {
-                process.destroyForcibly();
-                process.waitFor(200, TimeUnit.MILLISECONDS);
+                terminateProcessGroup(process, processGroupId, true);
                 closeQuietly(process.getInputStream());
                 closeQuietly(process.getErrorStream());
             }
@@ -381,12 +397,15 @@ public final class McpNodeService extends Service implements McpToolActions {
                     started,
                     callCount);
         } finally {
+            if (pidFile != null) {
+                pidFile.delete();
+            }
             if (process != null && !keepAlive) {
                 closeQuietly(process.getInputStream());
                 closeQuietly(process.getErrorStream());
                 closeQuietly(process.getOutputStream());
                 if (process.isAlive()) {
-                    process.destroyForcibly();
+                    terminateProcessGroup(process, processGroupId, true);
                 }
             }
         }
@@ -405,24 +424,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         ProcessSession session = requireProcessSession(sessionId);
         boolean wasRunning = session.process.isAlive();
         if (wasRunning) {
-            if (force) {
-                session.process.destroyForcibly();
-            } else {
-                session.process.destroy();
-            }
-            try {
-                session.process.waitFor(500L, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException error) {
-                Thread.currentThread().interrupt();
-            }
-            if (session.process.isAlive()) {
-                session.process.destroyForcibly();
-                try {
-                    session.process.waitFor(500L, TimeUnit.MILLISECONDS);
-                } catch (InterruptedException error) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            terminateProcessGroup(session, force);
         }
         JSONObject result = processSessionResult(session, callCount);
         result.put("stopRequested", wasRunning);
@@ -976,10 +978,77 @@ public final class McpNodeService extends Service implements McpToolActions {
     private synchronized void stopAllProcessSessions() {
         for (ProcessSession session : processSessions.values()) {
             if (session.process.isAlive()) {
-                session.process.destroyForcibly();
+                terminateProcessGroup(session, true);
             }
         }
         processSessions.clear();
+    }
+
+    private static void terminateProcessGroup(ProcessSession session, boolean force) {
+        terminateProcessGroup(session.process, session.processGroupId, force);
+    }
+
+    private static void terminateProcessGroup(Process process, int processGroupId, boolean force) {
+        int signal = force ? OsConstants.SIGKILL : OsConstants.SIGTERM;
+        try {
+            if (processGroupId > 0) {
+                Os.kill(-processGroupId, signal);
+            } else if (force) {
+                process.destroyForcibly();
+            } else {
+                process.destroy();
+            }
+        } catch (Exception ignored) {
+            if (force) {
+                process.destroyForcibly();
+            } else {
+                process.destroy();
+            }
+        }
+
+        try {
+            process.waitFor(750L, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        }
+
+        if (process.isAlive()) {
+            try {
+                if (processGroupId > 0) {
+                    Os.kill(-processGroupId, OsConstants.SIGKILL);
+                } else {
+                    process.destroyForcibly();
+                }
+            } catch (Exception ignored) {
+                process.destroyForcibly();
+            }
+            try {
+                process.waitFor(750L, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private static int waitForProcessGroupId(File pidFile, long timeoutMs) throws Exception {
+        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (pidFile.isFile() && pidFile.length() > 0L) {
+                String text = readProcessOutput(new FileInputStream(pidFile), 64).trim();
+                if (!text.isEmpty()) {
+                    int pid = Integer.parseInt(text);
+                    if (pid > 0) {
+                        return pid;
+                    }
+                }
+            }
+            Thread.sleep(10L);
+        }
+        throw new IOException("Timed out waiting for process group ID");
+    }
+
+    private static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\"'\"'") + "'";
     }
 
     private static List<String> commandArgv(String command) {
@@ -1044,6 +1113,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         final String sessionId;
         final String command;
         final String cwd;
+        final int processGroupId;
         final Process process;
         final StreamCapture stdout;
         final StreamCapture stderr;
@@ -1056,6 +1126,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 String sessionId,
                 String command,
                 String cwd,
+                int processGroupId,
                 Process process,
                 StreamCapture stdout,
                 StreamCapture stderr,
@@ -1065,6 +1136,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             this.sessionId = sessionId;
             this.command = command;
             this.cwd = cwd;
+            this.processGroupId = processGroupId;
             this.process = process;
             this.stdout = stdout;
             this.stderr = stderr;
