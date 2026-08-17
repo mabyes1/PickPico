@@ -76,9 +76,45 @@ final class McpToolRegistry {
 
         register(
                 "exec_command",
-                "Execute a Linux shell command inside MCPocket's Android app sandbox with optional cwd, env, stdin, timeout, and output limits.",
+                "Execute a Linux shell command inside MCPocket's Android app sandbox. Relative cwd values resolve below the private workspace root; background=true returns a managed process session.",
                 CommandRuntime.execCommandSchema(),
                 (arguments, callCount) -> runtime.execute("process.exec", arguments, callCount));
+
+        register(
+                "read_output",
+                "Read captured stdout/stderr and current status for a background exec_command session.",
+                CommandRuntime.processSessionSchema(false),
+                (arguments, callCount) -> runtime.execute("process.output", arguments, callCount));
+
+        register(
+                "kill_session",
+                "Stop a background exec_command process session.",
+                CommandRuntime.processSessionSchema(true),
+                (arguments, callCount) -> runtime.execute("process.stop", arguments, callCount));
+
+        register(
+                "workspace_info",
+                "Return MCPocket's private workspace root, free storage, execution features, and detected command-line runtimes.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> runtime.execute("workspace.info", arguments, callCount));
+
+        register(
+                "workspace_list",
+                "List files and directories below MCPocket's private workspace root.",
+                CommandRuntime.workspaceListSchema(),
+                (arguments, callCount) -> runtime.execute("workspace.list", arguments, callCount));
+
+        register(
+                "workspace_read_file",
+                "Read one UTF-8 text file below MCPocket's private workspace root.",
+                CommandRuntime.workspaceReadSchema(),
+                (arguments, callCount) -> runtime.execute("workspace.read", arguments, callCount));
+
+        register(
+                "workspace_write_file",
+                "Write one UTF-8 text file below MCPocket's private workspace root.",
+                CommandRuntime.workspaceWriteSchema(),
+                (arguments, callCount) -> runtime.execute("workspace.write", arguments, callCount));
 
         register(
                 "server_info",

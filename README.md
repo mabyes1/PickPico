@@ -9,6 +9,10 @@ MCPocket turns an Android phone into a manually controlled MCP execution node.
 - Authenticate every MCP POST with a per-start bearer token.
 - Keep compatibility tools including `server_info`, `phone_status`, `phone_ring`, restricted `phone_exec`, and `phone_echo`.
 - Expose a capability-oriented command runtime through `command_list`, `command_run`, and `command_status`.
+- Keep a persistent private workspace under the MCPocket app data directory.
+- Read, write, and recursively list workspace files without shell-escaping file contents.
+- Resolve relative `exec_command.cwd` values below the workspace root.
+- Keep long-running commands alive as managed background sessions with `read_output` and `kill_session`.
 - Support the legacy initialize flow and the MCP `2026-07-28` stateless discovery flow.
 - Keep MCP protocol/transport separate from Android tool implementations through a tool registry.
 
@@ -19,12 +23,29 @@ Current command IDs:
 - `phone.ring`
 - `phone.lock` (requires one-time Device Admin opt-in)
 - `phone.echo`
+- `workspace.info`
+- `workspace.list`
+- `workspace.read`
+- `workspace.write`
 - `process.run` (predefined diagnostics only)
 - `process.exec` (general Linux shell execution inside the MCPocket app sandbox)
+- `process.output`
+- `process.stop`
 
 MCP also exposes `exec_command` as a direct convenience tool for `process.exec`. It executes through
-`/system/bin/sh -c` and supports optional `cwd`, `env`, `stdin`, `timeoutMs`, and `maxOutputBytes`.
-Results keep `stdout` and `stderr` separate and report exit code, timeout, duration, and output truncation.
+`/system/bin/sh -c` and supports optional `cwd`, `env`, `stdin`, `timeoutMs`, `maxOutputBytes`, and
+`background`. The default working directory is MCPocket's private workspace root. Relative `cwd`
+values resolve below that root; absolute paths remain available for advanced sandbox-visible paths.
+Synchronous results keep `stdout` and `stderr` separate and report exit code, timeout, duration, and
+output truncation.
+
+With `background=true`, `exec_command` returns immediately with a `sessionId` and leaves the process
+running. Use `read_output` to inspect its captured output/status and `kill_session` to stop it. This is
+the foundation for dev servers and other long-lived project processes.
+
+Workspace-native MCP tools are available as `workspace_info`, `workspace_list`,
+`workspace_read_file`, and `workspace_write_file`. Workspace file paths are always relative and are
+canonicalized so `..` traversal cannot escape the workspace root.
 
 `process.exec` is intentionally powerful but it does not escape Android's app sandbox. Commands run
 as the MCPocket app UID, not as ADB shell, root, or the Android system user.
@@ -39,7 +60,23 @@ use `exec_command` or `command_run` with `process.exec`.
 `phone.lock` never attempts to elevate itself. Until the user explicitly enables MCPocket's
 force-lock Device Admin policy in the Android system UI, the command returns `requiresSetup=true`.
 
-ADB, FYT, Git tooling, SSH, discovery, remote relay, TLS, and UI polish are not implemented yet.
+Git/Node/Python toolchains are not bundled yet. `workspace_info` reports which executables are
+actually visible to MCPocket's Android app sandbox, so clients can distinguish the workspace/process
+layer from optional future runtimes. ADB, FYT, SSH, discovery, remote relay, TLS, and UI polish are
+also not implemented yet.
+
+## Workspace POC flow
+
+Once the node is running, an MCP client can create and run a project entirely inside the phone:
+
+1. Call `workspace_info` to discover the workspace root and available executables.
+2. Call `workspace_write_file` with `path: "hello/run.sh"` and the project contents.
+3. Call `exec_command` with `cwd: "hello"` and `command: "sh run.sh"`.
+4. For a long-running process, add `background: true`, then poll `read_output` with the returned
+   `sessionId` and stop it with `kill_session` when finished.
+
+The workspace survives node restarts and normal app updates because it lives in MCPocket's app data.
+It is removed if the app is uninstalled.
 
 ## Build
 

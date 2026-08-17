@@ -150,6 +150,67 @@ final class CommandRuntime {
                 });
 
         register(
+                "workspace.info",
+                "Return the MCPocket workspace root, storage state, and available command-line runtimes.",
+                "workspace",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.workspaceInfo(callCount));
+
+        register(
+                "workspace.list",
+                "List files and directories under MCPocket's private workspace root.",
+                "workspace",
+                "read_only",
+                false,
+                workspaceListSchema(),
+                (arguments, callCount) -> {
+                    validateWorkspacePath(arguments.optString("path", "."));
+                    int maxDepth = arguments.optInt("maxDepth", 2);
+                    int maxEntries = arguments.optInt("maxEntries", 500);
+                    if (maxDepth < 0 || maxDepth > 5) {
+                        throw new CommandInputException("workspace.list maxDepth must be between 0 and 5");
+                    }
+                    if (maxEntries < 1 || maxEntries > 2000) {
+                        throw new CommandInputException("workspace.list maxEntries must be between 1 and 2000");
+                    }
+                    return actions.workspaceList(arguments, callCount);
+                });
+
+        register(
+                "workspace.read",
+                "Read one UTF-8 text file from MCPocket's private workspace root.",
+                "workspace",
+                "read_only",
+                false,
+                workspaceReadSchema(),
+                (arguments, callCount) -> {
+                    validateWorkspacePath(arguments.optString("path", ""));
+                    int maxBytes = arguments.optInt("maxBytes", 262144);
+                    if (maxBytes < 1 || maxBytes > 1048576) {
+                        throw new CommandInputException("workspace.read maxBytes must be between 1 and 1048576");
+                    }
+                    return actions.workspaceReadFile(arguments, callCount);
+                });
+
+        register(
+                "workspace.write",
+                "Write one UTF-8 text file below MCPocket's private workspace root, creating parent directories by default.",
+                "workspace",
+                "filesystem_write",
+                true,
+                workspaceWriteSchema(),
+                (arguments, callCount) -> {
+                    validateWorkspacePath(arguments.optString("path", ""));
+                    String content = arguments.optString("content", "");
+                    if (content.length() > 1048576) {
+                        throw new CommandInputException("workspace.write content is limited to 1048576 characters");
+                    }
+                    return actions.workspaceWriteFile(arguments, callCount);
+                });
+
+        register(
                 "process.run",
                 "Run one predefined diagnostic process. Arbitrary shell strings and arguments are rejected.",
                 "process",
@@ -189,6 +250,24 @@ final class CommandRuntime {
                     validateExecArguments(arguments);
                     return actions.execCommand(arguments, callCount);
                 });
+
+        register(
+                "process.output",
+                "Read captured stdout/stderr and status for a background process session.",
+                "process",
+                "read_only",
+                false,
+                processSessionSchema(false),
+                (arguments, callCount) -> actions.readProcessOutput(arguments, callCount));
+
+        register(
+                "process.stop",
+                "Stop a background process session started by process.exec with background=true.",
+                "process",
+                "process_control",
+                true,
+                processSessionSchema(true),
+                (arguments, callCount) -> actions.killProcessSession(arguments, callCount));
     }
 
     JSONObject list() throws JSONException {
@@ -331,9 +410,102 @@ final class CommandRuntime {
                                 .put("type", "integer")
                                 .put("minimum", 1024)
                                 .put("maximum", 262144)
-                                .put("default", 65536)))
+                                .put("default", 65536))
+                        .put("background", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)
+                                .put("description", "Keep the process alive as a managed session and return immediately.")))
                 .put("required", new JSONArray().put("command"))
                 .put("additionalProperties", false);
+    }
+
+    static JSONObject workspaceListSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("path", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 1024)
+                                .put("default", "."))
+                        .put("maxDepth", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 0)
+                                .put("maximum", 5)
+                                .put("default", 2))
+                        .put("maxEntries", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 2000)
+                                .put("default", 500)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject workspaceReadSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("path", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 1024))
+                        .put("maxBytes", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 1048576)
+                                .put("default", 262144)))
+                .put("required", new JSONArray().put("path"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject workspaceWriteSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("path", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 1024))
+                        .put("content", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 1048576))
+                        .put("append", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false))
+                        .put("createParents", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)))
+                .put("required", new JSONArray().put("path").put("content"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject processSessionSchema(boolean includeForce) throws JSONException {
+        JSONObject properties = new JSONObject()
+                .put("sessionId", new JSONObject()
+                        .put("type", "string")
+                        .put("minLength", 1)
+                        .put("maxLength", 128));
+        if (includeForce) {
+            properties.put("force", new JSONObject()
+                    .put("type", "boolean")
+                    .put("default", false));
+        }
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", properties)
+                .put("required", new JSONArray().put("sessionId"))
+                .put("additionalProperties", false);
+    }
+
+    private static void validateWorkspacePath(String path) {
+        if (path == null || path.isEmpty()) {
+            throw new CommandInputException("workspace path must not be empty");
+        }
+        if (path.length() > 1024) {
+            throw new CommandInputException("workspace path is limited to 1024 characters");
+        }
+        if (path.startsWith("/") || path.startsWith("\\")) {
+            throw new CommandInputException("workspace paths must be relative to the MCPocket workspace root");
+        }
     }
 
     private static void validateExecArguments(JSONObject arguments) {

@@ -55,8 +55,61 @@ public final class McpHttpServerTest {
             public JSONObject execCommand(JSONObject arguments, long callCount) throws org.json.JSONException {
                 return new JSONObject()
                         .put("command", arguments.optString("command", ""))
+                        .put("cwd", arguments.optString("cwd", "workspace-root"))
+                        .put("background", arguments.optBoolean("background", false))
                         .put("stdout", "stub-output")
                         .put("exitCode", 0)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject readProcessOutput(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("sessionId", arguments.optString("sessionId", ""))
+                        .put("status", "running")
+                        .put("stdout", "background-output")
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject killProcessSession(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("sessionId", arguments.optString("sessionId", ""))
+                        .put("status", "exited")
+                        .put("stopRequested", true)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject workspaceInfo(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("root", "/data/test/workspaces")
+                        .put("backgroundProcesses", true)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject workspaceList(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("path", arguments.optString("path", "."))
+                        .put("entries", new org.json.JSONArray())
+                        .put("count", 0)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject workspaceReadFile(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("path", arguments.optString("path", ""))
+                        .put("content", "stub-file")
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject workspaceWriteFile(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("path", arguments.optString("path", ""))
+                        .put("bytesWritten", arguments.optString("content", "").length())
                         .put("toolCallCount", callCount);
             }
 
@@ -175,11 +228,13 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(7, listed.getInt("count"));
+        assertEquals(13, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("workspace.write"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.run"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.exec"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("process.output"));
 
         HttpResult run = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":21,\"method\":\"tools/call\"," +
@@ -251,6 +306,66 @@ public final class McpHttpServerTest {
         assertEquals("printf hello", result.getString("command"));
         assertEquals("stub-output", result.getString("stdout"));
         assertEquals(0, result.getInt("exitCode"));
+    }
+
+    @Test
+    public void workspaceToolsExposePrivateProjectStorage() throws Exception {
+        HttpResult info = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":27,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"workspace_info\",\"arguments\":{}}}",
+                authorizedHeaders());
+        assertEquals(200, info.status);
+        assertEquals("/data/test/workspaces", new JSONObject(info.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getString("root"));
+
+        HttpResult write = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":28,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"workspace_write_file\",\"arguments\":{" +
+                        "\"path\":\"hello/index.html\",\"content\":\"hello\"}}}",
+                authorizedHeaders());
+        assertEquals(200, write.status);
+        assertEquals("hello/index.html", new JSONObject(write.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getString("path"));
+    }
+
+    @Test
+    public void backgroundProcessToolsExposeSessionLifecycle() throws Exception {
+        HttpResult exec = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":29,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"exec_command\",\"arguments\":{" +
+                        "\"command\":\"sleep 60\",\"cwd\":\"hello\",\"background\":true}}}",
+                authorizedHeaders());
+        assertEquals(200, exec.status);
+        assertTrue(new JSONObject(exec.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getBoolean("background"));
+
+        HttpResult output = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":30,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"read_output\",\"arguments\":{" +
+                        "\"sessionId\":\"proc-test\"}}}",
+                authorizedHeaders());
+        assertEquals(200, output.status);
+        assertEquals("running", new JSONObject(output.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getString("status"));
+
+        HttpResult stop = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":31,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"kill_session\",\"arguments\":{" +
+                        "\"sessionId\":\"proc-test\"}}}",
+                authorizedHeaders());
+        assertEquals(200, stop.status);
+        assertTrue(new JSONObject(stop.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getBoolean("stopRequested"));
     }
 
     @Test
