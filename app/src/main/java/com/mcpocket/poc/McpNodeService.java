@@ -1,5 +1,6 @@
 package com.mcpocket.poc;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -162,7 +163,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.8.0")
+                .put("version", "0.9.0")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
@@ -551,6 +552,115 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    public JSONObject nodeStart(JSONObject arguments, long callCount) throws JSONException {
+        String entryPath = arguments.optString("entry", "");
+        try {
+            File entry = resolveWorkspacePath(entryPath);
+            if (!entry.isFile()) {
+                throw new CommandRuntime.CommandInputException("Node entry does not exist: " + entryPath);
+            }
+
+            if (findNodeRuntimePid() > 0) {
+                JSONObject current = nodeStatus(callCount);
+                current.put("started", false).put("alreadyRunning", true);
+                return current;
+            }
+
+            File cwd = entry.getParentFile();
+            Intent intent = new Intent(this, NodeRuntimeService.class)
+                    .setAction(NodeRuntimeService.ACTION_START)
+                    .putExtra(NodeRuntimeService.EXTRA_ENTRY, entry.getAbsolutePath())
+                    .putExtra(NodeRuntimeService.EXTRA_CWD, cwd.getAbsolutePath());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+
+            return new JSONObject()
+                    .put("started", true)
+                    .put("alreadyRunning", false)
+                    .put("status", "starting")
+                    .put("running", true)
+                    .put("entry", workspaceRelativePath(entry))
+                    .put("cwd", workspaceRelativePath(cwd))
+                    .put("runtime", "nodejs-mobile")
+                    .put("nodeVersion", "18.20.4")
+                    .put("toolCallCount", callCount);
+        } catch (IOException error) {
+            throw new CommandRuntime.CommandInputException("Invalid Node entry: " + error.getMessage());
+        }
+    }
+
+    @Override
+    public JSONObject nodeStatus(long callCount) throws JSONException {
+        JSONObject state = NodeRuntimeState.read(this);
+        boolean stateClaimedRunning = state.optBoolean("running", false);
+        int pid = findNodeRuntimePid();
+        boolean running = pid > 0;
+
+        state.put("running", running)
+                .put("runtime", "nodejs-mobile")
+                .put("nodeVersion", "18.20.4")
+                .put("toolCallCount", callCount);
+        if (running) {
+            state.put("pid", pid);
+            if (!"starting".equals(state.optString("status"))) {
+                state.put("status", "running");
+            }
+        } else if (stateClaimedRunning) {
+            state.put("status", "stopped");
+        }
+        return state;
+    }
+
+    @Override
+    public JSONObject nodeStop(JSONObject arguments, long callCount) throws JSONException {
+        boolean force = arguments.optBoolean("force", false);
+        int pid = findNodeRuntimePid();
+        boolean wasRunning = pid > 0;
+
+        if (wasRunning) {
+            try {
+                Os.kill(pid, force ? OsConstants.SIGKILL : OsConstants.SIGTERM);
+            } catch (Exception error) {
+                return new JSONObject()
+                        .put("stopped", false)
+                        .put("wasRunning", true)
+                        .put("pid", pid)
+                        .put("error", error.getClass().getSimpleName() + ": " + error.getMessage())
+                        .put("toolCallCount", callCount);
+            }
+
+            long deadline = SystemClock.elapsedRealtime() + 1000L;
+            while (findNodeRuntimePid() > 0 && SystemClock.elapsedRealtime() < deadline) {
+                SystemClock.sleep(25L);
+            }
+
+            int remainingPid = findNodeRuntimePid();
+            if (remainingPid > 0 && !force) {
+                try {
+                    Os.kill(remainingPid, OsConstants.SIGKILL);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        JSONObject stopped = new JSONObject()
+                .put("status", "stopped")
+                .put("running", false)
+                .put("stopped", true)
+                .put("wasRunning", wasRunning)
+                .put("force", force)
+                .put("runtime", "nodejs-mobile")
+                .put("nodeVersion", "18.20.4")
+                .put("completedAt", Instant.now().toString())
+                .put("toolCallCount", callCount);
+        NodeRuntimeState.write(this, stopped);
+        return stopped;
+    }
+
+    @Override
     public synchronized JSONObject phoneRing(String action, int durationSeconds, long callCount) throws JSONException {
         if ("stop".equals(action)) {
             boolean wasPlaying = activeRing != null && activeRing.isPlaying();
@@ -812,6 +922,25 @@ public final class McpNodeService extends Service implements McpToolActions {
             throw new IllegalStateException("Unable to create MCPocket workspace root");
         }
         return root;
+    }
+
+    private int findNodeRuntimePid() {
+        ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (activityManager == null) {
+            return -1;
+        }
+        List<ActivityManager.RunningAppProcessInfo> processes = activityManager.getRunningAppProcesses();
+        if (processes == null) {
+            return -1;
+        }
+
+        String expectedProcessName = getPackageName() + ":node";
+        for (ActivityManager.RunningAppProcessInfo process : processes) {
+            if (expectedProcessName.equals(process.processName)) {
+                return process.pid;
+            }
+        }
+        return -1;
     }
 
     private File resolveExecDirectory(String cwd) throws IOException {

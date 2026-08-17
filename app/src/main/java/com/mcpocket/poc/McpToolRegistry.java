@@ -117,6 +117,24 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.execute("workspace.write", arguments, callCount));
 
         register(
+                "node_start",
+                "Start a workspace JavaScript entry point inside MCPocket's isolated Node.js runtime process.",
+                CommandRuntime.nodeStartSchema(),
+                (arguments, callCount) -> runtime.execute("node.start", arguments, callCount));
+
+        register(
+                "node_status",
+                "Return the current MCPocket Node.js runtime state.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> runtime.execute("node.status", arguments, callCount));
+
+        register(
+                "node_stop",
+                "Stop MCPocket's isolated Node.js runtime process.",
+                CommandRuntime.nodeStopSchema(),
+                (arguments, callCount) -> runtime.execute("node.stop", arguments, callCount));
+
+        register(
                 "server_info",
                 "Return safe MCPocket node, Android device, endpoint, uptime, and call-count information.",
                 noArgumentsSchema(),

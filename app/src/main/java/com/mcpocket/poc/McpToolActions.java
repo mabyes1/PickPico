@@ -25,6 +25,12 @@ interface McpToolActions {
 
     JSONObject workspaceWriteFile(JSONObject arguments, long callCount) throws JSONException;
 
+    JSONObject nodeStart(JSONObject arguments, long callCount) throws JSONException;
+
+    JSONObject nodeStatus(long callCount) throws JSONException;
+
+    JSONObject nodeStop(JSONObject arguments, long callCount) throws JSONException;
+
     JSONObject phoneRing(String action, int durationSeconds, long callCount) throws JSONException;
 
     JSONObject phoneLock(long callCount) throws JSONException;

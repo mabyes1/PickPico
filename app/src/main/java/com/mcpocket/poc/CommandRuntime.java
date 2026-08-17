@@ -211,6 +211,36 @@ final class CommandRuntime {
                 });
 
         register(
+                "node.start",
+                "Start one Node.js workspace entry point in MCPocket's isolated :node runtime process.",
+                "runtime",
+                "process_start",
+                true,
+                nodeStartSchema(),
+                (arguments, callCount) -> {
+                    validateWorkspacePath(arguments.optString("entry", ""));
+                    return actions.nodeStart(arguments, callCount);
+                });
+
+        register(
+                "node.status",
+                "Return the current MCPocket Node.js runtime process state.",
+                "runtime",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.nodeStatus(callCount));
+
+        register(
+                "node.stop",
+                "Stop the isolated MCPocket Node.js runtime process.",
+                "runtime",
+                "process_control",
+                true,
+                nodeStopSchema(),
+                (arguments, callCount) -> actions.nodeStop(arguments, callCount));
+
+        register(
                 "process.run",
                 "Run one predefined diagnostic process. Arbitrary shell strings and arguments are rejected.",
                 "process",
@@ -493,6 +523,29 @@ final class CommandRuntime {
                 .put("type", "object")
                 .put("properties", properties)
                 .put("required", new JSONArray().put("sessionId"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject nodeStartSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("entry", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 1024)
+                                .put("description", "Workspace-relative JavaScript entry point.")))
+                .put("required", new JSONArray().put("entry"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject nodeStopSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("force", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)))
                 .put("additionalProperties", false);
     }
 

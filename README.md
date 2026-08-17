@@ -13,6 +13,7 @@ MCPocket turns an Android phone into a manually controlled MCP execution node.
 - Read, write, and recursively list workspace files without shell-escaping file contents.
 - Resolve relative `exec_command.cwd` values below the workspace root.
 - Keep long-running commands alive as managed background sessions with `read_output` and `kill_session`.
+- Run workspace JavaScript through an APK-embedded Node.js runtime in an isolated `:node` Android process.
 - Support the legacy initialize flow and the MCP `2026-07-28` stateless discovery flow.
 - Keep MCP protocol/transport separate from Android tool implementations through a tool registry.
 
@@ -27,6 +28,9 @@ Current command IDs:
 - `workspace.list`
 - `workspace.read`
 - `workspace.write`
+- `node.start`
+- `node.status`
+- `node.stop`
 - `process.run` (predefined diagnostics only)
 - `process.exec` (general Linux shell execution inside the MCPocket app sandbox)
 - `process.output`
@@ -50,6 +54,16 @@ canonicalized so `..` traversal cannot escape the workspace root.
 `process.exec` is intentionally powerful but it does not escape Android's app sandbox. Commands run
 as the MCPocket app UID, not as ADB shell, root, or the Android system user.
 
+Node.js is exposed separately from `exec_command`. Android does not treat MCPocket's writable
+workspace as a place for executable binaries, so MCPocket packages `libnode.so` with the APK and
+starts workspace JavaScript through JNI in an isolated `:node` service process. MCP tools
+`node_start`, `node_status`, and `node_stop` manage that runtime without stopping the MCP server.
+
+The current Node runtime is a bootstrap POC based on nodejs-mobile 18.20.4 for `arm64-v8a`. It has
+been smoke-tested on a Samsung S23 by writing `server.js` through the MCP workspace API, starting it
+with `node_start`, reaching its HTTP server over Wi-Fi, and then stopping the runtime process. It is
+not yet the intended long-term Node distribution/version strategy.
+
 The older phone-specific MCP tools remain available for compatibility, but they execute through the
 same command runtime. New capabilities should be added as commands rather than wiring new behavior
 directly into the HTTP/MCP transport layer.
@@ -60,10 +74,10 @@ use `exec_command` or `command_run` with `process.exec`.
 `phone.lock` never attempts to elevate itself. Until the user explicitly enables MCPocket's
 force-lock Device Admin policy in the Android system UI, the command returns `requiresSetup=true`.
 
-Git/Node/Python toolchains are not bundled yet. `workspace_info` reports which executables are
-actually visible to MCPocket's Android app sandbox, so clients can distinguish the workspace/process
-layer from optional future runtimes. ADB, FYT, SSH, discovery, remote relay, TLS, and UI polish are
-also not implemented yet.
+Git and Python toolchains are not bundled yet. `workspace_info` reports which executables are
+actually visible to MCPocket's Android app sandbox; the embedded Node runtime is managed through the
+dedicated Node commands instead of appearing as a shell executable. ADB, FYT, SSH, discovery,
+remote relay, TLS, and UI polish are also not implemented yet.
 
 ## Workspace POC flow
 
@@ -77,6 +91,17 @@ Once the node is running, an MCP client can create and run a project entirely in
 
 The workspace survives node restarts and normal app updates because it lives in MCPocket's app data.
 It is removed if the app is uninstalled.
+
+## Node workspace POC flow
+
+1. Write a JavaScript entry point, for example `hello-node/server.js`, with `workspace_write_file`.
+2. Call `node_start` with `{ "entry": "hello-node/server.js" }`.
+3. Call `node_status` to verify the isolated `:node` process is running.
+4. If the script opens a LAN server, connect directly to the phone IP and the script's port.
+5. Call `node_stop` to terminate only the Node runtime while leaving the MCP node running.
+
+The first build downloads the nodejs-mobile Android runtime archive and installs the configured NDK
+and CMake versions through the Android Gradle toolchain when they are not already present.
 
 ## Build
 

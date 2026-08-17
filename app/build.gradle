@@ -2,9 +2,52 @@ plugins {
     id 'com.android.application'
 }
 
+def nodeMobileVersion = '18.20.4'
+def nodeMobileSha256 = 'BD7321EAA1A7602FBE0BB87302DF2D79D87835CF4363FBDD17C350DBB485C2AF'
+def nodeMobileRoot = layout.buildDirectory.dir("generated/node-mobile-${nodeMobileVersion}").get().asFile
+def nodeMobileZip = layout.buildDirectory.file("downloads/nodejs-mobile-v${nodeMobileVersion}-android.zip").get().asFile
+
+tasks.register('prepareNodeMobileRuntime') {
+    outputs.file(new File(nodeMobileRoot, 'bin/arm64-v8a/libnode.so'))
+    outputs.file(new File(nodeMobileRoot, 'include/node/node.h'))
+
+    doLast {
+        if (!nodeMobileZip.isFile()) {
+            nodeMobileZip.parentFile.mkdirs()
+            def url = new URL("https://github.com/nodejs-mobile/nodejs-mobile/releases/download/v${nodeMobileVersion}/nodejs-mobile-v${nodeMobileVersion}-android.zip")
+            url.withInputStream { input ->
+                nodeMobileZip.withOutputStream { output -> output << input }
+            }
+        }
+
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        nodeMobileZip.withInputStream { input ->
+            byte[] buffer = new byte[8192]
+            int read
+            while ((read = input.read(buffer)) >= 0) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        def actualSha256 = digest.digest().encodeHex().toString().toUpperCase()
+        if (actualSha256 != nodeMobileSha256) {
+            nodeMobileZip.delete()
+            throw new GradleException("nodejs-mobile runtime SHA-256 mismatch: ${actualSha256}")
+        }
+
+        if (!new File(nodeMobileRoot, 'bin/arm64-v8a/libnode.so').isFile()) {
+            delete nodeMobileRoot
+            copy {
+                from zipTree(nodeMobileZip)
+                into nodeMobileRoot
+            }
+        }
+    }
+}
+
 android {
     namespace 'com.mcpocket.poc'
     compileSdk 35
+    ndkVersion '27.3.13750724'
 
     signingConfigs {
         debug {
@@ -16,8 +59,18 @@ android {
         applicationId 'com.mcpocket.poc'
         minSdk 26
         targetSdk 35
-        versionCode 10
-        versionName '0.8.0'
+        versionCode 11
+        versionName '0.9.0'
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_shared', "-DNODE_MOBILE_ROOT=${nodeMobileRoot.absolutePath.replace('\\', '/')}"
+            }
+        }
     }
 
     buildTypes {
@@ -30,6 +83,29 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs "${nodeMobileRoot.absolutePath}/bin"
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('prepareNodeMobileRuntime')
+}
+
+tasks.configureEach { task ->
+    if (task.name.contains('CMake') || task.name.contains('NativeLib')) {
+        task.dependsOn tasks.named('prepareNodeMobileRuntime')
     }
 }
 

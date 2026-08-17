@@ -114,6 +114,32 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject nodeStart(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("started", true)
+                        .put("running", true)
+                        .put("entry", arguments.optString("entry", ""))
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject nodeStatus(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("status", "running")
+                        .put("running", true)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject nodeStop(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("status", "stopped")
+                        .put("running", false)
+                        .put("stopped", true)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject phoneRing(String action, int durationSeconds, long callCount) throws org.json.JSONException {
                 return new JSONObject()
                         .put("action", action)
@@ -228,10 +254,11 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(13, listed.getInt("count"));
+        assertEquals(16, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("workspace.write"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("node.start"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.run"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.exec"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.output"));
