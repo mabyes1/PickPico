@@ -135,6 +135,18 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.execute("node.stop", arguments, callCount));
 
         register(
+                "app_update",
+                "Download a signed MCPocket APK, verify its SHA-256/package/signing certificate/version, then invoke Android's package installer.",
+                CommandRuntime.appUpdateSchema(),
+                (arguments, callCount) -> runtime.execute("app.update", arguments, callCount));
+
+        register(
+                "app_update_status",
+                "Return MCPocket self-update state and whether Android allows MCPocket to request package installs.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> runtime.execute("app.update_status", arguments, callCount));
+
+        register(
                 "server_info",
                 "Return safe MCPocket node, Android device, endpoint, uptime, and call-count information.",
                 noArgumentsSchema(),

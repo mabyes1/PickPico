@@ -163,7 +163,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.9.0")
+                .put("version", "0.10.6")
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
@@ -658,6 +658,16 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("toolCallCount", callCount);
         NodeRuntimeState.write(this, stopped);
         return stopped;
+    }
+
+    @Override
+    public JSONObject appUpdate(JSONObject arguments, long callCount) throws JSONException {
+        return SelfUpdateManager.start(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject appUpdateStatus(long callCount) throws JSONException {
+        return SelfUpdateManager.status(this, callCount);
     }
 
     @Override

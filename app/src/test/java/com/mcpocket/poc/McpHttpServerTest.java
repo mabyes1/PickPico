@@ -140,6 +140,24 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject appUpdate(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("status", "downloading")
+                        .put("running", true)
+                        .put("url", arguments.optString("url", ""))
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
+            public JSONObject appUpdateStatus(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("status", "idle")
+                        .put("running", false)
+                        .put("canRequestPackageInstalls", true)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject phoneRing(String action, int durationSeconds, long callCount) throws org.json.JSONException {
                 return new JSONObject()
                         .put("action", action)
@@ -254,11 +272,12 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(16, listed.getInt("count"));
+        assertEquals(18, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("workspace.write"));
         assertTrue(listed.getJSONArray("commands").toString().contains("node.start"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("app.update"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.run"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.exec"));
         assertTrue(listed.getJSONArray("commands").toString().contains("process.output"));

@@ -14,6 +14,7 @@ MCPocket turns an Android phone into a manually controlled MCP execution node.
 - Resolve relative `exec_command.cwd` values below the workspace root.
 - Keep long-running commands alive as managed background sessions with `read_output` and `kill_session`.
 - Run workspace JavaScript through an APK-embedded Node.js runtime in an isolated `:node` Android process.
+- Download and verify self-update APKs, then expose a foreground **Update MCPocket** button so Android's required install confirmation is user-initiated instead of relying on background popups.
 - Support the legacy initialize flow and the MCP `2026-07-28` stateless discovery flow.
 - Keep MCP protocol/transport separate from Android tool implementations through a tool registry.
 
@@ -31,6 +32,8 @@ Current command IDs:
 - `node.start`
 - `node.status`
 - `node.stop`
+- `app.update`
+- `app.update_status`
 - `process.run` (predefined diagnostics only)
 - `process.exec` (general Linux shell execution inside the MCPocket app sandbox)
 - `process.output`
@@ -63,6 +66,18 @@ The current Node runtime is a bootstrap POC based on nodejs-mobile 18.20.4 for `
 been smoke-tested on a Samsung S23 by writing `server.js` through the MCP workspace API, starting it
 with `node_start`, reaching its HTTP server over Wi-Fi, and then stopping the runtime process. It is
 not yet the intended long-term Node distribution/version strategy.
+
+Self-update candidates are downloaded into MCPocket private storage and are accepted only when the
+SHA-256 matches, the package name is MCPocket, the signing certificate matches the installed app,
+and the candidate version is newer. Once staged, the app UI shows the candidate version and enables
+an update button. Android still owns the final install confirmation; MCPocket does not bypass it.
+
+MCPocket can also update itself without ADB through `app_update`. The updater downloads an HTTP(S)
+APK in the background, requires the exact SHA-256 up front, checks that the package name and signing
+certificate match the installed MCPocket, rejects downgrades, and streams the verified APK into
+Android's `PackageInstaller`. Android may require a one-time "Install unknown apps" grant for
+MCPocket and then shows the system install/update confirmation UI. Progress and installer state are
+available through `app_update_status`.
 
 The older phone-specific MCP tools remain available for compatibility, but they execute through the
 same command runtime. New capabilities should be added as commands rather than wiring new behavior

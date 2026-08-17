@@ -25,6 +25,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.security.SecureRandom;
 
 public final class MainActivity extends Activity {
@@ -34,9 +36,12 @@ public final class MainActivity extends Activity {
     private TextView tokenView;
     private TextView recentView;
     private TextView remoteLockView;
+    private TextView appVersionView;
+    private TextView updateStatusView;
     private Button startButton;
     private Button stopButton;
     private Button enableRemoteLockButton;
+    private Button updateButton;
 
     private final Runnable refreshTask = new Runnable() {
         @Override
@@ -86,6 +91,8 @@ public final class MainActivity extends Activity {
         tokenView = valueView();
         recentView = valueView();
         remoteLockView = valueView();
+        appVersionView = valueView();
+        updateStatusView = valueView();
 
         root.addView(label("STATUS"));
         root.addView(statusView);
@@ -101,6 +108,17 @@ public final class MainActivity extends Activity {
         enableRemoteLockButton.setText(R.string.enable_remote_lock);
         enableRemoteLockButton.setOnClickListener(v -> requestDeviceAdmin());
         root.addView(enableRemoteLockButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(label("APP VERSION"));
+        root.addView(appVersionView);
+        root.addView(label("SELF UPDATE"));
+        root.addView(updateStatusView);
+
+        updateButton = new Button(this);
+        updateButton.setText("UPDATE MCPOCKET");
+        updateButton.setOnClickListener(v -> installStagedUpdate());
+        root.addView(updateButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
         LinearLayout buttons = new LinearLayout(this);
@@ -192,6 +210,17 @@ public final class MainActivity extends Activity {
         startActivity(intent);
     }
 
+    private void installStagedUpdate() {
+        try {
+            JSONObject state = SelfUpdateManager.installStagedFromForeground(this);
+            String status = state.optString("status", "staging");
+            Toast.makeText(this, "MCPocket update: " + status, Toast.LENGTH_SHORT).show();
+            handler.postDelayed(this::refreshStatus, 250L);
+        } catch (RuntimeException error) {
+            Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void refreshStatus() {
         SharedPreferences prefs = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE);
         boolean running = McpNodeService.isNodeRunning();
@@ -218,6 +247,43 @@ public final class MainActivity extends Activity {
         enableRemoteLockButton.setEnabled(!remoteLockEnabled);
         startButton.setEnabled(!running);
         stopButton.setEnabled(running);
+
+        JSONObject updateState = SelfUpdateManager.status(this, 0L);
+        String currentVersion = updateState.optString("currentVersionName", "unknown");
+        long currentVersionCode = updateState.optLong("currentVersionCode", -1L);
+        appVersionView.setText(currentVersion + " (" + currentVersionCode + ")");
+
+        String rawUpdateStatus = updateState.optString("status", "idle");
+        String updateStatus = rawUpdateStatus;
+        String candidateVersion = updateState.optString("candidateVersionName", "");
+        if (!TextUtils.isEmpty(candidateVersion)) {
+            updateStatus += " → " + candidateVersion;
+        }
+        if (updateState.has("bytesDownloaded")) {
+            updateStatus += "\n" + updateState.optLong("bytesDownloaded", 0L) + " bytes staged";
+        }
+        updateStatusView.setText(updateStatus);
+
+        boolean hasCandidate = SelfUpdateManager.hasInstallableCandidate(this);
+        updateButton.setEnabled(hasCandidate && !"downloading".equals(rawUpdateStatus));
+        updateButton.setText(hasCandidate && !TextUtils.isEmpty(candidateVersion)
+                ? "UPDATE TO " + candidateVersion
+                : "UPDATE MCPOCKET");
+
+        if ("pending_user_action".equals(rawUpdateStatus)
+                && updateState.optBoolean("startedByUser", false)) {
+            Intent confirmation = SelfUpdateManager.takePendingConfirmationIntent();
+            if (confirmation != null) {
+                try {
+                    startActivity(confirmation);
+                } catch (Throwable launchError) {
+                    Toast.makeText(
+                            this,
+                            "Tap the MCPocket update notification to continue",
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {

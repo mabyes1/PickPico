@@ -241,6 +241,24 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.nodeStop(arguments, callCount));
 
         register(
+                "app.update",
+                "Download, verify, and hand a newer MCPocket APK to Android's package installer.",
+                "app",
+                "software_update",
+                true,
+                appUpdateSchema(),
+                (arguments, callCount) -> actions.appUpdate(arguments, callCount));
+
+        register(
+                "app.update_status",
+                "Return MCPocket self-update progress, setup requirements, and installer status.",
+                "app",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.appUpdateStatus(callCount));
+
+        register(
                 "process.run",
                 "Run one predefined diagnostic process. Arbitrary shell strings and arguments are rejected.",
                 "process",
@@ -546,6 +564,28 @@ final class CommandRuntime {
                         .put("force", new JSONObject()
                                 .put("type", "boolean")
                                 .put("default", false)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject appUpdateSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("url", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 8)
+                                .put("maxLength", 4096)
+                                .put("description", "HTTP(S) URL for the candidate MCPocket APK."))
+                        .put("sha256", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 64)
+                                .put("maxLength", 64)
+                                .put("description", "Required SHA-256 of the exact APK bytes."))
+                        .put("allowSameVersion", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)
+                                .put("description", "Development-only override for reinstalling the same version.")))
+                .put("required", new JSONArray().put("url").put("sha256"))
                 .put("additionalProperties", false);
     }
 
