@@ -104,6 +104,13 @@ The current compatibility boundary is:
 
 `command_run` can return native MCP image/audio content, so media capabilities do not need dedicated top-level tools.
 
+Physical validation on 2026-09-03 confirmed the deployed `/v3` path end to end through the Cloudflare relay and a Samsung S23 / Android 16 node:
+
+- `tools/list` returned `toolProfile = thin-v1` with exactly **10** top-level tools.
+- Chinese natural-language discovery (`幫我截圖看看手機畫面`) ranked `screen.capture` as the only match and reported its current `setup_required` MediaProjection state instead of treating the capability as unsupported.
+- Thin-profile `initialize.instructions` explicitly directs the Agent to use `capability_search` before prematurely claiming a device action is impossible.
+- `command_run("phone.status")` successfully executed a capability that is not exposed as its own Thin MCP top-level tool.
+
 ### 2.2 Capability discovery policy
 
 Thin MCP must not cause an Agent to incorrectly assume that hidden capabilities do not exist.
@@ -226,7 +233,7 @@ Core Mode contains capabilities that do not depend on Android Accessibility or a
 | Shell runtime | `process.exec/output/stop` | ✅ implemented | App UID sandbox, not root |
 | Embedded Node.js | `node.start/status/stop` | ✅ implemented | App-private runtime |
 | Agent tasks | `task_*` | ✅ implemented | Long-running Agent lifecycle |
-| Self-update | `app.update_*` | ✅ implemented | Android package installer remains final boundary |
+| Self-update | `app.update_*` | ✅ implemented + continuity validated | Android package installer remains final boundary; when the node was running before a 0.15.3 → 0.16.0 update, `MY_PACKAGE_REPLACED` restored the Node/Relay automatically without pressing START NODE |
 
 ### 4.2 Core capabilities still to develop
 
