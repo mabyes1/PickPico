@@ -3,6 +3,9 @@
     <files-path
         name="self_update"
         path="self-update/" />
+    <files-path
+        name="workspace"
+        path="workspaces/" />
     <cache-path
         name="human_help_camera"
         path="human-help-camera/" />

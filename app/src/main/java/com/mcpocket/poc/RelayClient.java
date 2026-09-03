@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Base64;
 
 import org.json.JSONException;
@@ -11,8 +12,11 @@ import org.json.JSONObject;
 
 import java.security.SecureRandom;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.Headers;
@@ -44,12 +48,15 @@ final class RelayClient {
     private static final String PREF_NODE_ID = "relay_node_id";
     private static final String PREF_NODE_SECRET = "relay_node_secret";
     private static final long[] RECONNECT_DELAYS_MS = {1000L, 2000L, 4000L, 8000L, 16000L, 30000L};
+    private static final long HEARTBEAT_INTERVAL_MS = 10_000L;
+    private static final long HEARTBEAT_TIMEOUT_MS = 15_000L;
 
     private final Context context;
     private final String relayBaseUrl;
     private final Listener listener;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService requestExecutor = Executors.newFixedThreadPool(2);
+    private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(31, TimeUnit.MINUTES)
@@ -63,6 +70,9 @@ final class RelayClient {
     private volatile WebSocket webSocket;
     private volatile boolean closed;
     private int reconnectAttempt;
+    private volatile String pendingHeartbeatNonce;
+    private volatile ScheduledFuture<?> heartbeatFuture;
+    private volatile ScheduledFuture<?> heartbeatTimeoutFuture;
 
     RelayClient(Context context, String relayBaseUrl, Listener listener) {
         this.context = context.getApplicationContext();
@@ -108,12 +118,14 @@ final class RelayClient {
     void close() {
         closed = true;
         mainHandler.removeCallbacksAndMessages(null);
+        clearHeartbeatState();
         WebSocket socket = webSocket;
         webSocket = null;
         if (socket != null) {
             socket.close(1000, "PickPico node stopped");
         }
         requestExecutor.shutdownNow();
+        heartbeatExecutor.shutdownNow();
         listener.onRelayState("stopped", "", "relay stopped");
     }
 
@@ -130,7 +142,8 @@ final class RelayClient {
             @Override
             public void onOpen(WebSocket webSocket, Response response) {
                 reconnectAttempt = 0;
-                listener.onRelayState("connected", remoteEndpoint, "remote endpoint online");
+                listener.onRelayState("verifying", remoteEndpoint, "relay socket open; verifying heartbeat");
+                startHeartbeatLoop(webSocket);
             }
 
             @Override
@@ -140,7 +153,11 @@ final class RelayClient {
 
             @Override
             public void onClosed(WebSocket webSocket, int code, String reason) {
+                if (RelayClient.this.webSocket != webSocket) {
+                    return;
+                }
                 RelayClient.this.webSocket = null;
+                clearHeartbeatState();
                 if (!closed) {
                     listener.onRelayState("disconnected", remoteEndpoint, "relay closed: " + reason);
                     scheduleReconnect();
@@ -149,7 +166,11 @@ final class RelayClient {
 
             @Override
             public void onFailure(WebSocket webSocket, Throwable error, Response response) {
+                if (RelayClient.this.webSocket != webSocket) {
+                    return;
+                }
                 RelayClient.this.webSocket = null;
+                clearHeartbeatState();
                 if (!closed) {
                     listener.onRelayState("disconnected", remoteEndpoint,
                             "relay error: " + error.getClass().getSimpleName());
@@ -166,6 +187,89 @@ final class RelayClient {
         mainHandler.postDelayed(this::connect, delay);
     }
 
+    private void sendHeartbeat(WebSocket socket) {
+        if (closed || socket != webSocket || pendingHeartbeatNonce != null) {
+            return;
+        }
+        String nonce = UUID.randomUUID().toString();
+        pendingHeartbeatNonce = nonce;
+        try {
+            boolean queued = socket.send(new JSONObject()
+                    .put("type", "ping")
+                    .put("nonce", nonce)
+                    .put("sentAtElapsedMs", SystemClock.elapsedRealtime())
+                    .toString());
+            if (!queued) {
+                pendingHeartbeatNonce = null;
+                listener.onRelayState("stale", remoteEndpoint, "relay heartbeat could not be queued");
+                socket.cancel();
+                return;
+            }
+        } catch (JSONException error) {
+            pendingHeartbeatNonce = null;
+            socket.cancel();
+            return;
+        }
+        ScheduledFuture<?> previousTimeout = heartbeatTimeoutFuture;
+        if (previousTimeout != null) {
+            previousTimeout.cancel(false);
+        }
+        heartbeatTimeoutFuture = heartbeatExecutor.schedule(
+                () -> handleHeartbeatTimeout(socket, nonce),
+                HEARTBEAT_TIMEOUT_MS,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private void startHeartbeatLoop(WebSocket socket) {
+        clearHeartbeatState();
+        sendHeartbeat(socket);
+        heartbeatFuture = heartbeatExecutor.scheduleAtFixedRate(
+                () -> sendHeartbeat(socket),
+                HEARTBEAT_INTERVAL_MS,
+                HEARTBEAT_INTERVAL_MS,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private void handleHeartbeatTimeout(WebSocket socket, String nonce) {
+        if (closed || socket != webSocket || !nonce.equals(pendingHeartbeatNonce)) {
+            return;
+        }
+        pendingHeartbeatNonce = null;
+        listener.onRelayState("stale", remoteEndpoint, "relay heartbeat timed out");
+        socket.cancel();
+    }
+
+    private void clearHeartbeatState() {
+        pendingHeartbeatNonce = null;
+        ScheduledFuture<?> timeout = heartbeatTimeoutFuture;
+        heartbeatTimeoutFuture = null;
+        if (timeout != null) {
+            timeout.cancel(false);
+        }
+        ScheduledFuture<?> loop = heartbeatFuture;
+        heartbeatFuture = null;
+        if (loop != null) {
+            loop.cancel(false);
+        }
+    }
+
+    private void handleHeartbeatPong(WebSocket socket, JSONObject payload) {
+        if (socket != webSocket) {
+            return;
+        }
+        String nonce = payload.optString("nonce", "");
+        if (pendingHeartbeatNonce == null || !pendingHeartbeatNonce.equals(nonce)) {
+            return;
+        }
+        pendingHeartbeatNonce = null;
+        ScheduledFuture<?> timeout = heartbeatTimeoutFuture;
+        heartbeatTimeoutFuture = null;
+        if (timeout != null) {
+            timeout.cancel(false);
+        }
+        listener.onRelayState("connected", remoteEndpoint, "relay heartbeat healthy");
+    }
+
     private void handleRelayMessage(WebSocket socket, String text) {
         final JSONObject envelope;
         try {
@@ -173,7 +277,28 @@ final class RelayClient {
         } catch (JSONException error) {
             return;
         }
+        if ("pong".equals(envelope.optString("type", ""))) {
+            handleHeartbeatPong(socket, envelope);
+            return;
+        }
         if (!"request".equals(envelope.optString("type", ""))) {
+            return;
+        }
+        String requestId = envelope.optString("requestId", "");
+        if (requestId.isEmpty()) {
+            return;
+        }
+        try {
+            boolean acknowledged = socket.send(new JSONObject()
+                    .put("type", "request_ack")
+                    .put("requestId", requestId)
+                    .toString());
+            if (!acknowledged) {
+                socket.cancel();
+                return;
+            }
+        } catch (JSONException error) {
+            socket.cancel();
             return;
         }
         requestExecutor.execute(() -> proxyToLoopback(socket, envelope));

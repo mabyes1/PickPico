@@ -7,10 +7,8 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageInstaller;
 import android.os.Build;
-import android.text.TextUtils;
 
 import org.json.JSONObject;
 
@@ -70,7 +68,10 @@ public final class SelfUpdateInstallReceiver extends BroadcastReceiver {
             if (candidate.exists()) {
                 candidate.delete();
             }
-            requestNodeRestart(context, state);
+            // NodeRestoreReceiver owns post-update runtime restoration via
+            // ACTION_MY_PACKAGE_REPLACED. Keeping a second restart path here races
+            // package replacement and can trigger restricted foreground-service types
+            // while PickPico is still backgrounded.
         }
         SelfUpdateState.write(context, state);
         SelfUpdateManager.markFinished();
@@ -105,31 +106,4 @@ public final class SelfUpdateInstallReceiver extends BroadcastReceiver {
         manager.notify(UPDATE_NOTIFICATION_ID, notification);
     }
 
-    private static void requestNodeRestart(Context context, JSONObject state) {
-        SharedPreferences prefs = context.getSharedPreferences(McpNodeService.PREFS, Context.MODE_PRIVATE);
-        String token = prefs.getString(McpNodeService.KEY_TOKEN, "");
-        if (TextUtils.isEmpty(token)) {
-            SelfUpdateState.put(state, "nodeRestartRequested", false);
-            SelfUpdateState.put(state, "nodeRestartReason", "No persisted MCP bearer token");
-            return;
-        }
-
-        Intent node = new Intent(context, McpNodeService.class)
-                .setAction(McpNodeService.ACTION_START)
-                .putExtra(McpNodeService.EXTRA_TOKEN, token);
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(node);
-            } else {
-                context.startService(node);
-            }
-            SelfUpdateState.put(state, "nodeRestartRequested", true);
-        } catch (Throwable error) {
-            SelfUpdateState.put(state, "nodeRestartRequested", false);
-            SelfUpdateState.put(
-                    state,
-                    "nodeRestartError",
-                    error.getClass().getSimpleName() + ": " + error.getMessage());
-        }
-    }
 }

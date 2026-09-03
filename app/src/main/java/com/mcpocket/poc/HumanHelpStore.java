@@ -160,6 +160,110 @@ final class HumanHelpStore {
         return new JSONObject(attachment.toString());
     }
 
+    static synchronized JSONObject addAudioAttachment(
+            Context context,
+            String requestId,
+            byte[] audioBytes,
+            String extension,
+            String mimeType,
+            String source) throws IOException, JSONException {
+        cleanupStorageIfNeeded(context);
+        JSONObject request = requireWaiting(context, requestId);
+        JSONArray attachments = request.optJSONArray("attachments");
+        if (attachments == null) {
+            attachments = new JSONArray();
+            request.put("attachments", attachments);
+        }
+
+        int audioIndex = 1;
+        for (int index = 0; index < attachments.length(); index++) {
+            if ("audio".equals(attachments.optJSONObject(index) == null
+                    ? ""
+                    : attachments.optJSONObject(index).optString("type", ""))) {
+                audioIndex++;
+            }
+        }
+        File dir = requestDirectory(context, requestId);
+        String safeExtension = extension == null || extension.isEmpty() ? "m4a" : extension;
+        String safeMimeType = mimeType == null || mimeType.isEmpty() ? "audio/mp4" : mimeType;
+        String filename = String.format("voice-%02d.%s", audioIndex, safeExtension);
+        File output = new File(dir, filename);
+        try (FileOutputStream stream = new FileOutputStream(output)) {
+            stream.write(audioBytes);
+        }
+        cleanupStorageIfNeeded(context);
+        if (storageBytes(context) > MAX_STORAGE_BYTES) {
+            output.delete();
+            throw new IOException("Human-help storage limit reached; finish older requests before adding audio");
+        }
+        String relativePath = "human-help/" + requestId + "/" + filename;
+        JSONObject attachment = new JSONObject()
+                .put("type", "audio")
+                .put("mimeType", safeMimeType)
+                .put("source", source == null ? "unknown" : source)
+                .put("path", relativePath)
+                .put("sizeBytes", audioBytes.length);
+        attachments.put(attachment);
+        save(context, request);
+        return new JSONObject(attachment.toString());
+    }
+
+    static synchronized boolean removeAttachment(Context context, String requestId, String relativePath)
+            throws JSONException {
+        if (relativePath == null || relativePath.isEmpty()) {
+            return false;
+        }
+        JSONObject request = requireWaiting(context, requestId);
+        JSONArray attachments = request.optJSONArray("attachments");
+        if (attachments == null || attachments.length() == 0) {
+            return false;
+        }
+        JSONArray kept = new JSONArray();
+        boolean removed = false;
+        for (int index = 0; index < attachments.length(); index++) {
+            JSONObject attachment = attachments.optJSONObject(index);
+            if (!removed && attachment != null && relativePath.equals(attachment.optString("path", ""))) {
+                removed = true;
+                continue;
+            }
+            if (attachment != null) {
+                kept.put(attachment);
+            }
+        }
+        if (!removed) {
+            return false;
+        }
+        request.put("attachments", kept);
+        save(context, request);
+        File file = workspaceFile(context, relativePath);
+        if (file.isFile()) {
+            file.delete();
+        }
+        return true;
+    }
+
+    static synchronized JSONObject latestWaiting(Context context) throws JSONException {
+        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        JSONObject latest = null;
+        long latestCreatedAt = Long.MIN_VALUE;
+        for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+            if (!entry.getKey().startsWith(KEY_PREFIX)) {
+                continue;
+            }
+            String requestId = entry.getKey().substring(KEY_PREFIX.length());
+            JSONObject request = load(context, requestId);
+            if (request == null || !"waiting_human".equals(request.optString("status", ""))) {
+                continue;
+            }
+            long createdAt = request.optLong("createdAtEpochMs", 0L);
+            if (latest == null || createdAt > latestCreatedAt) {
+                latest = request;
+                latestCreatedAt = createdAt;
+            }
+        }
+        return latest == null ? null : new JSONObject(latest.toString());
+    }
+
     static synchronized boolean renewHumanActivity(Context context, String requestId, String activity, boolean openGraceOnly)
             throws JSONException {
         JSONObject request = load(context, requestId);
@@ -216,13 +320,26 @@ final class HumanHelpStore {
             JSONArray attachments = response.optJSONArray("attachments");
             if (attachments != null) {
                 JSONArray enriched = new JSONArray();
+                JSONArray nativeContent = new JSONArray();
                 for (int index = 0; index < attachments.length(); index++) {
                     JSONObject attachment = new JSONObject(attachments.getJSONObject(index).toString());
                     String path = attachment.optString("path", "");
                     File file = workspaceFile(context, path);
                     if (file.isFile() && file.length() <= MAX_INLINE_ATTACHMENT_BYTES) {
                         try {
-                            attachment.put("dataBase64", Base64.encodeToString(readAll(file), Base64.NO_WRAP));
+                            byte[] data = readAll(file);
+                            if ("audio".equals(attachment.optString("type", ""))) {
+                                nativeContent.put(new JSONObject()
+                                        .put("type", "text")
+                                        .put("text", "Human voice reply: " + path));
+                                nativeContent.put(new JSONObject()
+                                        .put("type", "audio")
+                                        .put("mimeType", attachment.optString("mimeType", "audio/wav"))
+                                        .put("data", Base64.encodeToString(data, Base64.NO_WRAP)));
+                                attachment.put("nativeContentDelivered", true);
+                            } else {
+                                attachment.put("dataBase64", Base64.encodeToString(data, Base64.NO_WRAP));
+                            }
                         } catch (IOException error) {
                             attachment.put("dataError", error.getMessage());
                         }
@@ -233,6 +350,9 @@ final class HumanHelpStore {
                     enriched.put(attachment);
                 }
                 response.put("attachments", enriched);
+                if (nativeContent.length() > 0) {
+                    result.put("_mcpContent", nativeContent);
+                }
             }
         }
         return result.put("toolCallCount", callCount);

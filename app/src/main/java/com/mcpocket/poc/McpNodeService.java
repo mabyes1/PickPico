@@ -94,12 +94,14 @@ public final class McpNodeService extends Service implements McpToolActions {
     private AndroidDeviceCapabilities deviceCapabilities;
     private boolean mediaForegroundRequested;
     private RelayClient relayClient;
+    private BleButtonBridge buttonBridge;
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
         deviceCapabilities = new AndroidDeviceCapabilities(this, workspaceRoot());
+        buttonBridge = new BleButtonBridge(this);
     }
 
     @Override
@@ -153,6 +155,9 @@ public final class McpNodeService extends Service implements McpToolActions {
                     .remove(KEY_ERROR)
                     .apply();
             startRelayIfConfigured();
+            if (buttonBridge != null) {
+                buttonBridge.start();
+            }
             updateNotification("Listening on " + endpoint);
         } catch (Exception error) {
             nodeActive = false;
@@ -172,6 +177,10 @@ public final class McpNodeService extends Service implements McpToolActions {
         nodeActive = false;
         stopAlertSound();
         stopAllProcessSessions();
+        if (buttonBridge != null) {
+            buttonBridge.stop();
+            buttonBridge = null;
+        }
         if (deviceCapabilities != null) {
             deviceCapabilities.shutdown();
             deviceCapabilities = null;
@@ -1111,6 +1120,68 @@ public final class McpNodeService extends Service implements McpToolActions {
         return result;
     }
 
+    @Override
+    public JSONObject contactsSearch(JSONObject arguments, long callCount) throws JSONException {
+        return AndroidPersonalDataActions.contactsSearch(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject contactsGet(JSONObject arguments, long callCount) throws JSONException {
+        return AndroidPersonalDataActions.contactsGet(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject calendarList(JSONObject arguments, long callCount) throws JSONException {
+        return AndroidPersonalDataActions.calendarList(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject calendarGet(JSONObject arguments, long callCount) throws JSONException {
+        return AndroidPersonalDataActions.calendarGet(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject calendarCreate(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidPersonalDataActions.calendarCreate(this, arguments, callCount);
+        recordCapabilityAction("calendar.create", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject calendarUpdate(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidPersonalDataActions.calendarUpdate(this, arguments, callCount);
+        recordCapabilityAction("calendar.update", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject calendarDelete(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidPersonalDataActions.calendarDelete(this, arguments, callCount);
+        recordCapabilityAction("calendar.delete", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject filePick(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = PickerRequestStore.createAndWait(this, arguments, false, callCount);
+        recordCapabilityAction("file.pick", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject mediaPick(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = PickerRequestStore.createAndWait(this, arguments, true, callCount);
+        recordCapabilityAction("media.pick", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject shareSend(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidPersonalDataActions.shareSend(this, workspaceRoot(), arguments, callCount);
+        recordCapabilityAction("share.send", result, callCount);
+        return result;
+    }
+
     private static String approvalArgumentSummary(String commandId, JSONObject arguments) {
         if (arguments == null || arguments.length() == 0) {
             return "";
@@ -1254,8 +1325,9 @@ public final class McpNodeService extends Service implements McpToolActions {
                     && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
             }
-            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                    || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (mediaForegroundRequested
+                    && (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
                 types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
             }
             if (types != 0) {

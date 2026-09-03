@@ -2,6 +2,7 @@ package com.mcpocket.poc;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -37,6 +38,10 @@ import java.io.File;
 import java.io.IOException;
 
 public final class HumanHelpActivity extends Activity {
+    static final String EXTRA_CONFIRM_BLE_VOICE = "confirm_ble_voice";
+    static final String EXTRA_BLE_VOICE_PATH = "ble_voice_path";
+    static final String EXTRA_BLE_VOICE_TRANSCRIPT = "ble_voice_transcript";
+    static final String EXTRA_BLE_VOICE_STT_STATUS = "ble_voice_stt_status";
     private static final int REQUEST_PICK_IMAGE = 201;
     private static final int REQUEST_CAMERA = 202;
     private static final int REQUEST_CAMERA_PERMISSION = 203;
@@ -89,6 +94,12 @@ public final class HumanHelpActivity extends Activity {
         } catch (Exception ignored) {
         }
         setContentView(buildContent());
+        if (getIntent().getBooleanExtra(EXTRA_CONFIRM_BLE_VOICE, false)) {
+            showBleVoiceConfirmation(
+                    getIntent().getStringExtra(EXTRA_BLE_VOICE_PATH),
+                    getIntent().getStringExtra(EXTRA_BLE_VOICE_TRANSCRIPT),
+                    getIntent().getStringExtra(EXTRA_BLE_VOICE_STT_STATUS));
+        }
     }
 
     @Override
@@ -229,6 +240,50 @@ public final class HumanHelpActivity extends Activity {
             String text = replyInput == null ? "" : replyInput.getText().toString();
             HumanHelpStore.complete(this, requestId, action, text);
             Toast.makeText(this, "Sent to Agent", Toast.LENGTH_SHORT).show();
+            finish();
+        } catch (Exception error) {
+            Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showBleVoiceConfirmation(String attachmentPath, String transcript, String sttStatus) {
+        String safeTranscript = transcript == null ? "" : transcript.trim();
+        String message;
+        if (!safeTranscript.isEmpty()) {
+            message = "辨識到：\n\n「" + safeTranscript + "」\n\n還沒有傳給 Agent。";
+        } else {
+            String status = TextUtils.isEmpty(sttStatus) ? "no transcript" : sttStatus;
+            message = "系統語音辨識沒有取得文字。\n\nSTT: " + status
+                    + "\n\n目前仍未傳給 Agent。";
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("確定要傳送嗎？")
+                .setMessage(message)
+                .setPositiveButton("傳送", (dialog, which) -> {
+                    try {
+                        HumanHelpStore.complete(this, requestId, "語音回覆", safeTranscript);
+                        Toast.makeText(this, "語音已傳送", Toast.LENGTH_SHORT).show();
+                        finish();
+                    } catch (Exception error) {
+                        Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNeutralButton("重錄", (dialog, which) -> discardBleVoice(attachmentPath, true))
+                .setNegativeButton("取消", (dialog, which) -> discardBleVoice(attachmentPath, false))
+                .setOnCancelListener(dialog -> discardBleVoice(attachmentPath, false))
+                .show();
+    }
+
+    private void discardBleVoice(String attachmentPath, boolean retry) {
+        try {
+            if (!TextUtils.isEmpty(attachmentPath)) {
+                HumanHelpStore.removeAttachment(this, requestId, attachmentPath);
+            }
+            HumanHelpStore.renewHumanActivity(this, requestId,
+                    retry ? "ble_voice_retry" : "ble_voice_cancel", false);
+            Toast.makeText(this,
+                    retry ? "已丟棄，按住藍鍵重新說一次" : "已取消傳送",
+                    Toast.LENGTH_SHORT).show();
             finish();
         } catch (Exception error) {
             Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
@@ -420,7 +475,15 @@ public final class HumanHelpActivity extends Activity {
             }
         }
         JSONArray attachments = request.optJSONArray("attachments");
-        int count = attachments == null ? 0 : attachments.length();
+        int count = 0;
+        if (attachments != null) {
+            for (int index = 0; index < attachments.length(); index++) {
+                JSONObject attachment = attachments.optJSONObject(index);
+                if (attachment != null && "image".equals(attachment.optString("type", ""))) {
+                    count++;
+                }
+            }
+        }
         int max = request.optInt("maxImages", 3);
         if (attachmentStatus != null) {
             attachmentStatus.setText(count == 0

@@ -4,6 +4,8 @@ import { DurableObject } from "cloudflare:workers";
 // can legitimately exceed one 360-second lease. This is only a transport
 // safety net; the product-level timeout is enforced by PickPico itself.
 const REQUEST_TIMEOUT_MS = 30 * 60_000;
+const HEARTBEAT_STALE_MS = 35_000;
+const DELIVERY_ACK_TIMEOUT_MS = 5_000;
 const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
 export default {
@@ -140,8 +142,16 @@ export class NodeRelay extends DurableObject {
       return this.connectNode(request);
     }
     if (url.pathname.endsWith("/status")) {
+      const sockets = this.nodeSockets();
+      const healthySockets = sockets.filter((socket) => this.isSocketHealthy(socket));
+      const heartbeatAges = sockets
+        .map((socket) => this.socketHeartbeatAgeMs(socket))
+        .filter((value) => Number.isFinite(value));
       return json({
-        online: this.nodeSockets().length > 0,
+        online: healthySockets.length > 0,
+        connectedSockets: sockets.length,
+        healthySockets: healthySockets.length,
+        lastHeartbeatAgeMs: heartbeatAges.length ? Math.min(...heartbeatAges) : null,
         pendingRequests: this.pending.size,
       });
     }
@@ -188,12 +198,19 @@ export class NodeRelay extends DurableObject {
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server, ["node"]);
-    server.serializeAttachment({ role: "node", connectedAt: new Date().toISOString() });
+    server.serializeAttachment({
+      role: "node",
+      connectedAt: new Date().toISOString(),
+      lastHeartbeatAt: Date.now(),
+    });
     return new Response(null, { status: 101, webSocket: client });
   }
 
   async forwardMcp(request) {
-    const socket = this.nodeSockets()[0];
+    const sockets = this.nodeSockets();
+    // Heartbeat is advisory health telemetry. Delivery ACK is the authoritative
+    // end-to-end proof that the phone actually received this MCP request.
+    const socket = sockets[0];
     if (!socket) {
       return json({ error: "node_offline" }, 503, corsHeaders());
     }
@@ -225,7 +242,22 @@ export class NodeRelay extends DurableObject {
           body: JSON.stringify({ error: "node_timeout" }),
         });
       }, REQUEST_TIMEOUT_MS);
-      this.pending.set(requestId, { resolve, timeout });
+      const ackTimer = setTimeout(() => {
+        const pending = this.pending.get(requestId);
+        if (!pending || pending.acked) return;
+        clearTimeout(pending.timeout);
+        this.pending.delete(requestId);
+        pending.resolve({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ error: "node_delivery_timeout" }),
+        });
+        try {
+          socket.close(1012, "PickPico request delivery ACK timed out");
+        } catch (_) {
+        }
+      }, DELIVERY_ACK_TIMEOUT_MS);
+      this.pending.set(requestId, { resolve, timeout, ackTimer, acked: false, socket });
     });
 
     try {
@@ -238,7 +270,10 @@ export class NodeRelay extends DurableObject {
       }));
     } catch (_) {
       const pending = this.pending.get(requestId);
-      if (pending) clearTimeout(pending.timeout);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        if (pending.ackTimer) clearTimeout(pending.ackTimer);
+      }
       this.pending.delete(requestId);
       return json({ error: "node_disconnected" }, 503, corsHeaders());
     }
@@ -262,12 +297,48 @@ export class NodeRelay extends DurableObject {
     } catch (_) {
       return;
     }
+    if (payload?.type === "ping" && typeof payload.nonce === "string" && payload.nonce) {
+      const attachment = ws.deserializeAttachment?.() || {};
+      ws.serializeAttachment({
+        ...attachment,
+        role: "node",
+        lastHeartbeatAt: Date.now(),
+      });
+      try {
+        ws.send(JSON.stringify({ type: "pong", nonce: payload.nonce, serverTime: Date.now() }));
+      } catch (_) {
+      }
+      return;
+    }
+    if (payload?.type === "request_ack" && typeof payload.requestId === "string") {
+      const pending = this.pending.get(payload.requestId);
+      if (!pending || pending.socket !== ws) return;
+      pending.acked = true;
+      if (pending.ackTimer) {
+        clearTimeout(pending.ackTimer);
+        pending.ackTimer = null;
+      }
+      const attachment = ws.deserializeAttachment?.() || {};
+      ws.serializeAttachment({
+        ...attachment,
+        role: "node",
+        lastHeartbeatAt: Date.now(),
+      });
+      return;
+    }
     if (payload?.type !== "response" || typeof payload.requestId !== "string") return;
 
     const pending = this.pending.get(payload.requestId);
     if (!pending) return;
     clearTimeout(pending.timeout);
+    if (pending.ackTimer) clearTimeout(pending.ackTimer);
     this.pending.delete(payload.requestId);
+    const attachment = ws.deserializeAttachment?.() || {};
+    ws.serializeAttachment({
+      ...attachment,
+      role: "node",
+      lastHeartbeatAt: Date.now(),
+    });
     pending.resolve({
       status: payload.status,
       headers: payload.headers || {},
@@ -287,9 +358,21 @@ export class NodeRelay extends DurableObject {
     return this.ctx.getWebSockets("node");
   }
 
+  socketHeartbeatAgeMs(socket) {
+    const attachment = socket?.deserializeAttachment?.() || {};
+    const lastHeartbeatAt = Number(attachment.lastHeartbeatAt);
+    if (!Number.isFinite(lastHeartbeatAt) || lastHeartbeatAt <= 0) return Infinity;
+    return Math.max(0, Date.now() - lastHeartbeatAt);
+  }
+
+  isSocketHealthy(socket) {
+    return this.socketHeartbeatAgeMs(socket) <= HEARTBEAT_STALE_MS;
+  }
+
   failPending(error) {
     for (const [requestId, pending] of this.pending.entries()) {
       clearTimeout(pending.timeout);
+      if (pending.ackTimer) clearTimeout(pending.ackTimer);
       pending.resolve({
         status: 503,
         headers: { "content-type": "application/json" },

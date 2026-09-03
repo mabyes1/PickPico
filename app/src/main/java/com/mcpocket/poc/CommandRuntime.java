@@ -556,6 +556,172 @@ final class CommandRuntime {
                 });
 
         register(
+                "contacts.search",
+                "Search the owner's Android contacts by display name and return stable contact IDs.",
+                "contacts",
+                "personal_data_read",
+                false,
+                contactsSearchSchema(),
+                (arguments, callCount) -> {
+                    String query = arguments.optString("query", "");
+                    if (query.length() > 200) {
+                        throw new CommandInputException("contacts.search query is limited to 200 characters");
+                    }
+                    int limit = arguments.optInt("limit", 20);
+                    if (limit < 1 || limit > 100) {
+                        throw new CommandInputException("contacts.search limit must be between 1 and 100");
+                    }
+                    return actions.contactsSearch(arguments, callCount);
+                });
+
+        register(
+                "contacts.get",
+                "Read one Android contact including phone numbers and email addresses.",
+                "contacts",
+                "personal_data_read",
+                false,
+                contactGetSchema(),
+                (arguments, callCount) -> {
+                    validateNumericId(arguments.optString("id", ""), "contacts.get id");
+                    return actions.contactsGet(arguments, callCount);
+                });
+
+        register(
+                "calendar.list",
+                "List Android calendar events in a time range and return available calendar IDs for future writes.",
+                "calendar",
+                "personal_data_read",
+                false,
+                calendarListSchema(),
+                (arguments, callCount) -> {
+                    long start = arguments.optLong("startEpochMs", System.currentTimeMillis());
+                    long end = arguments.optLong("endEpochMs", start + 7L * 24L * 60L * 60L * 1000L);
+                    if (end <= start) {
+                        throw new CommandInputException("calendar.list endEpochMs must be after startEpochMs");
+                    }
+                    if (end - start > 370L * 24L * 60L * 60L * 1000L) {
+                        throw new CommandInputException("calendar.list range is limited to 370 days");
+                    }
+                    int limit = arguments.optInt("limit", 50);
+                    if (limit < 1 || limit > 200) {
+                        throw new CommandInputException("calendar.list limit must be between 1 and 200");
+                    }
+                    return actions.calendarList(arguments, callCount);
+                });
+
+        register(
+                "calendar.get",
+                "Read one Android calendar event by event ID.",
+                "calendar",
+                "personal_data_read",
+                false,
+                calendarEventIdSchema(),
+                (arguments, callCount) -> {
+                    validateNumericId(arguments.optString("eventId", ""), "calendar.get eventId");
+                    return actions.calendarGet(arguments, callCount);
+                });
+
+        register(
+                "calendar.create",
+                "Create an Android calendar event. The owner approval policy applies before the write.",
+                "calendar",
+                "calendar_write",
+                true,
+                calendarCreateSchema(),
+                (arguments, callCount) -> {
+                    validateCalendarTimes(arguments, true);
+                    if (arguments.optString("title", "").trim().isEmpty()) {
+                        throw new CommandInputException("calendar.create title must not be empty");
+                    }
+                    if (arguments.has("calendarId")) {
+                        validateNumericId(arguments.optString("calendarId", ""), "calendar.create calendarId");
+                    }
+                    return actions.calendarCreate(arguments, callCount);
+                });
+
+        register(
+                "calendar.update",
+                "Update fields on one Android calendar event. The owner approval policy applies before the write.",
+                "calendar",
+                "calendar_write",
+                true,
+                calendarUpdateSchema(),
+                (arguments, callCount) -> {
+                    validateNumericId(arguments.optString("eventId", ""), "calendar.update eventId");
+                    validateCalendarTimes(arguments, false);
+                    return actions.calendarUpdate(arguments, callCount);
+                });
+
+        register(
+                "calendar.delete",
+                "Delete one Android calendar event. The owner approval policy applies before the write.",
+                "calendar",
+                "calendar_write",
+                true,
+                calendarEventIdSchema(),
+                (arguments, callCount) -> {
+                    validateNumericId(arguments.optString("eventId", ""), "calendar.delete eventId");
+                    return actions.calendarDelete(arguments, callCount);
+                });
+
+        register(
+                "file.pick",
+                "Ask the owner to choose one or more files with Android's system document picker, then import the selections into the PickPico workspace.",
+                "files",
+                "human_interaction",
+                false,
+                filePickSchema(),
+                (arguments, callCount) -> {
+                    validatePickerArguments(arguments);
+                    JSONArray mimeTypes = arguments.optJSONArray("mimeTypes");
+                    if (mimeTypes != null && mimeTypes.length() > 16) {
+                        throw new CommandInputException("file.pick supports at most 16 MIME types");
+                    }
+                    return actions.filePick(arguments, callCount);
+                });
+
+        register(
+                "media.pick",
+                "Ask the owner to choose photos or videos with Android's system media picker, then import the selections into the PickPico workspace.",
+                "media",
+                "human_interaction",
+                false,
+                mediaPickSchema(),
+                (arguments, callCount) -> {
+                    validatePickerArguments(arguments);
+                    String mediaType = arguments.optString("mediaType", "image_or_video");
+                    if (!"image".equals(mediaType)
+                            && !"video".equals(mediaType)
+                            && !"image_or_video".equals(mediaType)) {
+                        throw new CommandInputException("media.pick mediaType must be image, video, or image_or_video");
+                    }
+                    return actions.mediaPick(arguments, callCount);
+                });
+
+        register(
+                "share.send",
+                "Open Android's share sheet for Agent-prepared text, a URL, or a PickPico workspace file. The human chooses the destination app/recipient.",
+                "share",
+                "external_communication",
+                true,
+                shareSendSchema(),
+                (arguments, callCount) -> {
+                    String text = arguments.optString("text", "");
+                    String url = arguments.optString("url", "");
+                    String workspacePath = arguments.optString("workspacePath", "");
+                    if (text.isEmpty() && url.isEmpty() && workspacePath.isEmpty()) {
+                        throw new CommandInputException("share.send requires text, url, or workspacePath");
+                    }
+                    if (text.length() > 65536 || url.length() > 4096) {
+                        throw new CommandInputException("share.send text or URL is too long");
+                    }
+                    if (!workspacePath.isEmpty()) {
+                        validateWorkspacePath(workspacePath);
+                    }
+                    return actions.shareSend(arguments, callCount);
+                });
+
+        register(
                 "workspace.info",
                 "Return the PickPico workspace root, storage state, and available command-line runtimes.",
                 "workspace",
@@ -1019,6 +1185,23 @@ final class CommandRuntime {
             case "clipboard.get":
             case "clipboard.set":
                 return "clipboard copy paste text";
+            case "contacts.search":
+                return "contacts search find lookup address book person people name contact 通訊錄 聯絡人 搜尋 尋找 姓名";
+            case "contacts.get":
+                return "contact details phone email address person contact info 聯絡人 詳細 電話 email 地址";
+            case "calendar.list":
+            case "calendar.get":
+                return "calendar event events schedule agenda appointment meeting read 日曆 行事曆 行程 會議 約會";
+            case "calendar.create":
+            case "calendar.update":
+            case "calendar.delete":
+                return "calendar event schedule appointment meeting create update edit delete add 日曆 行事曆 行程 新增 修改 刪除";
+            case "file.pick":
+                return "file picker choose select upload document pdf zip browse 檔案 選擇 上傳 文件";
+            case "media.pick":
+                return "photo video media picker gallery choose select image 相簿 圖片 照片 影片 選擇";
+            case "share.send":
+                return "share send handoff android app text url file line gmail messenger 分享 傳送 傳給";
             case "workspace.list":
             case "workspace.read":
             case "workspace.write":
@@ -1603,6 +1786,179 @@ final class CommandRuntime {
                 .put("additionalProperties", false);
     }
 
+    static JSONObject contactsSearchSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("query", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 200)
+                                .put("description", "Display-name search. Empty lists contacts in name order."))
+                        .put("limit", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 100)
+                                .put("default", 20)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject contactGetSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("id", numericIdSchema("Contact ID returned by contacts.search.")))
+                .put("required", new JSONArray().put("id"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject calendarListSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("startEpochMs", new JSONObject()
+                                .put("type", "integer")
+                                .put("description", "Inclusive start in Unix epoch milliseconds. Defaults to now."))
+                        .put("endEpochMs", new JSONObject()
+                                .put("type", "integer")
+                                .put("description", "Exclusive end in Unix epoch milliseconds. Defaults to seven days after start."))
+                        .put("calendarId", numericIdSchema("Optional calendar ID filter."))
+                        .put("limit", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 200)
+                                .put("default", 50)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject calendarEventIdSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("eventId", numericIdSchema("Calendar event ID.")))
+                .put("required", new JSONArray().put("eventId"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject calendarCreateSchema() throws JSONException {
+        JSONObject properties = calendarMutableProperties();
+        properties.put("calendarId", numericIdSchema(
+                "Target calendar ID. If omitted, PickPico chooses a writable visible calendar."));
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", properties)
+                .put("required", new JSONArray().put("title").put("startEpochMs").put("endEpochMs"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject calendarUpdateSchema() throws JSONException {
+        JSONObject properties = calendarMutableProperties();
+        properties.put("eventId", numericIdSchema("Calendar event ID to update."));
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", properties)
+                .put("required", new JSONArray().put("eventId"))
+                .put("additionalProperties", false);
+    }
+
+    private static JSONObject calendarMutableProperties() throws JSONException {
+        return new JSONObject()
+                .put("title", new JSONObject().put("type", "string").put("maxLength", 500))
+                .put("description", new JSONObject().put("type", "string").put("maxLength", 10000))
+                .put("location", new JSONObject().put("type", "string").put("maxLength", 1000))
+                .put("startEpochMs", new JSONObject().put("type", "integer"))
+                .put("endEpochMs", new JSONObject().put("type", "integer"))
+                .put("allDay", new JSONObject().put("type", "boolean").put("default", false))
+                .put("timezone", new JSONObject().put("type", "string").put("maxLength", 120));
+    }
+
+    static JSONObject filePickSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("mimeTypes", new JSONObject()
+                                .put("type", "array")
+                                .put("maxItems", 16)
+                                .put("items", new JSONObject()
+                                        .put("type", "string")
+                                        .put("maxLength", 120)))
+                        .put("allowMultiple", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false))
+                        .put("maxItems", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 10)
+                                .put("default", 5))
+                        .put("timeoutSeconds", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 30)
+                                .put("maximum", 300)
+                                .put("default", 120)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject mediaPickSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("mediaType", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray()
+                                        .put("image")
+                                        .put("video")
+                                        .put("image_or_video"))
+                                .put("default", "image_or_video"))
+                        .put("allowMultiple", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false))
+                        .put("maxItems", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 10)
+                                .put("default", 5))
+                        .put("returnContent", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)
+                                .put("description", "Return selected images as native MCP image content when payload size allows."))
+                        .put("timeoutSeconds", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 30)
+                                .put("maximum", 300)
+                                .put("default", 120)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject shareSendSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("text", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 65536))
+                        .put("url", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 4096))
+                        .put("workspacePath", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 1024))
+                        .put("mimeType", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 120))
+                        .put("chooserTitle", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 120)
+                                .put("default", "Share with")))
+                .put("additionalProperties", false);
+    }
+
+    private static JSONObject numericIdSchema(String description) throws JSONException {
+        return new JSONObject()
+                .put("type", "string")
+                .put("pattern", "^[0-9]+$")
+                .put("maxLength", 32)
+                .put("description", description);
+    }
+
     static JSONObject workspaceListSchema() throws JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -1735,6 +2091,45 @@ final class CommandRuntime {
                                 .put("maxLength", 4096)
                                 .put("description", "Optional HTTP(S) update manifest URL. Defaults to <configured relay>/v1/update/latest.")))
                 .put("additionalProperties", false);
+    }
+
+    private static void validateNumericId(String raw, String label) {
+        if (raw == null || raw.isEmpty() || raw.length() > 32) {
+            throw new CommandInputException(label + " must be a numeric Android provider ID");
+        }
+        for (int index = 0; index < raw.length(); index++) {
+            if (!Character.isDigit(raw.charAt(index))) {
+                throw new CommandInputException(label + " must contain digits only");
+            }
+        }
+    }
+
+    private static void validateCalendarTimes(JSONObject arguments, boolean requireBoth) {
+        boolean hasStart = arguments.has("startEpochMs");
+        boolean hasEnd = arguments.has("endEpochMs");
+        if (requireBoth && (!hasStart || !hasEnd)) {
+            throw new CommandInputException("calendar event requires startEpochMs and endEpochMs");
+        }
+        if (hasStart && hasEnd && arguments.optLong("endEpochMs") <= arguments.optLong("startEpochMs")) {
+            throw new CommandInputException("calendar event endEpochMs must be after startEpochMs");
+        }
+        if (arguments.optString("title", "").length() > 500
+                || arguments.optString("description", "").length() > 10000
+                || arguments.optString("location", "").length() > 1000
+                || arguments.optString("timezone", "").length() > 120) {
+            throw new CommandInputException("calendar event field exceeds its maximum length");
+        }
+    }
+
+    private static void validatePickerArguments(JSONObject arguments) {
+        int timeoutSeconds = arguments.optInt("timeoutSeconds", 120);
+        if (timeoutSeconds < 30 || timeoutSeconds > 300) {
+            throw new CommandInputException("picker timeoutSeconds must be between 30 and 300");
+        }
+        int maxItems = arguments.optInt("maxItems", 5);
+        if (maxItems < 1 || maxItems > 10) {
+            throw new CommandInputException("picker maxItems must be between 1 and 10");
+        }
     }
 
     private static void validateWorkspacePath(String path) {

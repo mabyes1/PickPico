@@ -353,6 +353,30 @@ public final class McpHttpServerTest {
                 "screen.capture",
                 chineseDiscovery.getJSONArray("matches").getJSONObject(0).getString("id"));
 
+        HttpResult contactsSearch = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":532,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
+                        "\"query\":\"搜尋通訊錄聯絡人\"}}}",
+                thinHeaders());
+        JSONObject contactsDiscovery = new JSONObject(contactsSearch.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(
+                "contacts.search",
+                contactsDiscovery.getJSONArray("matches").getJSONObject(0).getString("id"));
+
+        HttpResult shareSearch = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":533,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
+                        "\"query\":\"把這個檔案分享到其他 app\"}}}",
+                thinHeaders());
+        JSONObject shareDiscovery = new JSONObject(shareSearch.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(
+                "share.send",
+                shareDiscovery.getJSONArray("matches").getJSONObject(0).getString("id"));
+
         HttpResult directLegacyTool = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":54,\"method\":\"tools/call\"," +
                         "\"params\":{\"name\":\"camera_capture\",\"arguments\":{}}}",
@@ -460,7 +484,7 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(47, listed.getInt("count"));
+        assertEquals(57, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
@@ -490,6 +514,16 @@ public final class McpHttpServerTest {
         assertTrue(listed.getJSONArray("commands").toString().contains("location.get"));
         assertTrue(listed.getJSONArray("commands").toString().contains("clipboard.get"));
         assertTrue(listed.getJSONArray("commands").toString().contains("clipboard.set"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("contacts.search"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("contacts.get"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("calendar.list"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("calendar.get"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("calendar.create"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("calendar.update"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("calendar.delete"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("file.pick"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("media.pick"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("share.send"));
         assertTrue(listed.getJSONArray("commands").toString().contains("workspace.write"));
         assertTrue(listed.getJSONArray("commands").toString().contains("node.start"));
         assertTrue(listed.getJSONArray("commands").toString().contains("app.update"));
@@ -547,7 +581,7 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(47, capabilityList.getInt("count"));
+        assertEquals(57, capabilityList.getInt("count"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
 

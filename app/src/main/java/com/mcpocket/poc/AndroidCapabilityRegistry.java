@@ -44,6 +44,29 @@ final class AndroidCapabilityRegistry {
                     || hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION);
             return setupState(result, granted, "runtime_permission", "Location permission is not granted");
         }
+        if ("contacts.search".equals(commandId) || "contacts.get".equals(commandId)) {
+            return permissionState(context, result, Manifest.permission.READ_CONTACTS, "runtime_permission");
+        }
+        if ("calendar.list".equals(commandId) || "calendar.get".equals(commandId)) {
+            return permissionState(context, result, Manifest.permission.READ_CALENDAR, "runtime_permission");
+        }
+        if ("calendar.create".equals(commandId)
+                || "calendar.update".equals(commandId)
+                || "calendar.delete".equals(commandId)) {
+            boolean granted = hasPermission(context, Manifest.permission.READ_CALENDAR)
+                    && hasPermission(context, Manifest.permission.WRITE_CALENDAR);
+            return setupState(
+                    result,
+                    granted,
+                    "runtime_permission",
+                    "Calendar read/write permissions are not granted");
+        }
+        if ("file.pick".equals(commandId) || "media.pick".equals(commandId) || "share.send".equals(commandId)) {
+            return result
+                    .put("available", true)
+                    .put("state", "available")
+                    .put("userInteractionRequired", true);
+        }
         if ("phone.notify".equals(commandId) || "human.help".equals(commandId)) {
             boolean granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                     || hasPermission(context, Manifest.permission.POST_NOTIFICATIONS);

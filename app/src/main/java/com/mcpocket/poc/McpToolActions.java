@@ -258,4 +258,51 @@ interface McpToolActions {
                 .put("capability", "clipboard.set")
                 .put("toolCallCount", callCount);
     }
+
+    default JSONObject contactsSearch(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("contacts.search", callCount);
+    }
+
+    default JSONObject contactsGet(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("contacts.get", callCount);
+    }
+
+    default JSONObject calendarList(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("calendar.list", callCount);
+    }
+
+    default JSONObject calendarGet(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("calendar.get", callCount);
+    }
+
+    default JSONObject calendarCreate(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("calendar.create", callCount);
+    }
+
+    default JSONObject calendarUpdate(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("calendar.update", callCount);
+    }
+
+    default JSONObject calendarDelete(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("calendar.delete", callCount);
+    }
+
+    default JSONObject filePick(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("file.pick", callCount);
+    }
+
+    default JSONObject mediaPick(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("media.pick", callCount);
+    }
+
+    default JSONObject shareSend(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("share.send", callCount);
+    }
+
+    private static JSONObject unsupported(String capability, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", capability)
+                .put("toolCallCount", callCount);
+    }
 }
