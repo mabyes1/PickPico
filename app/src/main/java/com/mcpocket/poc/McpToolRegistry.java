@@ -242,6 +242,12 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.execute("camera.capture", arguments, callCount));
 
         register(
+                "screen_capture",
+                "Capture the current Android screen from an active user-authorized MediaProjection session. Returns native MCP image content and stores the file in the PickPico workspace.",
+                CommandRuntime.screenCaptureSchema(),
+                (arguments, callCount) -> runtime.execute("screen.capture", arguments, callCount));
+
+        register(
                 "phone_notify",
                 "Post a user-visible Android notification from the Agent.",
                 CommandRuntime.phoneNotifySchema(),

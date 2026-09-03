@@ -204,6 +204,21 @@ public final class McpHttpServerTest {
                                         .put("data", "aW1hZ2U=")))
                         .put("toolCallCount", callCount);
             }
+
+            @Override
+            public JSONObject screenCapture(JSONObject arguments, long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("captured", true)
+                        .put("path", "captures/screen-test.jpg")
+                        .put("mimeType", "image/jpeg")
+                        .put("_mcpContent", new org.json.JSONArray()
+                                .put(new JSONObject().put("type", "text").put("text", "fake screen frame"))
+                                .put(new JSONObject()
+                                        .put("type", "image")
+                                        .put("mimeType", "image/jpeg")
+                                        .put("data", "aW1hZ2U=")))
+                        .put("toolCallCount", callCount);
+            }
         });
         server.start();
     }
@@ -299,6 +314,20 @@ public final class McpHttpServerTest {
         HttpResult response = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":61,\"method\":\"tools/call\"," +
                         "\"params\":{\"name\":\"camera_capture\",\"arguments\":{}}}",
+                authorizedHeaders());
+        assertEquals(200, response.status);
+        JSONObject result = new JSONObject(response.body).getJSONObject("result");
+        assertEquals("image", result.getJSONArray("content").getJSONObject(1).getString("type"));
+        assertEquals("image/jpeg", result.getJSONArray("content").getJSONObject(1).getString("mimeType"));
+        assertTrue(result.getJSONObject("structuredContent").getBoolean("captured"));
+        assertTrue(!result.getJSONObject("structuredContent").has("_mcpContent"));
+    }
+
+    @Test
+    public void screenCaptureReturnsNativeMcpImageContent() throws Exception {
+        HttpResult response = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":62,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"screen_capture\",\"arguments\":{}}}",
                 authorizedHeaders());
         assertEquals(200, response.status);
         JSONObject result = new JSONObject(response.body).getJSONObject("result");
