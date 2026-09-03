@@ -124,6 +124,15 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.phoneLock(callCount));
 
         register(
+                "phone.wake",
+                "Turn on the phone display without dismissing the lock screen.",
+                "phone",
+                "physical_action",
+                true,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.phoneWake(callCount));
+
+        register(
                 "phone.echo",
                 "Show an observable message through vibration and the foreground notification.",
                 "phone",
@@ -147,6 +156,247 @@ final class CommandRuntime {
                         throw new CommandInputException("phone.echo text is limited to 512 characters");
                     }
                     return actions.phoneEcho(text, callCount);
+                });
+
+        register(
+                "camera.capture",
+                "Capture one JPEG frame from the Android camera and persist it in the MCPocket workspace.",
+                "sensor",
+                "sensor_read",
+                true,
+                cameraCaptureSchema(),
+                (arguments, callCount) -> {
+                    String lens = arguments.optString("lens", "back");
+                    if (!"back".equals(lens) && !"front".equals(lens) && !"any".equals(lens)) {
+                        throw new CommandInputException("camera.capture lens must be back, front, or any");
+                    }
+                    int maxWidth = arguments.optInt("maxWidth", 1280);
+                    int maxHeight = arguments.optInt("maxHeight", 1280);
+                    int quality = arguments.optInt("quality", 85);
+                    if (maxWidth < 320 || maxWidth > 4096 || maxHeight < 320 || maxHeight > 4096) {
+                        throw new CommandInputException("camera.capture maxWidth/maxHeight must be between 320 and 4096");
+                    }
+                    if (quality < 50 || quality > 100) {
+                        throw new CommandInputException("camera.capture quality must be between 50 and 100");
+                    }
+                    return actions.cameraCapture(arguments, callCount);
+                });
+
+        register(
+                "phone.notify",
+                "Post a user-visible Android notification from the Agent.",
+                "interaction",
+                "physical_action",
+                true,
+                phoneNotifySchema(),
+                (arguments, callCount) -> {
+                    String title = arguments.optString("title", "MCPocket Agent");
+                    String body = arguments.optString("body", "");
+                    if (title.isEmpty() || title.length() > 120) {
+                        throw new CommandInputException("phone.notify title must be 1-120 characters");
+                    }
+                    if (body.isEmpty() || body.length() > 2000) {
+                        throw new CommandInputException("phone.notify body must be 1-2000 characters");
+                    }
+                    return actions.phoneNotify(arguments, callCount);
+                });
+
+        register(
+                "phone.speak",
+                "Speak text through Android TextToSpeech so the Agent can address people near the phone.",
+                "interaction",
+                "physical_action",
+                true,
+                phoneSpeakSchema(),
+                (arguments, callCount) -> {
+                    String text = arguments.optString("text", "");
+                    if (text.isEmpty() || text.length() > 2000) {
+                        throw new CommandInputException("phone.speak text must be 1-2000 characters");
+                    }
+                    double rate = arguments.optDouble("rate", 1.0);
+                    double pitch = arguments.optDouble("pitch", 1.0);
+                    if (rate < 0.5 || rate > 2.0 || pitch < 0.5 || pitch > 2.0) {
+                        throw new CommandInputException("phone.speak rate and pitch must be between 0.5 and 2.0");
+                    }
+                    String queue = arguments.optString("queue", "flush");
+                    if (!"flush".equals(queue) && !"add".equals(queue)) {
+                        throw new CommandInputException("phone.speak queue must be flush or add");
+                    }
+                    return actions.phoneSpeak(arguments, callCount);
+                });
+
+        register(
+                "microphone.record",
+                "Record mono 16 kHz WAV audio from the Android microphone and persist it in the MCPocket workspace.",
+                "sensor",
+                "sensor_read",
+                true,
+                microphoneRecordSchema(),
+                (arguments, callCount) -> {
+                    int durationMs = arguments.optInt("durationMs", 3000);
+                    if (durationMs < 500 || durationMs > 10000) {
+                        throw new CommandInputException("microphone.record durationMs must be between 500 and 10000");
+                    }
+                    return actions.microphoneRecord(arguments, callCount);
+                });
+
+        register(
+                "human.help",
+                "Ask the nearby human for help through MCPocket and block until they respond or the renewable idle timeout expires. Human typing, image selection, or camera activity renews the idle timeout.",
+                "interaction",
+                "human_interaction",
+                true,
+                humanHelpSchema(),
+                (arguments, callCount) -> {
+                    String instruction = arguments.optString("instruction", "");
+                    if (instruction.isEmpty() || instruction.length() > 4000) {
+                        throw new CommandInputException("human.help instruction must be 1-4000 characters");
+                    }
+                    int idleTimeoutSeconds = arguments.optInt("idleTimeoutSeconds", 180);
+                    if (idleTimeoutSeconds != 120 && idleTimeoutSeconds != 180 && idleTimeoutSeconds != 360) {
+                        throw new CommandInputException("human.help idleTimeoutSeconds must be 120, 180, or 360");
+                    }
+                    int maxImages = arguments.optInt("maxImages", 3);
+                    if (maxImages < 0 || maxImages > 3) {
+                        throw new CommandInputException("human.help maxImages must be between 0 and 3");
+                    }
+                    JSONArray actionsList = arguments.optJSONArray("actions");
+                    if (actionsList != null && actionsList.length() > 6) {
+                        throw new CommandInputException("human.help supports at most 6 actions");
+                    }
+                    return actions.humanHelp(arguments, callCount);
+                });
+
+        register(
+                "human.help.status",
+                "Return the current human-help request state and, when completed, the human response and optional image attachments.",
+                "interaction",
+                "read_only",
+                false,
+                humanHelpStatusSchema(),
+                (arguments, callCount) -> {
+                    String requestId = arguments.optString("requestId", "");
+                    if (requestId.isEmpty() || requestId.length() > 128) {
+                        throw new CommandInputException("human.help.status requires a valid requestId");
+                    }
+                    return actions.humanHelpStatus(arguments, callCount);
+                });
+
+        register(
+                "notification.list",
+                "List currently active Android notifications visible to MCPocket's Notification Listener.",
+                "notification",
+                "personal_data_read",
+                false,
+                notificationListSchema(),
+                (arguments, callCount) -> actions.notificationList(arguments, callCount));
+
+        register(
+                "notification.get",
+                "Return one active Android notification by notification key.",
+                "notification",
+                "personal_data_read",
+                false,
+                notificationKeySchema(),
+                (arguments, callCount) -> {
+                    String key = arguments.optString("key", "");
+                    if (key.isEmpty() || key.length() > 1024) {
+                        throw new CommandInputException("notification.get requires a valid key");
+                    }
+                    return actions.notificationGet(arguments, callCount);
+                });
+
+        register(
+                "notification.dismiss",
+                "Dismiss one active Android notification by notification key.",
+                "notification",
+                "notification_write",
+                true,
+                notificationKeySchema(),
+                (arguments, callCount) -> {
+                    String key = arguments.optString("key", "");
+                    if (key.isEmpty() || key.length() > 1024) {
+                        throw new CommandInputException("notification.dismiss requires a valid key");
+                    }
+                    return actions.notificationDismiss(arguments, callCount);
+                });
+
+        register(
+                "app.list",
+                "List launchable Android apps with labels and package names.",
+                "app",
+                "read_only",
+                false,
+                appListSchema(),
+                (arguments, callCount) -> actions.appList(arguments, callCount));
+
+        register(
+                "app.launch",
+                "Launch an installed Android app by package name.",
+                "app",
+                "physical_action",
+                true,
+                appLaunchSchema(),
+                (arguments, callCount) -> {
+                    String packageName = arguments.optString("packageName", "");
+                    if (packageName.isEmpty() || packageName.length() > 255) {
+                        throw new CommandInputException("app.launch requires a valid packageName");
+                    }
+                    return actions.appLaunch(arguments, callCount);
+                });
+
+        register(
+                "url.open",
+                "Open a web URL, Android deep link, geo URI, navigation URI, telephone URI, or another registered safe URI scheme.",
+                "app",
+                "physical_action",
+                true,
+                urlOpenSchema(),
+                (arguments, callCount) -> {
+                    String url = arguments.optString("url", "");
+                    if (url.isEmpty() || url.length() > 4096) {
+                        throw new CommandInputException("url.open url must be 1-4096 characters");
+                    }
+                    return actions.urlOpen(arguments, callCount);
+                });
+
+        register(
+                "location.get",
+                "Get the phone's current location with timestamp and accuracy. Returns setup guidance when location permission is unavailable.",
+                "location",
+                "sensitive_sensor_read",
+                false,
+                locationGetSchema(),
+                (arguments, callCount) -> {
+                    int timeoutMs = arguments.optInt("timeoutMs", 7000);
+                    if (timeoutMs < 500 || timeoutMs > 15000) {
+                        throw new CommandInputException("location.get timeoutMs must be between 500 and 15000");
+                    }
+                    return actions.locationGet(arguments, callCount);
+                });
+
+        register(
+                "clipboard.get",
+                "Read plain text from the Android clipboard when Android permits MCPocket clipboard access.",
+                "clipboard",
+                "personal_data_read",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.clipboardGet(callCount));
+
+        register(
+                "clipboard.set",
+                "Put plain text onto the Android clipboard.",
+                "clipboard",
+                "clipboard_write",
+                true,
+                clipboardSetSchema(),
+                (arguments, callCount) -> {
+                    String text = arguments.optString("text", "");
+                    if (text.length() > 65536) {
+                        throw new CommandInputException("clipboard.set text is limited to 65536 characters");
+                    }
+                    return actions.clipboardSet(arguments, callCount);
                 });
 
         register(
@@ -250,6 +500,24 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.appUpdate(arguments, callCount));
 
         register(
+                "app.update_check",
+                "Check MCPocket's configured update channel and report whether a newer signed APK is available.",
+                "app",
+                "read_only",
+                false,
+                appUpdateChannelSchema(),
+                (arguments, callCount) -> actions.appUpdateCheck(arguments, callCount));
+
+        register(
+                "app.update_latest",
+                "Resolve the latest MCPocket release from the configured update channel and start the verified self-update flow.",
+                "app",
+                "software_update",
+                true,
+                appUpdateChannelSchema(),
+                (arguments, callCount) -> actions.appUpdateLatest(arguments, callCount));
+
+        register(
                 "app.update_status",
                 "Return MCPocket self-update progress, setup requirements, and installer status.",
                 "app",
@@ -328,14 +596,6 @@ final class CommandRuntime {
                 .put("count", result.length());
     }
 
-    JSONArray commandIds() {
-        JSONArray ids = new JSONArray();
-        for (String id : commands.keySet()) {
-            ids.put(id);
-        }
-        return ids;
-    }
-
     JSONObject execute(String commandId, JSONObject arguments, long callCount) throws JSONException {
         Command command = requireCommand(commandId);
         return command.handler.call(arguments == null ? new JSONObject() : arguments, callCount);
@@ -350,13 +610,18 @@ final class CommandRuntime {
             JSONObject result = command.handler.call(
                     arguments == null ? new JSONObject() : arguments,
                     callCount);
+            JSONObject publicResult = new JSONObject(result.toString());
+            if (publicResult.remove("_mcpContent") != null) {
+                publicResult.put("mediaContentOmitted", true);
+                publicResult.put("mediaHint", "Use the direct media MCP tool to receive image/audio content.");
+            }
             JSONObject execution = new JSONObject()
                     .put("executionId", executionId)
                     .put("commandId", commandId)
                     .put("status", "completed")
                     .put("startedAt", startedAt)
                     .put("completedAt", Instant.now().toString())
-                    .put("result", result);
+                    .put("result", publicResult);
             remember(executionId, execution);
             return execution;
         } catch (CommandInputException error) {
@@ -421,7 +686,7 @@ final class CommandRuntime {
         }
     }
 
-    private static JSONObject noArgumentsSchema() throws JSONException {
+    static JSONObject noArgumentsSchema() throws JSONException {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject())
@@ -464,6 +729,247 @@ final class CommandRuntime {
                                 .put("default", false)
                                 .put("description", "Keep the process alive as a managed session and return immediately.")))
                 .put("required", new JSONArray().put("command"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject cameraCaptureSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("lens", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray().put("back").put("front").put("any"))
+                                .put("default", "back"))
+                        .put("maxWidth", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 320)
+                                .put("maximum", 4096)
+                                .put("default", 1280))
+                        .put("maxHeight", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 320)
+                                .put("maximum", 4096)
+                                .put("default", 1280))
+                        .put("quality", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 50)
+                                .put("maximum", 100)
+                                .put("default", 85))
+                        .put("returnContent", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject phoneNotifySchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("title", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 120)
+                                .put("default", "MCPocket Agent"))
+                        .put("body", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 2000)))
+                .put("required", new JSONArray().put("body"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject phoneSpeakSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("text", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 2000))
+                        .put("language", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 64)
+                                .put("description", "Optional BCP-47 language tag, for example zh-TW or en-US."))
+                        .put("rate", new JSONObject()
+                                .put("type", "number")
+                                .put("minimum", 0.5)
+                                .put("maximum", 2.0)
+                                .put("default", 1.0))
+                        .put("pitch", new JSONObject()
+                                .put("type", "number")
+                                .put("minimum", 0.5)
+                                .put("maximum", 2.0)
+                                .put("default", 1.0))
+                        .put("queue", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray().put("flush").put("add"))
+                                .put("default", "flush")))
+                .put("required", new JSONArray().put("text"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject microphoneRecordSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("durationMs", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 500)
+                                .put("maximum", 10000)
+                                .put("default", 3000))
+                        .put("returnContent", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject humanHelpSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("title", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 160)
+                                .put("default", "AI needs your help"))
+                        .put("instruction", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 4000))
+                        .put("actions", new JSONObject()
+                                .put("type", "array")
+                                .put("maxItems", 6)
+                                .put("items", new JSONObject()
+                                        .put("type", "string")
+                                        .put("minLength", 1)
+                                        .put("maxLength", 80)))
+                        .put("allowTextReply", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true))
+                        .put("allowImages", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true))
+                        .put("maxImages", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 0)
+                                .put("maximum", 3)
+                                .put("default", 3))
+                        .put("idleTimeoutSeconds", new JSONObject()
+                                .put("type", "integer")
+                                .put("enum", new JSONArray().put(120).put(180).put(360))
+                                .put("description", "Renewable human-idle timeout. Choose 120s for a quick nearby action, 180s for normal help, or 360s for a task that may require moving, taking a photo, or finding something. Human activity resets this timer.")
+                                .put("default", 180)))
+                .put("required", new JSONArray().put("instruction"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject humanHelpStatusSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("requestId", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 128))
+                        .put("includeAttachmentData", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)))
+                .put("required", new JSONArray().put("requestId"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject notificationListSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("limit", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 200)
+                                .put("default", 50))
+                        .put("includeOwn", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject notificationKeySchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("key", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 1024)))
+                .put("required", new JSONArray().put("key"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject appListSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("query", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 120))
+                        .put("limit", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 300)
+                                .put("default", 100)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject appLaunchSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("packageName", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 255)))
+                .put("required", new JSONArray().put("packageName"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject urlOpenSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("url", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 4096)))
+                .put("required", new JSONArray().put("url"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject locationGetSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("timeoutMs", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 500)
+                                .put("maximum", 15000)
+                                .put("default", 7000))
+                        .put("highAccuracy", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject clipboardSetSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("text", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 65536))
+                        .put("label", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 120)
+                                .put("default", "MCPocket Agent")))
+                .put("required", new JSONArray().put("text"))
                 .put("additionalProperties", false);
     }
 
@@ -586,6 +1092,18 @@ final class CommandRuntime {
                                 .put("default", false)
                                 .put("description", "Development-only override for reinstalling the same version.")))
                 .put("required", new JSONArray().put("url").put("sha256"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject appUpdateChannelSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("manifestUrl", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 8)
+                                .put("maxLength", 4096)
+                                .put("description", "Optional HTTP(S) update manifest URL. Defaults to <configured relay>/v1/update/latest.")))
                 .put("additionalProperties", false);
     }
 

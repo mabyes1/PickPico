@@ -38,6 +38,52 @@ final class McpToolRegistry {
 
     McpToolRegistry(McpToolActions actions) throws JSONException {
         CommandRuntime runtime = new CommandRuntime(actions);
+        AgentTaskRuntime tasks = new AgentTaskRuntime();
+
+        register(
+                "task_runtime_info",
+                "Describe MCPocket's Agent task runtime and current retained task lifecycle state.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> tasks.info());
+
+        register(
+                "task_create",
+                "Create a long-lived Agent task that can span multiple MCP commands, device capabilities, and human interactions.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("objective", new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 4096))
+                                .put("title", new JSONObject().put("type", "string").put("maxLength", 160))
+                                .put("agent", new JSONObject().put("type", "string").put("maxLength", 160))
+                                .put("context", new JSONObject().put("type", "object")))
+                        .put("required", new JSONArray().put("objective"))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> tasks.create(arguments));
+
+        register(
+                "task_update",
+                "Update an Agent task state or append a progress/blocker note.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("taskId", new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 128))
+                                .put("status", new JSONObject().put("type", "string").put("enum", new JSONArray()
+                                        .put("created").put("running").put("blocked").put("waiting_human")
+                                        .put("completed").put("failed").put("cancelled")))
+                                .put("note", new JSONObject().put("type", "string").put("maxLength", 4096)))
+                        .put("required", new JSONArray().put("taskId"))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> tasks.update(arguments));
+
+        register(
+                "task_status",
+                "Return one Agent task by ID, or the retained task list when taskId is omitted.",
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("taskId", new JSONObject().put("type", "string").put("maxLength", 128)))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> tasks.status(arguments));
 
         register(
                 "command_list",
@@ -47,13 +93,14 @@ final class McpToolRegistry {
 
         register(
                 "command_run",
-                "Run one MCPocket command by capability ID with structured JSON arguments.",
+                "Run one MCPocket command by capability ID with structured JSON arguments. Use command_list to discover the current capability IDs.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
                                 .put("commandId", new JSONObject()
                                         .put("type", "string")
-                                        .put("enum", runtime.commandIds()))
+                                        .put("minLength", 1)
+                                        .put("description", "Capability ID returned by command_list."))
                                 .put("arguments", new JSONObject()
                                         .put("type", "object")
                                         .put("default", new JSONObject())))
@@ -141,6 +188,18 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.execute("app.update", arguments, callCount));
 
         register(
+                "app_update_check",
+                "Check MCPocket's update channel and report the latest published version without installing it.",
+                CommandRuntime.appUpdateChannelSchema(),
+                (arguments, callCount) -> runtime.execute("app.update_check", arguments, callCount));
+
+        register(
+                "app_update_latest",
+                "Update MCPocket to the latest published signed APK without requiring the Agent to supply an APK URL or SHA-256.",
+                CommandRuntime.appUpdateChannelSchema(),
+                (arguments, callCount) -> runtime.execute("app.update_latest", arguments, callCount));
+
+        register(
                 "app_update_status",
                 "Return MCPocket self-update state and whether Android allows MCPocket to request package installs.",
                 noArgumentsSchema(),
@@ -157,6 +216,30 @@ final class McpToolRegistry {
                 "Return a live Android phone snapshot including battery, network, storage, and node state.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("phone.status", arguments, callCount));
+
+        register(
+                "camera_capture",
+                "Capture a JPEG image from the Android camera. Returns native MCP image content and stores the file in the MCPocket workspace.",
+                CommandRuntime.cameraCaptureSchema(),
+                (arguments, callCount) -> runtime.execute("camera.capture", arguments, callCount));
+
+        register(
+                "phone_notify",
+                "Post a user-visible Android notification from the Agent.",
+                CommandRuntime.phoneNotifySchema(),
+                (arguments, callCount) -> runtime.execute("phone.notify", arguments, callCount));
+
+        register(
+                "phone_speak",
+                "Speak text through Android TextToSpeech.",
+                CommandRuntime.phoneSpeakSchema(),
+                (arguments, callCount) -> runtime.execute("phone.speak", arguments, callCount));
+
+        register(
+                "microphone_record",
+                "Record mono 16 kHz WAV audio from the Android microphone. Returns native MCP audio content and stores the file in the MCPocket workspace.",
+                CommandRuntime.microphoneRecordSchema(),
+                (arguments, callCount) -> runtime.execute("microphone.record", arguments, callCount));
 
         register(
                 "phone_exec",
@@ -197,6 +280,12 @@ final class McpToolRegistry {
                 (arguments, callCount) -> {
                     return runtime.execute("phone.ring", arguments, callCount);
                 });
+
+        register(
+                "phone_wake",
+                "Turn on the Android phone display without dismissing the lock screen.",
+                CommandRuntime.noArgumentsSchema(),
+                (arguments, callCount) -> runtime.execute("phone.wake", arguments, callCount));
 
         register(
                 "phone_echo",
@@ -243,11 +332,17 @@ final class McpToolRegistry {
         }
         try {
             JSONObject structured = tool.handler.call(arguments, callCount);
+            JSONObject publicStructured = new JSONObject(structured.toString());
+            JSONArray content = publicStructured.optJSONArray("_mcpContent");
+            publicStructured.remove("_mcpContent");
+            if (content == null) {
+                content = new JSONArray().put(new JSONObject()
+                        .put("type", "text")
+                        .put("text", publicStructured.toString(2)));
+            }
             return new JSONObject()
-                    .put("content", new JSONArray().put(new JSONObject()
-                            .put("type", "text")
-                            .put("text", structured.toString(2))))
-                    .put("structuredContent", structured)
+                    .put("content", content)
+                    .put("structuredContent", publicStructured)
                     .put("isError", false);
         } catch (ToolInputException | CommandRuntime.CommandInputException error) {
             return toolError(error.getMessage(), modern);

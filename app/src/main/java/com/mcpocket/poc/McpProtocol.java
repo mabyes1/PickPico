@@ -13,7 +13,6 @@ final class McpProtocol {
     static final String MODERN_VERSION = "2026-07-28";
     private static final String DEFAULT_LEGACY_VERSION = "2025-11-25";
     private static final String SERVER_NAME = "MCPocket";
-    private static final String SERVER_VERSION = "0.10.6";
     private static final String SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
     private static final Set<String> LEGACY_VERSIONS = new HashSet<>(Arrays.asList(
             "2025-11-25", "2025-06-18", "2025-03-26"));
@@ -83,8 +82,9 @@ final class McpProtocol {
                 .put("capabilities", capabilities())
                 .put("serverInfo", implementation())
                 .put("instructions",
-                        "MCPocket is a user-started Android execution node. Use server_info for status and " +
-                                "phone_echo for an observable, allowlisted phone action.");
+                        "MCPocket is a user-started Android Mobile Agent Node. It lets an external Agent " +
+                                "execute work, sense through phone hardware, and interact with people nearby. " +
+                                "Use server_info or phone_status for node and capability state.");
     }
 
     private JSONObject discover() throws JSONException {
@@ -92,7 +92,8 @@ final class McpProtocol {
                 .put("supportedVersions", new JSONArray().put(MODERN_VERSION).put(DEFAULT_LEGACY_VERSION))
                 .put("capabilities", capabilities())
                 .put("instructions",
-                        "MCPocket exposes only allowlisted phone tools; arbitrary shell execution is disabled.")
+                        "MCPocket exposes Android device capabilities plus sandboxed workspace/process execution. " +
+                                "Camera and microphone require user-granted Android permissions and a user-started node.")
                 .put("ttlMs", 0)
                 .put("cacheScope", "private");
     }
@@ -111,7 +112,7 @@ final class McpProtocol {
     }
 
     private static JSONObject implementation() throws JSONException {
-        return new JSONObject().put("name", SERVER_NAME).put("version", SERVER_VERSION);
+        return new JSONObject().put("name", SERVER_NAME).put("version", BuildConfig.VERSION_NAME);
     }
 
     static void decorateModern(JSONObject result) throws JSONException {

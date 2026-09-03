@@ -4,3 +4,10 @@ local.properties
 **/build/
 **/.cxx/
 *.iml
+relay/node_modules/
+relay/.wrangler/
+relay/.dev.vars
+.env
+.env.*
+*.jks
+*.keystore

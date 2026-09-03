@@ -49,18 +49,16 @@ android {
     compileSdk 35
     ndkVersion '27.3.13750724'
 
-    signingConfigs {
-        debug {
-            storeFile file('C:/Users/ken/.android/debug.keystore')
-        }
+    buildFeatures {
+        buildConfig true
     }
 
     defaultConfig {
         applicationId 'com.mcpocket.poc'
         minSdk 26
         targetSdk 35
-        versionCode 18
-        versionName '0.10.6'
+        versionCode 30
+        versionName '0.13.6'
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -110,6 +108,8 @@ tasks.configureEach { task ->
 }
 
 dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20250517'
 }

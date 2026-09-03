@@ -1,5 +1,6 @@
 package com.mcpocket.poc;
 
+import android.Manifest;
 import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -10,6 +11,7 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
@@ -60,10 +62,14 @@ public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String EXTRA_TOKEN = "token";
+    public static final String EXTRA_ENABLE_MEDIA_FGS = "enableMediaForegroundCapabilities";
 
     public static final String PREFS = "mcpocket_node";
     public static final String KEY_RUNNING = "running";
     public static final String KEY_ENDPOINT = "endpoint";
+    public static final String KEY_REMOTE_ENDPOINT = "remote_endpoint";
+    public static final String KEY_RELAY_BASE_URL = "relay_base_url";
+    public static final String KEY_RELAY_STATUS = "relay_status";
     public static final String KEY_TOKEN = "token";
     public static final String KEY_RECENT = "recent";
     public static final String KEY_CALL_COUNT = "call_count";
@@ -82,11 +88,15 @@ public final class McpNodeService extends Service implements McpToolActions {
     private final LinkedHashMap<String, ProcessSession> processSessions = new LinkedHashMap<>();
     private Ringtone activeRing;
     private int previousAlarmVolume = -1;
+    private AndroidDeviceCapabilities deviceCapabilities;
+    private boolean mediaForegroundRequested;
+    private RelayClient relayClient;
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        deviceCapabilities = new AndroidDeviceCapabilities(this, workspaceRoot());
     }
 
     @Override
@@ -107,6 +117,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             return START_NOT_STICKY;
         }
 
+        mediaForegroundRequested = intent.getBooleanExtra(EXTRA_ENABLE_MEDIA_FGS, false);
         nodeActive = true;
         startAsForeground("Starting local MCP server…");
         try {
@@ -122,6 +133,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                     .putLong(KEY_CALL_COUNT, 0L)
                     .remove(KEY_ERROR)
                     .apply();
+            startRelayIfConfigured();
             updateNotification("Listening on " + endpoint);
         } catch (Exception error) {
             nodeActive = false;
@@ -141,6 +153,11 @@ public final class McpNodeService extends Service implements McpToolActions {
         nodeActive = false;
         stopAlertSound();
         stopAllProcessSessions();
+        if (deviceCapabilities != null) {
+            deviceCapabilities.shutdown();
+            deviceCapabilities = null;
+        }
+        stopRelay();
         if (server != null) {
             server.stop();
             server = null;
@@ -163,11 +180,15 @@ public final class McpNodeService extends Service implements McpToolActions {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "MCPocket")
-                .put("version", "0.10.6")
+                .put("version", BuildConfig.VERSION_NAME)
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
                 .put("apiLevel", Build.VERSION.SDK_INT)
                 .put("endpoint", endpoint)
+                .put("remoteEndpoint", getSharedPreferences(PREFS, MODE_PRIVATE)
+                        .getString(KEY_REMOTE_ENDPOINT, ""))
+                .put("relayStatus", getSharedPreferences(PREFS, MODE_PRIVATE)
+                        .getString(KEY_RELAY_STATUS, "disabled"))
                 .put("workspaceRoot", workspaceRoot().getAbsolutePath())
                 .put("uptimeSeconds", uptimeMs / 1000L)
                 .put("toolCallCount", callCount);
@@ -206,8 +227,15 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("storage", new JSONObject()
                         .put("appDataFreeBytes", storage.getAvailableBytes())
                         .put("appDataTotalBytes", storage.getTotalBytes()))
+                .put("capabilities", deviceCapabilities == null
+                        ? new JSONObject()
+                        : deviceCapabilities.status())
                 .put("node", new JSONObject()
                         .put("endpoint", endpoint)
+                        .put("remoteEndpoint", getSharedPreferences(PREFS, MODE_PRIVATE)
+                                .getString(KEY_REMOTE_ENDPOINT, ""))
+                        .put("relayStatus", getSharedPreferences(PREFS, MODE_PRIVATE)
+                                .getString(KEY_RELAY_STATUS, "disabled"))
                         .put("uptimeSeconds", uptimeMs / 1000L)
                         .put("toolCallCount", callCount));
     }
@@ -666,6 +694,16 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    public JSONObject appUpdateCheck(JSONObject arguments, long callCount) throws JSONException {
+        return SelfUpdateManager.checkLatest(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject appUpdateLatest(JSONObject arguments, long callCount) throws JSONException {
+        return SelfUpdateManager.startLatest(this, arguments, callCount);
+    }
+
+    @Override
     public JSONObject appUpdateStatus(long callCount) throws JSONException {
         return SelfUpdateManager.status(this, callCount);
     }
@@ -749,8 +787,64 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
+    public JSONObject phoneWake(long callCount) throws JSONException {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null) {
+            return new JSONObject()
+                    .put("woke", false)
+                    .put("supported", false)
+                    .put("error", "PowerManager is unavailable")
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        }
+
+        boolean wasInteractive = power.isInteractive();
+        long observationStartedAt = android.os.SystemClock.elapsedRealtime();
+        boolean interactive = wasInteractive;
+        if (!wasInteractive) {
+            int flags = PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                    | PowerManager.ON_AFTER_RELEASE;
+            PowerManager.WakeLock wakeLock = power.newWakeLock(flags, "MCPocket:phoneWake");
+            wakeLock.setReferenceCounted(false);
+            try {
+                wakeLock.acquire(3000L);
+                long deadline = observationStartedAt + 1000L;
+                do {
+                    interactive = power.isInteractive();
+                    if (interactive) {
+                        break;
+                    }
+                    android.os.SystemClock.sleep(50L);
+                } while (android.os.SystemClock.elapsedRealtime() < deadline);
+
+                if (!interactive) {
+                    interactive = power.isInteractive();
+                }
+            } finally {
+                if (wakeLock.isHeld()) {
+                    wakeLock.release();
+                }
+            }
+        }
+
+        long observationMs = android.os.SystemClock.elapsedRealtime() - observationStartedAt;
+        boolean woke = !wasInteractive && interactive;
+        return new JSONObject()
+                .put("woke", woke)
+                .put("wasInteractive", wasInteractive)
+                .put("interactive", interactive)
+                .put("observationMs", observationMs)
+                .put("unlocked", false)
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
     public JSONObject phoneEcho(String text, long callCount) throws JSONException {
         vibrate();
+        String inboxId = AgentInboxStore.add(this, "phone.echo", "MCPocket Agent", text);
         String summary = "phone_echo #" + callCount + ": " + abbreviate(text, 80);
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(KEY_RECENT, summary + "\n" + Instant.now())
@@ -759,15 +853,144 @@ public final class McpNodeService extends Service implements McpToolActions {
         updateNotification(summary);
         return new JSONObject()
                 .put("echo", text)
+                .put("inboxId", inboxId)
                 .put("executedOn", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("timestamp", Instant.now().toString())
                 .put("action", "vibrated_and_updated_notification")
                 .put("toolCallCount", callCount);
     }
 
+    @Override
+    public JSONObject cameraCapture(JSONObject arguments, long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("captured", callCount);
+        }
+        JSONObject result = deviceCapabilities.captureCamera(arguments, callCount);
+        recordCapabilityAction("camera.capture", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject phoneNotify(JSONObject arguments, long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("notified", callCount);
+        }
+        JSONObject result = deviceCapabilities.notifyUser(arguments, callCount);
+        recordCapabilityAction("phone.notify", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject phoneSpeak(JSONObject arguments, long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("speaking", callCount);
+        }
+        JSONObject result = deviceCapabilities.speak(arguments, callCount);
+        recordCapabilityAction("phone.speak", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject microphoneRecord(JSONObject arguments, long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("recorded", callCount);
+        }
+        JSONObject result = deviceCapabilities.recordMicrophone(arguments, callCount);
+        recordCapabilityAction("microphone.record", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject humanHelp(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = HumanHelpStore.createAndWait(this, arguments, callCount);
+        recordCapabilityAction("human.help", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject humanHelpStatus(JSONObject arguments, long callCount) throws JSONException {
+        return HumanHelpStore.status(
+                this,
+                arguments.optString("requestId", ""),
+                arguments.optBoolean("includeAttachmentData", true),
+                callCount);
+    }
+
+    @Override
+    public JSONObject notificationList(JSONObject arguments, long callCount) throws JSONException {
+        return McpNotificationListenerService.list(
+                this,
+                Math.max(1, Math.min(200, arguments.optInt("limit", 50))),
+                arguments.optBoolean("includeOwn", false),
+                callCount);
+    }
+
+    @Override
+    public JSONObject notificationGet(JSONObject arguments, long callCount) throws JSONException {
+        return McpNotificationListenerService.get(this, arguments.optString("key", ""), callCount);
+    }
+
+    @Override
+    public JSONObject notificationDismiss(JSONObject arguments, long callCount) throws JSONException {
+        return McpNotificationListenerService.dismiss(this, arguments.optString("key", ""), callCount);
+    }
+
+    @Override
+    public JSONObject appList(JSONObject arguments, long callCount) throws JSONException {
+        return AndroidAgentActions.appList(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject appLaunch(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidAgentActions.appLaunch(this, arguments, callCount);
+        recordCapabilityAction("app.launch", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject urlOpen(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidAgentActions.urlOpen(this, arguments, callCount);
+        recordCapabilityAction("url.open", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject locationGet(JSONObject arguments, long callCount) throws JSONException {
+        return AndroidAgentActions.locationGet(this, arguments, callCount);
+    }
+
+    @Override
+    public JSONObject clipboardGet(long callCount) throws JSONException {
+        return AndroidAgentActions.clipboardGet(this, callCount);
+    }
+
+    @Override
+    public JSONObject clipboardSet(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = AndroidAgentActions.clipboardSet(this, arguments, callCount);
+        recordCapabilityAction("clipboard.set", result, callCount);
+        return result;
+    }
+
+    private JSONObject capabilityRuntimeUnavailable(String resultKey, long callCount) throws JSONException {
+        return new JSONObject()
+                .put(resultKey, false)
+                .put("errorCode", "capability_runtime_unavailable")
+                .put("toolCallCount", callCount);
+    }
+
+    private void recordCapabilityAction(String capability, JSONObject result, long callCount) {
+        String detail = result.optString("path", result.optString("errorCode", "ok"));
+        String summary = capability + " #" + callCount + ": " + abbreviate(detail, 80);
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(KEY_RECENT, summary + "\n" + Instant.now())
+                .putLong(KEY_CALL_COUNT, callCount)
+                .apply();
+    }
+
     private void stopNode() {
         nodeActive = false;
         stopAlertSound();
+        stopRelay();
         if (server != null) {
             server.stop();
             server = null;
@@ -775,12 +998,47 @@ public final class McpNodeService extends Service implements McpToolActions {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(KEY_RUNNING, false)
                 .putString(KEY_ENDPOINT, "")
+                .putString(KEY_REMOTE_ENDPOINT, "")
+                .putString(KEY_RELAY_STATUS, "stopped")
                 .putString(KEY_TOKEN, "")
                 .putString(KEY_RECENT, "Node stopped at " + Instant.now())
                 .remove(KEY_ERROR)
                 .apply();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
+    }
+
+    private void startRelayIfConfigured() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String relayBaseUrl = prefs.getString(KEY_RELAY_BASE_URL, "");
+        if (TextUtils.isEmpty(relayBaseUrl)) {
+            prefs.edit()
+                    .putString(KEY_RELAY_STATUS, "disabled")
+                    .putString(KEY_REMOTE_ENDPOINT, "")
+                    .apply();
+            return;
+        }
+        stopRelay();
+        relayClient = new RelayClient(this, relayBaseUrl, new RelayClient.Listener() {
+            @Override
+            public void onRelayState(String status, String remoteEndpoint, String detail) {
+                SharedPreferences.Editor editor = getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                        .putString(KEY_RELAY_STATUS, status)
+                        .putString(KEY_REMOTE_ENDPOINT, remoteEndpoint == null ? "" : remoteEndpoint);
+                if (detail != null && !detail.isEmpty()) {
+                    editor.putString(KEY_RECENT, "relay: " + detail + "\n" + Instant.now());
+                }
+                editor.apply();
+            }
+        });
+        relayClient.start();
+    }
+
+    private void stopRelay() {
+        if (relayClient != null) {
+            relayClient.close();
+            relayClient = null;
+        }
     }
 
     private void recordFailure(String message) {
@@ -792,11 +1050,29 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     private void startAsForeground(String message) {
         Notification notification = buildNotification(message);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            int types = 0;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE;
+            }
+            if (mediaForegroundRequested
+                    && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
+            }
+            if (mediaForegroundRequested
+                    && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+            }
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+            }
+            if (types != 0) {
+                startForeground(NOTIFICATION_ID, notification, types);
+                return;
+            }
         }
+        startForeground(NOTIFICATION_ID, notification);
     }
 
     private void updateNotification(String message) {

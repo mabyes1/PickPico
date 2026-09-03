@@ -1,5 +1,8 @@
 package com.mcpocket.poc;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -11,8 +14,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
+import androidx.core.content.FileProvider;
+
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -20,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HashSet;
@@ -29,6 +36,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 final class SelfUpdateManager {
     private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;
+    private static final long MAX_MANIFEST_BYTES = 256L * 1024L;
+    private static final String DEFAULT_UPDATE_RELAY = "https://relay.mcpocket.workers.dev";
+    private static final String UPDATE_CHANNEL_ID = "mcpocket_self_update";
+    private static final int UPDATE_NOTIFICATION_ID = 8768;
     private static final AtomicBoolean ACTIVE = new AtomicBoolean(false);
     private static Intent pendingConfirmationIntent;
 
@@ -38,10 +49,23 @@ final class SelfUpdateManager {
     static JSONObject status(Context context, long callCount) {
         JSONObject state = SelfUpdateState.read(context);
         PackageInfo current = currentPackage(context);
+        long currentVersionCode = current == null ? -1L : versionCode(current);
+        long candidateVersionCode = state.optLong("candidateVersionCode", -1L);
+        if (candidateVersionCode > 0L && currentVersionCode >= candidateVersionCode) {
+            SelfUpdateState.put(state, "status", "installed");
+            SelfUpdateState.put(state, "running", false);
+            SelfUpdateState.put(state, "completedAt", Instant.now().toString());
+            ACTIVE.set(false);
+            File candidate = SelfUpdateState.candidateFile(context);
+            if (candidate.isFile()) {
+                candidate.delete();
+            }
+            SelfUpdateState.write(context, state);
+        }
         SelfUpdateState.put(state, "active", ACTIVE.get());
         SelfUpdateState.put(state, "canRequestPackageInstalls", canRequestPackageInstalls(context));
         SelfUpdateState.put(state, "currentVersionName", current == null ? "unknown" : current.versionName);
-        SelfUpdateState.put(state, "currentVersionCode", current == null ? -1L : versionCode(current));
+        SelfUpdateState.put(state, "currentVersionCode", currentVersionCode);
         SelfUpdateState.put(state, "toolCallCount", callCount);
         return state;
     }
@@ -107,6 +131,58 @@ final class SelfUpdateManager {
         return state;
     }
 
+    static JSONObject checkLatest(Context context, JSONObject arguments, long callCount) {
+        String manifestUrl = resolveManifestUrl(context, arguments);
+        try {
+            JSONObject manifest = fetchManifest(manifestUrl);
+            validateManifest(manifest);
+
+            PackageInfo current = currentPackage(context);
+            long currentVersionCode = versionCode(current);
+            long latestVersionCode = manifest.optLong("versionCode", -1L);
+
+            return new JSONObject()
+                    .put("channel", manifest.optString("channel", "stable"))
+                    .put("manifestUrl", manifestUrl)
+                    .put("currentVersionName", current == null ? "unknown" : current.versionName)
+                    .put("currentVersionCode", currentVersionCode)
+                    .put("latestVersionName", manifest.optString("versionName", "unknown"))
+                    .put("latestVersionCode", latestVersionCode)
+                    .put("updateAvailable", latestVersionCode > currentVersionCode)
+                    .put("apkUrl", manifest.getString("apkUrl"))
+                    .put("sha256", manifest.getString("sha256").toLowerCase(Locale.ROOT))
+                    .put("publishedAt", manifest.optString("publishedAt", ""))
+                    .put("toolCallCount", callCount);
+        } catch (CommandRuntime.CommandInputException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new CommandRuntime.CommandInputException(
+                    "Unable to check MCPocket update channel: "
+                            + error.getClass().getSimpleName() + ": " + error.getMessage());
+        }
+    }
+
+    static JSONObject startLatest(Context context, JSONObject arguments, long callCount) {
+        JSONObject latest = checkLatest(context, arguments, callCount);
+        if (!latest.optBoolean("updateAvailable", false)) {
+            SelfUpdateState.put(latest, "started", false);
+            SelfUpdateState.put(latest, "status", "up_to_date");
+            return latest;
+        }
+
+        JSONObject direct = new JSONObject();
+        SelfUpdateState.put(direct, "url", latest.optString("apkUrl", ""));
+        SelfUpdateState.put(direct, "sha256", latest.optString("sha256", ""));
+        SelfUpdateState.put(direct, "allowSameVersion", false);
+        JSONObject state = start(context, direct, callCount);
+        SelfUpdateState.put(state, "channel", latest.optString("channel", "stable"));
+        SelfUpdateState.put(state, "manifestUrl", latest.optString("manifestUrl", ""));
+        SelfUpdateState.put(state, "latestVersionName", latest.optString("latestVersionName", ""));
+        SelfUpdateState.put(state, "latestVersionCode", latest.optLong("latestVersionCode", -1L));
+        SelfUpdateState.write(context, state);
+        return state;
+    }
+
     static void markFinished() {
         ACTIVE.set(false);
     }
@@ -129,22 +205,34 @@ final class SelfUpdateManager {
             return setup;
         }
 
-        JSONObject previous = SelfUpdateState.read(context);
-        abandonInstallerSession(context, previous.optInt("sessionId", 0));
         ACTIVE.set(true);
 
-        JSONObject state = SelfUpdateState.read(context);
-        SelfUpdateState.put(state, "status", "staging_from_ui");
-        SelfUpdateState.put(state, "running", true);
-        SelfUpdateState.put(state, "startedByUser", true);
-        SelfUpdateState.put(state, "updatedAt", Instant.now().toString());
-        SelfUpdateState.write(context, state);
-
-        Context appContext = context.getApplicationContext();
-        new Thread(
-                () -> installStagedCandidate(appContext, candidate),
-                "mcpocket-self-update-confirm").start();
-        return state;
+        try {
+            JSONObject verified = verifyCandidate(context, candidate, false);
+            Intent installIntent = buildInstallIntent(context, candidate);
+            setPendingConfirmationIntent(installIntent);
+            JSONObject state = SelfUpdateState.read(context);
+            SelfUpdateState.put(state, "status", "pending_user_action");
+            SelfUpdateState.put(state, "running", false);
+            SelfUpdateState.put(state, "startedByUser", true);
+            SelfUpdateState.put(state, "message", "Android confirmation required");
+            SelfUpdateState.put(state, "candidateVersionName", verified.optString("candidateVersionName", ""));
+            SelfUpdateState.put(state, "candidateVersionCode", verified.optLong("candidateVersionCode", -1L));
+            SelfUpdateState.put(state, "updatedAt", Instant.now().toString());
+            SelfUpdateState.write(context, state);
+            context.startActivity(installIntent);
+            ACTIVE.set(false);
+            return state;
+        } catch (Throwable error) {
+            JSONObject failed = SelfUpdateState.read(context);
+            SelfUpdateState.put(failed, "status", "failed");
+            SelfUpdateState.put(failed, "running", false);
+            SelfUpdateState.put(failed, "error", error.getClass().getSimpleName() + ": " + error.getMessage());
+            SelfUpdateState.put(failed, "completedAt", Instant.now().toString());
+            SelfUpdateState.write(context, failed);
+            ACTIVE.set(false);
+            return failed;
+        }
     }
 
     static boolean hasInstallableCandidate(Context context) {
@@ -169,49 +257,6 @@ final class SelfUpdateManager {
         return intent;
     }
 
-    private static void installStagedCandidate(Context context, File candidate) {
-        try {
-            JSONObject verified = verifyCandidate(context, candidate, false);
-            SelfUpdateState.put(verified, "status", "staging_from_ui");
-            SelfUpdateState.put(verified, "running", true);
-            SelfUpdateState.put(verified, "startedByUser", true);
-            SelfUpdateState.put(verified, "bytesDownloaded", candidate.length());
-            SelfUpdateState.put(verified, "updatedAt", Instant.now().toString());
-            SelfUpdateState.write(context, verified);
-
-            int sessionId = commitInstall(context, candidate);
-            JSONObject committed = SelfUpdateState.read(context);
-            SelfUpdateState.put(committed, "status", "committed");
-            SelfUpdateState.put(committed, "running", true);
-            SelfUpdateState.put(committed, "sessionId", sessionId);
-            SelfUpdateState.put(committed, "startedByUser", true);
-            SelfUpdateState.put(committed, "message", "Waiting for Android package installer result");
-            SelfUpdateState.put(committed, "updatedAt", Instant.now().toString());
-            SelfUpdateState.write(context, committed);
-        } catch (Throwable error) {
-            JSONObject failed = SelfUpdateState.read(context);
-            SelfUpdateState.put(failed, "status", "failed");
-            SelfUpdateState.put(failed, "running", false);
-            SelfUpdateState.put(
-                    failed,
-                    "error",
-                    error.getClass().getSimpleName() + ": " + error.getMessage());
-            SelfUpdateState.put(failed, "completedAt", Instant.now().toString());
-            SelfUpdateState.write(context, failed);
-            ACTIVE.set(false);
-        }
-    }
-
-    private static void abandonInstallerSession(Context context, int sessionId) {
-        if (sessionId <= 0) {
-            return;
-        }
-        try {
-            context.getPackageManager().getPackageInstaller().abandonSession(sessionId);
-        } catch (Throwable ignored) {
-        }
-    }
-
     private static void runUpdate(
             Context context,
             String url,
@@ -234,14 +279,17 @@ final class SelfUpdateManager {
             SelfUpdateState.put(verified, "updatedAt", Instant.now().toString());
             SelfUpdateState.write(context, verified);
 
-            int sessionId = commitInstall(context, candidate);
-            JSONObject committed = SelfUpdateState.read(context);
-            SelfUpdateState.put(committed, "status", "committed");
-            SelfUpdateState.put(committed, "running", true);
-            SelfUpdateState.put(committed, "sessionId", sessionId);
-            SelfUpdateState.put(committed, "message", "Waiting for Android package installer result");
-            SelfUpdateState.put(committed, "updatedAt", Instant.now().toString());
-            SelfUpdateState.write(context, committed);
+            Intent installIntent = buildInstallIntent(context, candidate);
+            setPendingConfirmationIntent(installIntent);
+            JSONObject ready = SelfUpdateState.read(context);
+            SelfUpdateState.put(ready, "status", "pending_user_action");
+            SelfUpdateState.put(ready, "running", false);
+            SelfUpdateState.put(ready, "message", "APK verified. Tap the MCPocket update notification to install.");
+            SelfUpdateState.put(ready, "confirmationNotification", true);
+            SelfUpdateState.put(ready, "updatedAt", Instant.now().toString());
+            SelfUpdateState.write(context, ready);
+            showInstallNotification(context, installIntent);
+            ACTIVE.set(false);
         } catch (Throwable error) {
             JSONObject failed = SelfUpdateState.read(context);
             SelfUpdateState.put(failed, "status", "failed");
@@ -314,6 +362,87 @@ final class SelfUpdateManager {
         return toHex(digest.digest());
     }
 
+    private static String resolveManifestUrl(Context context, JSONObject arguments) {
+        String explicit = arguments == null ? "" : arguments.optString("manifestUrl", "").trim();
+        if (!explicit.isEmpty()) {
+            if (!isAllowedUrl(explicit)) {
+                throw new CommandRuntime.CommandInputException("manifestUrl must use http:// or https://");
+            }
+            return explicit;
+        }
+
+        String relay = context.getSharedPreferences(McpNodeService.PREFS, Context.MODE_PRIVATE)
+                .getString(McpNodeService.KEY_RELAY_BASE_URL, "");
+        if (relay == null || relay.trim().isEmpty()) {
+            relay = DEFAULT_UPDATE_RELAY;
+        }
+        relay = relay.trim();
+        while (relay.endsWith("/")) {
+            relay = relay.substring(0, relay.length() - 1);
+        }
+        if (!isAllowedUrl(relay)) {
+            throw new CommandRuntime.CommandInputException("Configured relay URL must use http:// or https://");
+        }
+        return relay + "/v1/update/latest";
+    }
+
+    private static JSONObject fetchManifest(String manifestUrl) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(manifestUrl).openConnection();
+        connection.setConnectTimeout(15000);
+        connection.setReadTimeout(15000);
+        connection.setInstanceFollowRedirects(true);
+        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("User-Agent", "MCPocket-UpdateChannel/1");
+        try {
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new IllegalStateException("Update manifest returned HTTP " + status);
+            }
+            long declaredLength = connection.getContentLengthLong();
+            if (declaredLength > MAX_MANIFEST_BYTES) {
+                throw new IllegalStateException("Update manifest exceeds 256 KiB limit");
+            }
+            try (InputStream input = connection.getInputStream();
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                long total = 0L;
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (read == 0) {
+                        continue;
+                    }
+                    total += read;
+                    if (total > MAX_MANIFEST_BYTES) {
+                        throw new IllegalStateException("Update manifest exceeds 256 KiB limit");
+                    }
+                    output.write(buffer, 0, read);
+                }
+                return new JSONObject(output.toString(StandardCharsets.UTF_8.name()));
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static void validateManifest(JSONObject manifest) {
+        long versionCode = manifest.optLong("versionCode", -1L);
+        String versionName = manifest.optString("versionName", "").trim();
+        String apkUrl = manifest.optString("apkUrl", "").trim();
+        String sha256 = manifest.optString("sha256", "").trim().toLowerCase(Locale.ROOT);
+        if (versionCode <= 0L) {
+            throw new CommandRuntime.CommandInputException("Update manifest versionCode must be positive");
+        }
+        if (versionName.isEmpty() || versionName.length() > 128) {
+            throw new CommandRuntime.CommandInputException("Update manifest versionName is missing or invalid");
+        }
+        if (!isAllowedUrl(apkUrl)) {
+            throw new CommandRuntime.CommandInputException("Update manifest apkUrl must use http:// or https://");
+        }
+        if (!sha256.matches("[0-9a-f]{64}")) {
+            throw new CommandRuntime.CommandInputException("Update manifest sha256 must be exactly 64 hexadecimal characters");
+        }
+    }
+
     private static JSONObject verifyCandidate(
             Context context,
             File candidate,
@@ -361,49 +490,43 @@ final class SelfUpdateManager {
         return verified;
     }
 
-    private static int commitInstall(Context context, File candidate) throws Exception {
-        PackageInstaller installer = context.getPackageManager().getPackageInstaller();
-        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(
-                PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-        params.setAppPackageName(context.getPackageName());
-        params.setSize(candidate.length());
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            params.setInstallReason(PackageManager.INSTALL_REASON_USER);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
-        }
+    private static Intent buildInstallIntent(Context context, File candidate) {
+        Uri uri = FileProvider.getUriForFile(
+                context,
+                context.getPackageName() + ".files",
+                candidate);
+        return new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
 
-        int sessionId = installer.createSession(params);
-        try (PackageInstaller.Session session = installer.openSession(sessionId)) {
-            try (FileInputStream input = new FileInputStream(candidate);
-                 OutputStream output = session.openWrite("base.apk", 0L, candidate.length())) {
-                byte[] buffer = new byte[64 * 1024];
-                int read;
-                while ((read = input.read(buffer)) >= 0) {
-                    output.write(buffer, 0, read);
-                }
-                session.fsync(output);
-            }
+    private static void showInstallNotification(Context context, Intent installIntent) {
+        NotificationManager manager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationChannel channel = new NotificationChannel(
+                UPDATE_CHANNEL_ID,
+                "MCPocket updates",
+                NotificationManager.IMPORTANCE_HIGH);
+        manager.createNotificationChannel(channel);
 
-            Intent callback = new Intent(context, SelfUpdateInstallReceiver.class)
-                    .setAction("com.mcpocket.poc.SELF_UPDATE_RESULT")
-                    .putExtra("sessionId", sessionId);
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                flags |= PendingIntent.FLAG_MUTABLE;
-            }
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                    context,
-                    sessionId,
-                    callback,
-                    flags);
-            session.commit(pendingIntent.getIntentSender());
-        } catch (Throwable error) {
-            installer.abandonSession(sessionId);
-            throw error;
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
         }
-        return sessionId;
+        PendingIntent contentIntent = PendingIntent.getActivity(
+                context,
+                UPDATE_NOTIFICATION_ID,
+                installIntent,
+                flags);
+
+        Notification notification = new Notification.Builder(context, UPDATE_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("MCPocket update ready")
+                .setContentText("Tap to install the verified update")
+                .setContentIntent(contentIntent)
+                .setAutoCancel(true)
+                .build();
+        manager.notify(UPDATE_NOTIFICATION_ID, notification);
     }
 
     private static boolean canRequestPackageInstalls(Context context) {

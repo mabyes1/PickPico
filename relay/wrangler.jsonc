@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "relay",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NODE_RELAY",
+        "class_name": "NodeRelay"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "UPDATE_KV",
+      "id": "d1fcd248606a43f6a9a11fc9d1f8cbd7"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["NodeRelay"]
+    }
+  ]
+}

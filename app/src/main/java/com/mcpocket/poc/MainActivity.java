@@ -16,10 +16,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -28,20 +30,35 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class MainActivity extends Activity {
+    private static final int REQUEST_NOTIFICATION = 100;
+    private static final int REQUEST_NODE_MEDIA = 101;
+    private static final int REQUEST_LOCATION = 102;
+    private static volatile boolean uiVisible;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView statusView;
     private TextView endpointView;
+    private TextView remoteEndpointView;
+    private TextView relayStatusView;
     private TextView tokenView;
     private TextView recentView;
     private TextView remoteLockView;
+    private TextView notificationAccessView;
+    private TextView locationAccessView;
     private TextView appVersionView;
     private TextView updateStatusView;
     private Button startButton;
     private Button stopButton;
     private Button enableRemoteLockButton;
+    private Button enableNotificationAccessButton;
+    private Button enableLocationButton;
+    private Button agentInboxButton;
     private Button updateButton;
+    private EditText relayUrlInput;
 
     private final Runnable refreshTask = new Runnable() {
         @Override
@@ -61,13 +78,19 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        uiVisible = true;
         handler.post(refreshTask);
     }
 
     @Override
     protected void onPause() {
+        uiVisible = false;
         handler.removeCallbacks(refreshTask);
         super.onPause();
+    }
+
+    static boolean isUiVisible() {
+        return uiVisible;
     }
 
     private View buildContent() {
@@ -81,23 +104,46 @@ public final class MainActivity extends Activity {
 
         TextView title = text("MCPocket", 28, Typeface.BOLD);
         root.addView(title);
-        TextView subtitle = text("Android as a portable MCP execution node", 15, Typeface.NORMAL);
+        TextView subtitle = text("Android Mobile Agent Node", 15, Typeface.NORMAL);
         subtitle.setTextColor(Color.DKGRAY);
         subtitle.setPadding(0, dp(4), 0, dp(22));
         root.addView(subtitle);
 
         statusView = valueView();
         endpointView = valueView();
+        remoteEndpointView = valueView();
+        relayStatusView = valueView();
         tokenView = valueView();
         recentView = valueView();
         remoteLockView = valueView();
+        notificationAccessView = valueView();
+        locationAccessView = valueView();
         appVersionView = valueView();
         updateStatusView = valueView();
 
         root.addView(label("STATUS"));
         root.addView(statusView);
-        root.addView(label("MCP ENDPOINT"));
+        root.addView(label("LOCAL MCP ENDPOINT"));
         root.addView(endpointView);
+        root.addView(label("REMOTE RELAY"));
+        relayUrlInput = new EditText(this);
+        relayUrlInput.setSingleLine(true);
+        relayUrlInput.setHint("https://your-relay.workers.dev");
+        relayUrlInput.setText(getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE)
+                .getString(McpNodeService.KEY_RELAY_BASE_URL, ""));
+        root.addView(relayUrlInput, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        Button saveRelayButton = new Button(this);
+        saveRelayButton.setText("SAVE RELAY URL");
+        saveRelayButton.setOnClickListener(v -> saveRelayUrl());
+        root.addView(saveRelayButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(label("RELAY STATUS"));
+        root.addView(relayStatusView);
+        root.addView(label("REMOTE MCP ENDPOINT"));
+        root.addView(remoteEndpointView);
         root.addView(label("BEARER TOKEN"));
         root.addView(tokenView);
 
@@ -108,6 +154,30 @@ public final class MainActivity extends Activity {
         enableRemoteLockButton.setText(R.string.enable_remote_lock);
         enableRemoteLockButton.setOnClickListener(v -> requestDeviceAdmin());
         root.addView(enableRemoteLockButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(label("NOTIFICATION ACCESS"));
+        root.addView(notificationAccessView);
+        enableNotificationAccessButton = new Button(this);
+        enableNotificationAccessButton.setText("ENABLE NOTIFICATION ACCESS");
+        enableNotificationAccessButton.setOnClickListener(v ->
+                startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        root.addView(enableNotificationAccessButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(label("LOCATION"));
+        root.addView(locationAccessView);
+        enableLocationButton = new Button(this);
+        enableLocationButton.setText("ENABLE LOCATION");
+        enableLocationButton.setOnClickListener(v -> requestLocationPermission());
+        root.addView(enableLocationButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(label("AGENT INBOX"));
+        agentInboxButton = new Button(this);
+        agentInboxButton.setOnClickListener(v ->
+                startActivity(new Intent(this, AgentInboxActivity.class)));
+        root.addView(agentInboxButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
         root.addView(label("APP VERSION"));
@@ -160,12 +230,42 @@ public final class MainActivity extends Activity {
     }
 
     private void startNode() {
+        List<String> missing = new ArrayList<>();
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.CAMERA);
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.RECORD_AUDIO);
+        }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            missing.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+        if (!missing.isEmpty()) {
+            requestPermissions(missing.toArray(new String[0]), REQUEST_NODE_MEDIA);
+            return;
+        }
+        startNodeService();
+    }
+
+    private void startNodeService() {
         Intent intent = new Intent(this, McpNodeService.class);
         intent.setAction(McpNodeService.ACTION_START);
         intent.putExtra(McpNodeService.EXTRA_TOKEN, generateToken());
+        intent.putExtra(McpNodeService.EXTRA_ENABLE_MEDIA_FGS, true);
         startForegroundService(intent);
         Toast.makeText(this, "Starting MCP node…", Toast.LENGTH_SHORT).show();
         handler.postDelayed(this::refreshStatus, 400L);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NODE_MEDIA && !McpNodeService.isNodeRunning()) {
+            startNodeService();
+        } else if (requestCode == REQUEST_LOCATION && McpNodeService.isNodeRunning()) {
+            Toast.makeText(this, "Restart the node to apply background location access", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void stopNode() {
@@ -177,21 +277,49 @@ public final class MainActivity extends Activity {
 
     private void copyConnection() {
         SharedPreferences prefs = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE);
-        String endpoint = prefs.getString(McpNodeService.KEY_ENDPOINT, "");
+        String remoteEndpoint = prefs.getString(McpNodeService.KEY_REMOTE_ENDPOINT, "");
+        String localEndpoint = prefs.getString(McpNodeService.KEY_ENDPOINT, "");
+        String endpoint = TextUtils.isEmpty(remoteEndpoint) ? localEndpoint : remoteEndpoint;
         String token = prefs.getString(McpNodeService.KEY_TOKEN, "");
         if (TextUtils.isEmpty(endpoint) || TextUtils.isEmpty(token)) {
             Toast.makeText(this, "Start the node first", Toast.LENGTH_SHORT).show();
             return;
         }
-        String json = "{\n" +
-                "  \"url\": \"" + endpoint + "\",\n" +
-                "  \"headers\": {\n" +
-                "    \"Authorization\": \"Bearer " + token + "\"\n" +
-                "  }\n" +
-                "}";
+        String json;
+        if (!TextUtils.isEmpty(remoteEndpoint)) {
+            json = "{\n" +
+                    "  \"url\": \"" + endpoint + "\",\n" +
+                    "  \"authentication\": \"none\"\n" +
+                    "}";
+        } else {
+            json = "{\n" +
+                    "  \"url\": \"" + endpoint + "\",\n" +
+                    "  \"headers\": {\n" +
+                    "    \"Authorization\": \"Bearer " + token + "\"\n" +
+                    "  }\n" +
+                    "}";
+        }
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         clipboard.setPrimaryClip(ClipData.newPlainText("MCPocket connection", json));
         Toast.makeText(this, "Connection JSON copied", Toast.LENGTH_SHORT).show();
+    }
+
+    private void saveRelayUrl() {
+        String value = relayUrlInput.getText().toString().trim();
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        if (!value.isEmpty() && !value.startsWith("https://") && !value.startsWith("http://")) {
+            Toast.makeText(this, "Relay URL must start with https://", Toast.LENGTH_LONG).show();
+            return;
+        }
+        getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE).edit()
+                .putString(McpNodeService.KEY_RELAY_BASE_URL, value)
+                .apply();
+        relayUrlInput.setText(value);
+        Toast.makeText(this,
+                McpNodeService.isNodeRunning() ? "Relay saved. Restart node to apply." : "Relay saved.",
+                Toast.LENGTH_SHORT).show();
     }
 
     private void requestDeviceAdmin() {
@@ -228,6 +356,7 @@ public final class MainActivity extends Activity {
             prefs.edit()
                     .putBoolean(McpNodeService.KEY_RUNNING, false)
                     .putString(McpNodeService.KEY_ENDPOINT, "")
+                    .putString(McpNodeService.KEY_REMOTE_ENDPOINT, "")
                     .putString(McpNodeService.KEY_TOKEN, "")
                     .apply();
         }
@@ -235,6 +364,12 @@ public final class MainActivity extends Activity {
         statusView.setText(running ? "RUNNING" : (TextUtils.isEmpty(error) ? "STOPPED" : "ERROR: " + error));
         statusView.setTextColor(running ? Color.rgb(0, 120, 60) : Color.rgb(170, 35, 35));
         endpointView.setText(orDash(prefs.getString(McpNodeService.KEY_ENDPOINT, "")));
+        remoteEndpointView.setText(orDash(prefs.getString(McpNodeService.KEY_REMOTE_ENDPOINT, "")));
+        String relayStatus = prefs.getString(McpNodeService.KEY_RELAY_STATUS, "disabled");
+        relayStatusView.setText(relayStatus.toUpperCase());
+        relayStatusView.setTextColor("connected".equals(relayStatus)
+                ? Color.rgb(0, 120, 60)
+                : Color.rgb(150, 90, 0));
         tokenView.setText(orDash(prefs.getString(McpNodeService.KEY_TOKEN, "")));
         String recent = prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet");
         long calls = prefs.getLong(McpNodeService.KEY_CALL_COUNT, 0L);
@@ -245,6 +380,25 @@ public final class MainActivity extends Activity {
         remoteLockView.setText(remoteLockEnabled ? "ENABLED" : "NOT ENABLED");
         remoteLockView.setTextColor(remoteLockEnabled ? Color.rgb(0, 120, 60) : Color.rgb(170, 35, 35));
         enableRemoteLockButton.setEnabled(!remoteLockEnabled);
+
+        boolean notificationAccess = McpNotificationListenerService.hasAccess(this);
+        notificationAccessView.setText(notificationAccess ? "ENABLED" : "NOT ENABLED");
+        notificationAccessView.setTextColor(notificationAccess
+                ? Color.rgb(0, 120, 60)
+                : Color.rgb(170, 35, 35));
+        enableNotificationAccessButton.setEnabled(!notificationAccess);
+
+        boolean locationAccess = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        locationAccessView.setText(locationAccess ? "ENABLED" : "NOT ENABLED");
+        locationAccessView.setTextColor(locationAccess
+                ? Color.rgb(0, 120, 60)
+                : Color.rgb(170, 35, 35));
+        enableLocationButton.setEnabled(!locationAccess);
+
+        int inboxCount = AgentInboxStore.count(this);
+        agentInboxButton.setText("OPEN AGENT INBOX (" + inboxCount + ")");
+
         startButton.setEnabled(!running);
         stopButton.setEnabled(running);
 
@@ -289,8 +443,20 @@ public final class MainActivity extends Activity {
     private void requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATION);
         }
+    }
+
+    private void requestLocationPermission() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Location is already enabled", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        requestPermissions(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        }, REQUEST_LOCATION);
     }
 
     private static String generateToken() {

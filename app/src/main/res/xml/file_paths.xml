@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <files-path
+        name="self_update"
+        path="self-update/" />
+    <cache-path
+        name="human_help_camera"
+        path="human-help-camera/" />
+</paths>
