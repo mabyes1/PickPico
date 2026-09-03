@@ -10,7 +10,7 @@ if (-not (Test-Path $adb)) {
     --es action start_node
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to request MCPocket dev node start"
+    throw "Failed to request PickPico dev node start"
 }
 
 Start-Sleep -Milliseconds 1200

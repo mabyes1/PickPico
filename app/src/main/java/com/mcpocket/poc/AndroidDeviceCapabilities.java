@@ -280,7 +280,7 @@ final class AndroidDeviceCapabilities {
                     .put("setupAction", "grant_notification_permission")
                     .put("toolCallCount", callCount);
         }
-        String title = arguments.optString("title", "MCPocket Agent");
+        String title = arguments.optString("title", "PickPico Agent");
         String body = arguments.optString("body", "");
         int notificationId = notificationIds.incrementAndGet();
         String inboxId = AgentInboxStore.add(service, "phone.notify", title, body);
@@ -496,7 +496,7 @@ final class AndroidDeviceCapabilities {
                 AGENT_CHANNEL_ID,
                 "Agent messages",
                 NotificationManager.IMPORTANCE_DEFAULT);
-        channel.setDescription("Notifications explicitly sent by an Agent through MCPocket");
+        channel.setDescription("Notifications explicitly sent by an Agent through PickPico");
         manager.createNotificationChannel(channel);
     }
 
@@ -507,14 +507,14 @@ final class AndroidDeviceCapabilities {
                     .put("available", false)
                     .put("requiresSetup", true)
                     .put("setupAction", "grant_" + capability + "_permission")
-                    .put("message", "Grant " + capability + " permission in MCPocket and restart the node");
+                    .put("message", "Grant " + capability + " permission in PickPico and restart the node");
         }
         if (!foregroundTypeActive(foregroundType)) {
             return new JSONObject()
                     .put("available", false)
                     .put("requiresSetup", true)
                     .put("setupAction", "restart_node_from_app")
-                    .put("message", "Restart MCPocket from its UI so the " + capability + " foreground-service type is active");
+                    .put("message", "Restart PickPico from its UI so the " + capability + " foreground-service type is active");
         }
         return null;
     }

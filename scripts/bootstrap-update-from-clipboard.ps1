@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $connectionText = Get-Clipboard -Raw
 if ([string]::IsNullOrWhiteSpace($connectionText)) {
-    throw 'Clipboard is empty. Copy MCPocket connection JSON first.'
+    throw 'Clipboard is empty. Copy PickPico connection JSON first.'
 }
 
 $connection = $connectionText | ConvertFrom-Json

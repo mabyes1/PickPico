@@ -609,7 +609,7 @@ public final class McpHttpServerTest {
         JSONObject result = new JSONObject(discovery.body).getJSONObject("result");
         assertEquals("complete", result.getString("resultType"));
         assertTrue(result.getJSONArray("supportedVersions").toString().contains("2026-07-28"));
-        assertEquals("MCPocket", result.getJSONObject("_meta")
+        assertEquals("PickPico", result.getJSONObject("_meta")
                 .getJSONObject("io.modelcontextprotocol/serverInfo").getString("name"));
     }
 

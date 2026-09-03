@@ -25,7 +25,7 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /**
- * Outbound reverse relay for MCPocket.
+ * Outbound reverse relay for PickPico.
  *
  * The phone only makes outbound WSS/HTTPS connections. Incoming public MCP POSTs are carried over
  * that socket and replayed against the existing loopback MCP server. The public relay URL is a
@@ -86,7 +86,7 @@ final class RelayClient {
         WebSocket socket = webSocket;
         webSocket = null;
         if (socket != null) {
-            socket.close(1000, "MCPocket node stopped");
+            socket.close(1000, "PickPico node stopped");
         }
         requestExecutor.shutdownNow();
         listener.onRelayState("stopped", "", "relay stopped");
@@ -99,7 +99,7 @@ final class RelayClient {
         listener.onRelayState("connecting", remoteEndpoint, "connecting to relay");
         Request request = new Request.Builder()
                 .url(toWebSocketUrl(relayBaseUrl) + "/v1/nodes/" + nodeId + "/connect")
-                .header("X-MCPocket-Relay-Secret", nodeSecret)
+                .header("X-PickPico-Relay-Secret", nodeSecret)
                 .build();
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override

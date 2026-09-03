@@ -238,7 +238,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public JSONObject serverInfo(long callCount) throws JSONException {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
-                .put("name", "MCPocket")
+                .put("name", "PickPico")
                 .put("version", BuildConfig.VERSION_NAME)
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 .put("androidRelease", Build.VERSION.RELEASE)
@@ -903,7 +903,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public JSONObject phoneEcho(String text, long callCount) throws JSONException {
         vibrate();
-        String inboxId = AgentInboxStore.add(this, "phone.echo", "MCPocket Agent", text);
+        String inboxId = AgentInboxStore.add(this, "phone.echo", "PickPico Agent", text);
         String summary = "phone_echo #" + callCount + ": " + abbreviate(text, 80);
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(KEY_RECENT, summary + "\n" + Instant.now())
@@ -1253,7 +1253,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setContentTitle("MCPocket node is running")
+                .setContentTitle("PickPico node is running")
                 .setContentText(message)
                 .setStyle(new Notification.BigTextStyle().bigText(message))
                 .setContentIntent(pendingIntent)
@@ -1265,7 +1265,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "MCPocket node",
+                "PickPico node",
                 NotificationManager.IMPORTANCE_LOW);
         channel.setDescription("Shows when the local MCP execution node is reachable");
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -1369,7 +1369,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private File workspaceRoot() {
         File root = new File(getFilesDir(), "workspaces");
         if (!root.isDirectory() && !root.mkdirs() && !root.isDirectory()) {
-            throw new IllegalStateException("Unable to create MCPocket workspace root");
+            throw new IllegalStateException("Unable to create PickPico workspace root");
         }
         return root;
     }
@@ -1504,7 +1504,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         if (processSessions.size() >= MAX_PROCESS_SESSIONS) {
             session.process.destroyForcibly();
             throw new CommandRuntime.CommandInputException(
-                    "Too many running MCPocket process sessions; stop one before starting another");
+                    "Too many running PickPico process sessions; stop one before starting another");
         }
         processSessions.put(session.sessionId, session);
     }

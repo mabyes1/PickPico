@@ -208,7 +208,7 @@ final class AndroidAgentActions {
                     .put("available", false)
                     .put("requiresSetup", true)
                     .put("permission", "location")
-                    .put("message", "Grant location permission to MCPocket")
+                    .put("message", "Grant location permission to PickPico")
                     .put("toolCallCount", callCount);
         }
         LocationManager manager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
@@ -381,7 +381,7 @@ final class AndroidAgentActions {
                     .put("toolCallCount", callCount);
         }
         String text = arguments.optString("text", "");
-        String label = arguments.optString("label", "MCPocket Agent");
+        String label = arguments.optString("label", "PickPico Agent");
         try {
             clipboard.setPrimaryClip(ClipData.newPlainText(label, text));
             return new JSONObject()
@@ -414,7 +414,7 @@ final class AndroidAgentActions {
         }
         NotificationChannel channel = new NotificationChannel(
                 ACTION_CHANNEL_ID,
-                "MCPocket actions",
+                "PickPico actions",
                 NotificationManager.IMPORTANCE_HIGH);
         manager.createNotificationChannel(channel);
 

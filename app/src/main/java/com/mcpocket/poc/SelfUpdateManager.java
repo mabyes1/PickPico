@@ -157,7 +157,7 @@ final class SelfUpdateManager {
             throw error;
         } catch (Exception error) {
             throw new CommandRuntime.CommandInputException(
-                    "Unable to check MCPocket update channel: "
+                    "Unable to check PickPico update channel: "
                             + error.getClass().getSimpleName() + ": " + error.getMessage());
         }
     }
@@ -190,7 +190,7 @@ final class SelfUpdateManager {
     static JSONObject installStagedFromForeground(Context context) {
         File candidate = SelfUpdateState.candidateFile(context);
         if (!candidate.isFile() || candidate.length() <= 0L) {
-            throw new CommandRuntime.CommandInputException("No staged MCPocket update APK is available");
+            throw new CommandRuntime.CommandInputException("No staged PickPico update APK is available");
         }
 
         if (!canRequestPackageInstalls(context)) {
@@ -284,7 +284,7 @@ final class SelfUpdateManager {
             JSONObject ready = SelfUpdateState.read(context);
             SelfUpdateState.put(ready, "status", "pending_user_action");
             SelfUpdateState.put(ready, "running", false);
-            SelfUpdateState.put(ready, "message", "APK verified. Tap the MCPocket update notification to install.");
+            SelfUpdateState.put(ready, "message", "APK verified. Tap the PickPico update notification to install.");
             SelfUpdateState.put(ready, "confirmationNotification", true);
             SelfUpdateState.put(ready, "updatedAt", Instant.now().toString());
             SelfUpdateState.write(context, ready);
@@ -309,7 +309,7 @@ final class SelfUpdateManager {
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(30000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "MCPocket-SelfUpdate/1");
+        connection.setRequestProperty("User-Agent", "PickPico-SelfUpdate/1");
 
         int status = connection.getResponseCode();
         if (status < 200 || status >= 300) {
@@ -392,7 +392,7 @@ final class SelfUpdateManager {
         connection.setReadTimeout(15000);
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "MCPocket-UpdateChannel/1");
+        connection.setRequestProperty("User-Agent", "PickPico-UpdateChannel/1");
         try {
             int status = connection.getResponseCode();
             if (status < 200 || status >= 300) {
@@ -477,7 +477,7 @@ final class SelfUpdateManager {
         Set<String> currentCertificates = signingCertificateDigests(currentInfo);
         Set<String> candidateCertificates = signingCertificateDigests(candidateInfo);
         if (currentCertificates.isEmpty() || !currentCertificates.equals(candidateCertificates)) {
-            throw new IllegalStateException("APK signing certificate does not match installed MCPocket");
+            throw new IllegalStateException("APK signing certificate does not match installed PickPico");
         }
 
         JSONObject verified = SelfUpdateState.json("verified", true);
@@ -505,7 +505,7 @@ final class SelfUpdateManager {
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel channel = new NotificationChannel(
                 UPDATE_CHANNEL_ID,
-                "MCPocket updates",
+                "PickPico updates",
                 NotificationManager.IMPORTANCE_HIGH);
         manager.createNotificationChannel(channel);
 
@@ -521,7 +521,7 @@ final class SelfUpdateManager {
 
         Notification notification = new Notification.Builder(context, UPDATE_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("MCPocket update ready")
+                .setContentTitle("PickPico update ready")
                 .setContentText("Tap to install the verified update")
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)

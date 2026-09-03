@@ -302,7 +302,7 @@ public final class McpNotificationListenerService extends NotificationListenerSe
                     .put("listenerConnected", false)
                     .put("requiresSetup", true)
                     .put("setupAction", "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-                    .put("message", "Enable Notification access for MCPocket in Android settings")
+                    .put("message", "Enable Notification access for PickPico in Android settings")
                     .put("toolCallCount", callCount);
         }
         if (activeInstance == null) {

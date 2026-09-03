@@ -96,7 +96,7 @@
         <service
             android:name=".McpNotificationListenerService"
             android:exported="true"
-            android:label="MCPocket Notification Access"
+            android:label="PickPico Notification Access"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
@@ -106,7 +106,7 @@
         <service
             android:name=".McpAccessibilityService"
             android:exported="true"
-            android:label="MCPocket Hyper UI Control"
+            android:label="PickPico Hyper UI Control"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
@@ -124,7 +124,7 @@
             android:stopWithTask="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-started Node.js runtime for an MCPocket workspace project" />
+                android:value="User-started Node.js runtime for a PickPico workspace project" />
         </service>
 
         <service
@@ -134,7 +134,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="ADB-shell-only MCPocket debug smoke-test bridge" />
+                android:value="ADB-shell-only PickPico debug smoke-test bridge" />
         </service>
     </application>
 

@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 
 // HUMAN_HELP uses a renewable human-idle lease, so its total wall-clock wait
 // can legitimately exceed one 360-second lease. This is only a transport
-// safety net; the product-level timeout is enforced by MCPocket itself.
+// safety net; the product-level timeout is enforced by PickPico itself.
 const REQUEST_TIMEOUT_MS = 30 * 60_000;
 const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
@@ -10,7 +10,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") {
-      return json({ ok: true, service: "mcpocket-relay" });
+      return json({ ok: true, service: "pickpico-relay" });
     }
 
     if (url.pathname === "/u.apk") {
@@ -162,7 +162,9 @@ export class NodeRelay extends DurableObject {
       return json({ error: "websocket_upgrade_required" }, 426);
     }
 
-    const secret = request.headers.get("X-MCPocket-Relay-Secret") || "";
+    const secret = request.headers.get("X-PickPico-Relay-Secret")
+      || request.headers.get("X-MCPocket-Relay-Secret")
+      || "";
     if (secret.length < 24) {
       return json({ error: "relay_secret_required" }, 401);
     }
@@ -177,7 +179,7 @@ export class NodeRelay extends DurableObject {
 
     for (const existing of this.nodeSockets()) {
       try {
-        existing.close(1012, "Replaced by a newer MCPocket connection");
+        existing.close(1012, "Replaced by a newer PickPico connection");
       } catch (_) {
       }
     }

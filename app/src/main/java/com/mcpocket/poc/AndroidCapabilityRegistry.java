@@ -69,13 +69,13 @@ final class AndroidCapabilityRegistry {
                     result,
                     McpAccessibilityService.hasAccess(context),
                     "accessibility_service",
-                    "MCPocket Accessibility Service is not enabled");
+                    "PickPico Accessibility Service is not enabled");
         }
         if ("phone.lock".equals(commandId)) {
             DevicePolicyManager manager = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
             ComponentName receiver = new ComponentName(context, McpDeviceAdminReceiver.class);
             boolean granted = manager != null && manager.isAdminActive(receiver);
-            return setupState(result, granted, "device_admin", "MCPocket is not an active Device Admin");
+            return setupState(result, granted, "device_admin", "PickPico is not an active Device Admin");
         }
 
         return result

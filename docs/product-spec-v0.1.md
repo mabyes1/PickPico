@@ -195,7 +195,7 @@ These capabilities existed before the unified Hyper Mode work and are now govern
 | Planned capability | Proposed MCP surface | Android mechanism | Notes |
 | --- | --- | --- | --- |
 | Hyper Mode manager | capability layer + local UI | App settings + capability registry | ✅ implemented; one product switch, many independent access grants |
-| UI tree inspection | `ui.inspect` | AccessibilityService | ✅ implemented in source; device validation pending |
+| UI tree inspection | `ui.inspect` | AccessibilityService | ✅ implemented and capability availability validated on Samsung S23 / Android 16 |
 | UI click/action | `ui.action` | AccessibilityNodeInfo actions | ✅ implemented in source; click/focus/global back/home/recents |
 | UI text entry | `ui.type` | Accessibility actions | ✅ implemented in source; subject to app/widget support |
 | UI scroll | `ui.scroll` | Accessibility actions | ✅ implemented in source; structured scroll first |
@@ -226,7 +226,7 @@ Hyper Mode does **not** provide:
 - permission bypass
 - Android security-setting bypass
 
-Hyper Mode removes a MCPocket product restriction only when the user has explicitly granted the underlying Android access.
+Hyper Mode removes a PickPico product restriction only when the user has explicitly granted the underlying Android access.
 
 ## 6. Hyper Mode enable flow
 
@@ -234,9 +234,15 @@ Hyper Mode removes a MCPocket product restriction only when the user has explici
 flowchart TD
     A[User turns Hyper Mode ON] --> B[Show Hyper capability setup]
     B --> C{Accessibility granted?}
-    C -->|No| D[Open Android Accessibility Settings]
+    C -->|No| D[Open PickPico App info]
+    D --> R{Restricted settings gate shown?}
+    R -->|Yes| S[Human taps Allow restricted settings]
+    R -->|No| T[Continue]
+    S --> T
+    T --> U[Open Android Accessibility Settings]
+    U --> V[Human enables PickPico Hyper UI Control]
+    V --> E
     C -->|Yes| E[UI tools available]
-    D --> E
 
     B --> F{Notification access granted?}
     F -->|No| G[Open Notification Listener Settings]
@@ -253,6 +259,24 @@ flowchart TD
     J --> L
     K --> L
 ```
+
+Android Special Access is intentionally a **human-owned security boundary**. PickPico can deep-link
+the owner to the relevant system settings page and explain the next action, but it cannot silently
+grant Accessibility, Notification Listener, Device Admin, MediaProjection, or similar privileged
+access to itself.
+
+For sideloaded Android builds, Accessibility can additionally be protected by Android's
+**Restricted settings** gate. The validated setup flow is:
+
+1. PickPico opens its Android App info page.
+2. If the device presents the option, the owner chooses `⋮ → Allow restricted settings` and confirms locally.
+3. The owner returns to PickPico and opens Accessibility settings.
+4. The owner enables **PickPico Hyper UI Control**.
+5. `capability.status` for `ui.inspect` changes from `setup_required` to `available`.
+
+The product should present this as a guided setup rather than as a failed Agent action. Store-installed
+builds or future Android versions may skip or rename the Restricted settings step, so live capability
+status remains authoritative.
 
 ### UX rule
 
@@ -490,7 +514,7 @@ Deep links                    Available
 | Deep-link handoff | ✅ | ✅ limited by platform | shared abstraction |
 | Persistent Agent node | ✅ | ❌ strict parity | Android Full Node advantage |
 | Other-app notification observation | ✅ | ❌ public parity | Hyper Android |
-| Cross-app UI accessibility automation | ✅ implemented in source; device validation pending | ❌ public parity | Hyper Android |
+| Cross-app UI accessibility automation | ✅ implemented and Accessibility enablement validated on Android 16 | ❌ public parity | Hyper Android |
 | App-sandbox shell / embedded Node | ✅ | ❌ strict parity | Android-specific |
 | Device lock/wake | ✅ partial | ❌ strict parity | Android-specific |
 | APK-style self-update | ✅ | ❌ | Android-specific |
@@ -523,7 +547,7 @@ Current priority is to demonstrate the strongest form of the product rather than
 | --- | --- | --- |
 | Notification Listener | notification read/dismiss/actions/invoke/reply | ✅ implemented; device validation for new action/reply flow pending |
 | Device Admin | `phone.lock` | ✅ current |
-| Accessibility Service | `ui.inspect/action/type/scroll` | ✅ implemented in source; device validation pending |
+| Accessibility Service | `ui.inspect/action/type/scroll` | ✅ implemented; Restricted settings + Accessibility human setup validated on Android 16 |
 | MediaProjection consent | `screen.capture` | ⏳ P0 Hyper |
 | Usage Access | `usage.*` | ⏳ P1 Hyper |
 
@@ -539,8 +563,8 @@ Current priority is to demonstrate the strongest form of the product rather than
 
 ### Phase B: Hyper MVP
 
-1. ✅ Accessibility Service setup in source; physical-device enable/test pending.
-2. ✅ `ui.inspect` implemented; physical-device validation pending.
+1. ✅ Accessibility Service setup implemented and enabled on a physical Samsung S23 / Android 16.
+2. ✅ `ui.inspect` capability availability validated after the human-owned Restricted settings / Accessibility setup.
 3. ✅ `ui.action` / `ui.type` / `ui.scroll` implemented; physical-device validation pending.
 4. ⏳ `screen.capture` remains the major P0 Hyper capability not yet implemented.
 5. ✅ `notification.actions` / `notification.invoke_action` / `notification.reply` implemented; physical-device validation pending.

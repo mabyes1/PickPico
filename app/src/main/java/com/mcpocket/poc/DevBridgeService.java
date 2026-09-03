@@ -45,7 +45,7 @@ public final class DevBridgeService extends Service {
         super.onCreate();
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "MCPocket debug bridge",
+                "PickPico debug bridge",
                 NotificationManager.IMPORTANCE_LOW);
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(channel);
     }
@@ -183,7 +183,7 @@ public final class DevBridgeService extends Service {
     private void startAsForeground() {
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_warning)
-                .setContentTitle("MCPocket debug bridge")
+                .setContentTitle("PickPico debug bridge")
                 .setContentText("ADB smoke-test action is running")
                 .setOngoing(true)
                 .build();

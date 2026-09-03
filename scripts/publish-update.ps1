@@ -32,7 +32,7 @@ if (-not $versionNameMatch.Success -or -not $versionCodeMatch.Success) {
 $versionName = $versionNameMatch.Groups[1].Value
 $versionCode = [int64]$versionCodeMatch.Groups[1].Value
 $sha256 = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
-$assetName = "mcpocket-$versionName-$versionCode.apk"
+$assetName = "pickpico-$versionName-$versionCode.apk"
 $objectKey = "releases/$assetName"
 $relayBaseUrl = $RelayBaseUrl.TrimEnd('/')
 $apkUrl = "$relayBaseUrl/v1/update/files/$objectKey"
@@ -46,11 +46,11 @@ $manifest = [ordered]@{
     publishedAt = [DateTimeOffset]::UtcNow.ToString('o')
 }
 
-$manifestPath = Join-Path ([System.IO.Path]::GetTempPath()) 'mcpocket-update-latest.json'
+$manifestPath = Join-Path ([System.IO.Path]::GetTempPath()) 'pickpico-update-latest.json'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json), $utf8NoBom)
-$metadataPath = Join-Path ([System.IO.Path]::GetTempPath()) 'mcpocket-update-metadata.json'
-$chunkDir = Join-Path ([System.IO.Path]::GetTempPath()) ("mcpocket-update-" + [Guid]::NewGuid().ToString('N'))
+$metadataPath = Join-Path ([System.IO.Path]::GetTempPath()) 'pickpico-update-metadata.json'
+$chunkDir = Join-Path ([System.IO.Path]::GetTempPath()) ("pickpico-update-" + [Guid]::NewGuid().ToString('N'))
 [void][System.IO.Directory]::CreateDirectory($chunkDir)
 
 $chunkSize = [int64]$ChunkSizeMiB * 1024L * 1024L
@@ -110,7 +110,7 @@ try {
     Remove-Item -LiteralPath $chunkDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "Published MCPocket $versionName ($versionCode)"
+Write-Host "Published PickPico $versionName ($versionCode)"
 Write-Host "Manifest: $relayBaseUrl/v1/update/latest"
 Write-Host "APK:      $apkUrl"
 Write-Host "SHA-256:  $sha256"

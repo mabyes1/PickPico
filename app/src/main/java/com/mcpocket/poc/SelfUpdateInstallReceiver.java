@@ -81,7 +81,7 @@ public final class SelfUpdateInstallReceiver extends BroadcastReceiver {
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel channel = new NotificationChannel(
                 UPDATE_CHANNEL_ID,
-                "MCPocket updates",
+                "PickPico updates",
                 NotificationManager.IMPORTANCE_HIGH);
         manager.createNotificationChannel(channel);
 
@@ -97,7 +97,7 @@ public final class SelfUpdateInstallReceiver extends BroadcastReceiver {
 
         Notification notification = new Notification.Builder(context, UPDATE_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("MCPocket update ready")
+                .setContentTitle("PickPico update ready")
                 .setContentText("Tap to confirm the Android app update")
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)

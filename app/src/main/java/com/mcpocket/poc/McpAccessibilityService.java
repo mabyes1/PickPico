@@ -173,7 +173,7 @@ public final class McpAccessibilityService extends AccessibilityService {
         McpAccessibilityService service = activeInstance;
         if (service == null) {
             throw new CommandRuntime.CommandInputException(
-                    "MCPocket Accessibility Service is not connected. Enable Hyper Mode and Accessibility access locally.");
+                    "PickPico Accessibility Service is not connected. Enable Hyper Mode and Accessibility access locally.");
         }
         return service;
     }

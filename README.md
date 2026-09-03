@@ -1,14 +1,18 @@
-# MCPocket
+# PickPico
 
-MCPocket turns an Android phone into a **Mobile Agent Node**: a persistent MCP execution node that
+PickPico turns an Android phone into a **Mobile Agent Node**: a persistent MCP execution node that
 lets an external Agent use Android as a place to execute work, sense the physical world, and interact
 with the person carrying the device.
+
+> Renamed from **MCPocket** to **PickPico** on 2026-09-03 because of a project-name collision. Legacy
+> Android package/storage identifiers and the current demo relay hostname intentionally retain
+> `mcpocket` for upgrade compatibility.
 
 > FUTUREMODE × SITCON Hackathon 2026 · AI Agents & Automation · pre-hackathon baseline
 
 ## 100–200 字作品摘要
 
-AI Agent 很會在雲端工作，卻很難跨進真實世界：它看不到現場，也常在需要人類協助時反覆失敗。MCPocket 把 Android 手機變成標準 MCP Mobile Agent Node，讓 Agent 可遠端執行程式、使用相機、麥克風、通知、語音與位置，並透過 HUMAN HELP 向身邊的人請求文字、選項或照片；Cloudflare Relay 讓手機跨網路仍能持續連線。
+AI Agent 很會在雲端工作，卻很難跨進真實世界：它看不到現場，也常在需要人類協助時反覆失敗。PickPico 把 Android 手機變成標準 MCP Mobile Agent Node，讓 Agent 可遠端執行程式、使用相機、麥克風、通知、語音與位置，並透過 HUMAN HELP 向身邊的人請求文字、選項或照片；Cloudflare Relay 讓手機跨網路仍能持續連線。
 
 ## 問題與解法
 
@@ -19,7 +23,7 @@ AI Agent 很會在雲端工作，卻很難跨進真實世界：它看不到現�
 - 手機雖然有相機、麥克風、GPS、通知、喇叭與 App，卻通常不是 Agent runtime 的一部分。
 - Agent 與手機不在同一個 LAN 時，NAT、行動網路與防火牆又會把連線切開。
 
-MCPocket 的做法不是再做一個「手機遙控器」，而是把 Android 變成 Agent 可以直接使用的標準 MCP 節點，分成三類能力：
+PickPico 的做法不是再做一個「手機遙控器」，而是把 Android 變成 Agent 可以直接使用的標準 MCP 節點，分成三類能力：
 
 1. **Execute**：workspace、shell process、background session、embedded Node.js。
 2. **Sense**：camera、microphone、location、Android notification state。
@@ -31,7 +35,7 @@ MCPocket 的做法不是再做一個「手機遙控器」，而是把 Android �
 
 最短的展示路徑只需要一支 Android 手機與一個 MCP client：
 
-1. Agent 透過 Cloudflare Relay 連上不同網路上的 MCPocket。
+1. Agent 透過 Cloudflare Relay 連上不同網路上的 PickPico。
 2. Agent 呼叫 `location.get`、`camera.capture` 或 `notification.list` 取得真實世界資訊。
 3. Agent 可用 `phone.notify`、`phone.speak`、`app.launch` 或 `url.open` 對手機產生動作。
 4. 碰到「AI 繼續做很笨，人類做一下很快」的步驟時，呼叫 `human.help`。
@@ -57,11 +61,11 @@ MCPocket 的做法不是再做一個「手機遙控器」，而是把 Android �
 
 HUMAN HELP 的 timeout 是「人類閒置時間」而不是死板的總時限。打字、開啟請求、選圖或拍照都會續租等待時間；目前每次可選 120 / 180 / 360 秒，Relay 另外保留較長的 transport safety timeout，避免人在操作時 HTTP request 被提前切掉。
 
-### Optional Sponsor Bounty：MCPocket Financial Agent
+### Optional Sponsor Bounty：PickPico Financial Agent
 
-> **有多餘時間才做。不得為了 Sponsor Bounty 犧牲 MCPocket 主 Demo 的穩定度。**
+> **有多餘時間才做。不得為了 Sponsor Bounty 犧牲 PickPico 主 Demo 的穩定度。**
 
-若核心作品、影片與現場備援都已穩定，可額外把既有 MCPocket 能力組成金融 Agent workflow，作為企業命題延伸，而不是修改 MCPocket 核心定位：
+若核心作品、影片與現場備援都已穩定，可額外把既有 PickPico 能力組成金融 Agent workflow，作為企業命題延伸，而不是修改 PickPico 核心定位：
 
 ```text
 支付需求
@@ -81,7 +85,7 @@ Agent 監看 transaction status / Android notification
 繼續 invoice、付款確認或後續企業 workflow
 ```
 
-實作原則：優先使用 **testnet 或 mock stablecoin**；MCPocket 不實作 wallet custody、不保存私鑰、不代替使用者簽章。這個情境要展示的是「Agent 可以代理流程，但高風險授權仍能乾淨地 hand off 給人類」。
+實作原則：優先使用 **testnet 或 mock stablecoin**；PickPico 不實作 wallet custody、不保存私鑰、不代替使用者簽章。這個情境要展示的是「Agent 可以代理流程，但高風險授權仍能乾淨地 hand off 給人類」。
 
 **提醒：只有在主 Demo、README、2 分鐘影片、真機備援都完成後，才開始這顆 Sponsor DLC。**
 
@@ -91,7 +95,7 @@ Agent 監看 transaction status / Android notification
 flowchart LR
     A[External Agent / MCP Client]
     CF[Cloudflare Worker + Durable Object]
-    APP[Android MCPocket\nForeground Service]
+    APP[Android PickPico\nForeground Service]
     MCP[MCP HTTP Server\n127.0.0.1:8765]
     REG[Tool Registry + Command Runtime]
     EX[Execute\nWorkspace / Process / Node.js]
@@ -120,7 +124,7 @@ MCP Client --HTTP + Bearer--> http://<phone-ip>:8765/mcp
 遠端模式則由手機主動建立 outbound WSS，因此不需要 public IP、port forwarding 或 VPN：
 
 ```text
-Agent --HTTPS--> MCPocket Relay --WSS--> Android MCPocket --HTTP loopback--> :8765/mcp
+Agent --HTTPS--> PickPico Relay --WSS--> Android PickPico --HTTP loopback--> :8765/mcp
 ```
 
 ## 目前功能狀態
@@ -137,7 +141,7 @@ Agent --HTTPS--> MCPocket Relay --WSS--> Android MCPocket --HTTP loopback--> :87
 | Update | manifest check、signed APK verification、PackageInstaller、Cloudflare Workers KV release channel |
 | Safety boundaries | Android runtime permissions、Device Admin opt-in for lock、app sandbox for shell、separate relay secret/local bearer |
 
-目前 Android source 版本：**0.14.0** (`versionCode 31`)。尚未自動發佈到 project update channel；實機可能仍運行上一版，直到明確執行 publish / install。
+目前 Android source 版本：**0.14.0** (`versionCode 31`)。此版本已發佈到 project update channel，並已驗證實機可從舊品牌版本 `0.13.6` (`versionCode 30`) 經 SHA-256、package identity、signing certificate 與 Android 安裝確認原地升級為 PickPico 0.14.0。
 
 ## Current implementation snapshot
 
@@ -462,17 +466,18 @@ pwsh scripts/phone-find.ps1 -Stop
 
 ## Android 權限與安全邊界
 
-MCPocket 不會為了 Demo 偷繞過 Android 的權限模型：
+PickPico 不會為了 Demo 偷繞過 Android 的權限模型：
 
-| 能力 | Android / MCPocket 邊界 |
+| 能力 | Android / PickPico 邊界 |
 | --- | --- |
 | Camera | 使用者授權 `CAMERA`，node 由使用者啟動後才可使用 |
 | Microphone | 使用者授權 `RECORD_AUDIO`，錄音限制 0.5–10 秒/次 |
 | Location | 使用者授權 coarse/fine location；未授權時回傳 setup guidance |
 | Notification read/dismiss | 使用者必須在系統設定手動開啟 Notification Listener access |
+| Hyper UI / Accessibility | 必須由手機持有人在 Android 系統 UI 親自授權。側載 APK 可能先要求到 App info 的 `⋮ → Allow restricted settings`，再到 Accessibility 開啟 **PickPico Hyper UI Control**。PickPico 可以開啟正確設定頁並引導流程，但不能替自己核准這些安全門 |
 | Phone lock | 使用者必須一次性啟用 Device Admin；沒有權限就拒絕 |
 | Phone wake | 只點亮螢幕，不解鎖裝置 |
-| `process.exec` | 只以 MCPocket app UID 在 Android app sandbox 執行，不是 root / ADB shell |
+| `process.exec` | 只以 PickPico app UID 在 Android app sandbox 執行，不是 root / ADB shell |
 | HUMAN HELP | 人類回覆與圖片保存在 app private storage；附件空間有 100 MiB 上限與清理機制 |
 | Remote relay | relay secret、remote capability URL、local bearer 是三個不同安全邊界 |
 | Self-update | SHA-256、package name、signing certificate、version 全部驗證後才交給 Android installer |

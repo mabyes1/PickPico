@@ -46,7 +46,7 @@ try {
         Add-Check 'Android device' ($state -eq 'device') "adb state=$state"
 
         $package = (& $adb shell pm path com.mcpocket.poc 2>$null | Out-String).Trim()
-        Add-Check 'MCPocket installed' ($package -match '^package:') $package
+        Add-Check 'PickPico installed' ($package -match '^package:') $package
 
         & (Join-Path $PSScriptRoot 'dev-node-start.ps1') | Out-Host
         Add-Check 'Start MCP node' ($LASTEXITCODE -eq 0) 'DevBridgeService start request sent'
@@ -77,7 +77,7 @@ try {
     $failureMessage = $_.Exception.Message
 } finally {
     Write-Host ''
-    Write-Host '=== MCPocket Hackathon Readiness ==='
+    Write-Host '=== PickPico Hackathon Readiness ==='
     $results | Format-Table -AutoSize | Out-Host
 }
 

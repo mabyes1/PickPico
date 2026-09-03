@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -109,7 +110,7 @@ public final class MainActivity extends Activity {
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
 
-        TextView title = text("MCPocket", 28, Typeface.BOLD);
+        TextView title = text("PickPico", 28, Typeface.BOLD);
         root.addView(title);
         TextView subtitle = text("Android Mobile Agent Node", 15, Typeface.NORMAL);
         subtitle.setTextColor(Color.DKGRAY);
@@ -150,11 +151,11 @@ public final class MainActivity extends Activity {
             Toast.makeText(
                     this,
                     checked
-                            ? "Hyper Mode enabled. Grant each Android Special Access capability separately."
+                            ? "Hyper Mode enabled. Android requires the phone owner to finish Special Access setup locally."
                             : "Hyper Mode disabled. Android access may remain granted, but Hyper commands are hidden from the Agent.",
                     Toast.LENGTH_LONG).show();
             if (checked && !McpAccessibilityService.hasAccess(this)) {
-                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                openAppDetailsSettings();
             }
             refreshStatus();
         });
@@ -212,8 +213,26 @@ public final class MainActivity extends Activity {
 
         root.addView(label("HYPER UI CONTROL / ACCESSIBILITY"));
         root.addView(accessibilityAccessView);
+
+        TextView accessibilitySetupNote = text(
+                "Human setup required. Android may block sideloaded apps from Accessibility until the phone owner explicitly allows Restricted settings. " +
+                        "PickPico can open the correct system pages, but it cannot approve these security gates for itself.\n\n" +
+                        "Step 1: Open PickPico App info. If Android shows the option, tap the top-right menu (⋮) → Allow restricted settings, then return here.\n" +
+                        "Step 2: Open Accessibility settings and enable PickPico Hyper UI Control. Store-installed builds may not require Step 1.",
+                13,
+                Typeface.NORMAL);
+        accessibilitySetupNote.setTextColor(Color.DKGRAY);
+        accessibilitySetupNote.setPadding(0, 0, 0, dp(8));
+        root.addView(accessibilitySetupNote);
+
+        Button openAppInfoButton = new Button(this);
+        openAppInfoButton.setText("STEP 1 · OPEN APP INFO");
+        openAppInfoButton.setOnClickListener(v -> openAppDetailsSettings());
+        root.addView(openAppInfoButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
         enableAccessibilityButton = new Button(this);
-        enableAccessibilityButton.setText("ENABLE ACCESSIBILITY UI CONTROL");
+        enableAccessibilityButton.setText("STEP 2 · ENABLE ACCESSIBILITY UI CONTROL");
         enableAccessibilityButton.setOnClickListener(v ->
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         root.addView(enableAccessibilityButton, new LinearLayout.LayoutParams(
@@ -249,7 +268,7 @@ public final class MainActivity extends Activity {
         root.addView(updateStatusView);
 
         updateButton = new Button(this);
-        updateButton.setText("UPDATE MCPOCKET");
+        updateButton.setText("UPDATE PICKPICO");
         updateButton.setOnClickListener(v -> installStagedUpdate());
         root.addView(updateButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
@@ -283,7 +302,7 @@ public final class MainActivity extends Activity {
         TextView note = text(
                 "This build exposes only explicit phone capabilities. phone_status is read-only; " +
                         "phone_exec remains a restricted compatibility tool; exec_command runs Linux shell " +
-                        "commands inside the MCPocket app sandbox; phone_echo is observable.",
+                        "commands inside the PickPico app sandbox; phone_echo is observable.",
                 13,
                 Typeface.NORMAL);
         note.setTextColor(Color.DKGRAY);
@@ -363,7 +382,7 @@ public final class MainActivity extends Activity {
                     "}";
         }
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText("MCPocket connection", json));
+        clipboard.setPrimaryClip(ClipData.newPlainText("PickPico connection", json));
         Toast.makeText(this, "Connection JSON copied", Toast.LENGTH_SHORT).show();
     }
 
@@ -397,7 +416,14 @@ public final class MainActivity extends Activity {
                 .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
                 .putExtra(
                         DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                        "MCPocket can lock this phone when you explicitly request it through the authenticated node.");
+                        "PickPico can lock this phone when you explicitly request it through the authenticated node.");
+        startActivity(intent);
+    }
+
+    private void openAppDetailsSettings() {
+        Intent intent = new Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName()));
         startActivity(intent);
     }
 
@@ -405,7 +431,7 @@ public final class MainActivity extends Activity {
         try {
             JSONObject state = SelfUpdateManager.installStagedFromForeground(this);
             String status = state.optString("status", "staging");
-            Toast.makeText(this, "MCPocket update: " + status, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "PickPico update: " + status, Toast.LENGTH_SHORT).show();
             handler.postDelayed(this::refreshStatus, 250L);
         } catch (RuntimeException error) {
             Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
@@ -492,7 +518,7 @@ public final class MainActivity extends Activity {
         updateButton.setEnabled(hasCandidate && !"downloading".equals(rawUpdateStatus));
         updateButton.setText(hasCandidate && !TextUtils.isEmpty(candidateVersion)
                 ? "UPDATE TO " + candidateVersion
-                : "UPDATE MCPOCKET");
+                : "UPDATE PICKPICO");
 
         if ("pending_user_action".equals(rawUpdateStatus)
                 && updateState.optBoolean("startedByUser", false)) {
@@ -503,7 +529,7 @@ public final class MainActivity extends Activity {
                 } catch (Throwable launchError) {
                     Toast.makeText(
                             this,
-                            "Tap the MCPocket update notification to continue",
+                            "Tap the PickPico update notification to continue",
                             Toast.LENGTH_LONG).show();
                 }
             }

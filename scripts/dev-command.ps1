@@ -20,7 +20,7 @@ $argumentsBase64 = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '
     --es argumentsBase64 $argumentsBase64
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to request MCPocket dev MCP command"
+    throw "Failed to request PickPico dev MCP command"
 }
 
 $deadline = [DateTime]::UtcNow.AddSeconds(125)
@@ -33,4 +33,4 @@ do {
     }
 } while ([DateTime]::UtcNow -lt $deadline)
 
-throw "Timed out waiting for MCPocket dev MCP command result"
+throw "Timed out waiting for PickPico dev MCP command result"

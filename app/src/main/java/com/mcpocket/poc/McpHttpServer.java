@@ -118,7 +118,7 @@ final class McpHttpServer {
 
             if (!isAuthorized(request.header("authorization"))) {
                 Map<String, String> headers = new LinkedHashMap<>();
-                headers.put("WWW-Authenticate", "Bearer realm=\"MCPocket\"");
+                headers.put("WWW-Authenticate", "Bearer realm=\"PickPico\"");
                 headers.putAll(corsHeaders(origin));
                 writeText(output, 401, "Unauthorized", "text/plain; charset=utf-8", "Unauthorized", headers);
                 return;

@@ -141,7 +141,7 @@ public final class AgentInboxActivity extends Activity {
     private void copyText(String value) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("MCPocket Agent message", value));
+            clipboard.setPrimaryClip(ClipData.newPlainText("PickPico Agent message", value));
             Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show();
         }
     }

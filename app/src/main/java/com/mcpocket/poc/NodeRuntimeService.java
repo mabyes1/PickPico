@@ -27,7 +27,7 @@ public final class NodeRuntimeService extends Service {
         super.onCreate();
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "MCPocket Node runtime",
+                "PickPico Node runtime",
                 NotificationManager.IMPORTANCE_LOW);
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(channel);
     }
@@ -101,7 +101,7 @@ public final class NodeRuntimeService extends Service {
     private void startAsForeground(String entry) {
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("MCPocket Node runtime")
+                .setContentTitle("PickPico Node runtime")
                 .setContentText(new File(entry).getName())
                 .setOngoing(true)
                 .build();

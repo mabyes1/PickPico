@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/** Persistent user-owned policy settings for MCPocket Agent control. */
+/** Persistent user-owned policy settings for PickPico Agent control. */
 final class McpocketPolicySettings {
     static final String PREFS = "mcpocket_policy";
     static final String KEY_HYPER_MODE = "hyper_mode";
@@ -63,10 +63,10 @@ final class McpocketPolicySettings {
 
     private static String approvalMeaning(String value) {
         if (APPROVAL_ASK.equals(value)) {
-            return "Ask the human before MCPocket executes a command with side effects.";
+            return "Ask the human before PickPico executes a command with side effects.";
         }
         if (APPROVAL_YOLO.equals(value)) {
-            return "Do not add an MCPocket approval prompt; Android, biometric, app, and sandbox boundaries still apply.";
+            return "Do not add a PickPico approval prompt; Android, biometric, app, and sandbox boundaries still apply.";
         }
         return "Auto-approve ordinary operations, but ask the human before high-risk operations.";
     }

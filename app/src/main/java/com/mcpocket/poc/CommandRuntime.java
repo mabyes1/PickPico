@@ -69,7 +69,7 @@ final class CommandRuntime {
         this.actions = actions;
         register(
                 "node.info",
-                "Return MCPocket node and Android device information.",
+                "Return PickPico node and Android device information.",
                 "node",
                 "read_only",
                 false,
@@ -87,7 +87,7 @@ final class CommandRuntime {
 
         register(
                 "capability.list",
-                "List all implemented MCPocket capabilities, including disabled/setup-required capabilities and their runtime state.",
+                "List all implemented PickPico capabilities, including disabled/setup-required capabilities and their runtime state.",
                 "capability",
                 "read_only",
                 false,
@@ -96,7 +96,7 @@ final class CommandRuntime {
 
         register(
                 "capability.status",
-                "Return runtime availability, capability group, and setup requirements for one MCPocket capability.",
+                "Return runtime availability, capability group, and setup requirements for one PickPico capability.",
                 "capability",
                 "read_only",
                 false,
@@ -145,7 +145,7 @@ final class CommandRuntime {
 
         register(
                 "phone.lock",
-                "Immediately lock the phone when MCPocket has been explicitly enabled as a device administrator.",
+                "Immediately lock the phone when PickPico has been explicitly enabled as a device administrator.",
                 "phone",
                 "security_action",
                 true,
@@ -189,7 +189,7 @@ final class CommandRuntime {
 
         register(
                 "camera.capture",
-                "Capture one JPEG frame from the Android camera and persist it in the MCPocket workspace.",
+                "Capture one JPEG frame from the Android camera and persist it in the PickPico workspace.",
                 "sensor",
                 "sensor_read",
                 true,
@@ -219,7 +219,7 @@ final class CommandRuntime {
                 true,
                 phoneNotifySchema(),
                 (arguments, callCount) -> {
-                    String title = arguments.optString("title", "MCPocket Agent");
+                    String title = arguments.optString("title", "PickPico Agent");
                     String body = arguments.optString("body", "");
                     if (title.isEmpty() || title.length() > 120) {
                         throw new CommandInputException("phone.notify title must be 1-120 characters");
@@ -271,7 +271,7 @@ final class CommandRuntime {
 
         register(
                 "human.help",
-                "Ask the nearby human for help through MCPocket and block until they respond or the renewable idle timeout expires. Human typing, image selection, or camera activity renews the idle timeout.",
+                "Ask the nearby human for help through PickPico and block until they respond or the renewable idle timeout expires. Human typing, image selection, or camera activity renews the idle timeout.",
                 "interaction",
                 "human_interaction",
                 true,
@@ -514,7 +514,7 @@ final class CommandRuntime {
 
         register(
                 "clipboard.get",
-                "Read plain text from the Android clipboard when Android permits MCPocket clipboard access.",
+                "Read plain text from the Android clipboard when Android permits PickPico clipboard access.",
                 "clipboard",
                 "personal_data_read",
                 false,
@@ -538,7 +538,7 @@ final class CommandRuntime {
 
         register(
                 "workspace.info",
-                "Return the MCPocket workspace root, storage state, and available command-line runtimes.",
+                "Return the PickPico workspace root, storage state, and available command-line runtimes.",
                 "workspace",
                 "read_only",
                 false,
@@ -547,7 +547,7 @@ final class CommandRuntime {
 
         register(
                 "workspace.list",
-                "List files and directories under MCPocket's private workspace root.",
+                "List files and directories under PickPico's private workspace root.",
                 "workspace",
                 "read_only",
                 false,
@@ -567,7 +567,7 @@ final class CommandRuntime {
 
         register(
                 "workspace.read",
-                "Read one UTF-8 text file from MCPocket's private workspace root.",
+                "Read one UTF-8 text file from PickPico's private workspace root.",
                 "workspace",
                 "read_only",
                 false,
@@ -583,7 +583,7 @@ final class CommandRuntime {
 
         register(
                 "workspace.write",
-                "Write one UTF-8 text file below MCPocket's private workspace root, creating parent directories by default.",
+                "Write one UTF-8 text file below PickPico's private workspace root, creating parent directories by default.",
                 "workspace",
                 "filesystem_write",
                 true,
@@ -599,7 +599,7 @@ final class CommandRuntime {
 
         register(
                 "node.start",
-                "Start one Node.js workspace entry point in MCPocket's isolated :node runtime process.",
+                "Start one Node.js workspace entry point in PickPico's isolated :node runtime process.",
                 "runtime",
                 "process_start",
                 true,
@@ -611,7 +611,7 @@ final class CommandRuntime {
 
         register(
                 "node.status",
-                "Return the current MCPocket Node.js runtime process state.",
+                "Return the current PickPico Node.js runtime process state.",
                 "runtime",
                 "read_only",
                 false,
@@ -620,7 +620,7 @@ final class CommandRuntime {
 
         register(
                 "node.stop",
-                "Stop the isolated MCPocket Node.js runtime process.",
+                "Stop the isolated PickPico Node.js runtime process.",
                 "runtime",
                 "process_control",
                 true,
@@ -629,7 +629,7 @@ final class CommandRuntime {
 
         register(
                 "app.update",
-                "Download, verify, and hand a newer MCPocket APK to Android's package installer.",
+                "Download, verify, and hand a newer PickPico APK to Android's package installer.",
                 "app",
                 "software_update",
                 true,
@@ -638,7 +638,7 @@ final class CommandRuntime {
 
         register(
                 "app.update_check",
-                "Check MCPocket's configured update channel and report whether a newer signed APK is available.",
+                "Check PickPico's configured update channel and report whether a newer signed APK is available.",
                 "app",
                 "read_only",
                 false,
@@ -647,7 +647,7 @@ final class CommandRuntime {
 
         register(
                 "app.update_latest",
-                "Resolve the latest MCPocket release from the configured update channel and start the verified self-update flow.",
+                "Resolve the latest PickPico release from the configured update channel and start the verified self-update flow.",
                 "app",
                 "software_update",
                 true,
@@ -656,7 +656,7 @@ final class CommandRuntime {
 
         register(
                 "app.update_status",
-                "Return MCPocket self-update progress, setup requirements, and installer status.",
+                "Return PickPico self-update progress, setup requirements, and installer status.",
                 "app",
                 "read_only",
                 false,
@@ -1016,7 +1016,7 @@ final class CommandRuntime {
                                 .put("type", "string")
                                 .put("minLength", 1)
                                 .put("maxLength", 120)
-                                .put("default", "MCPocket Agent"))
+                                .put("default", "PickPico Agent"))
                         .put("body", new JSONObject()
                                 .put("type", "string")
                                 .put("minLength", 1)
@@ -1348,7 +1348,7 @@ final class CommandRuntime {
                         .put("label", new JSONObject()
                                 .put("type", "string")
                                 .put("maxLength", 120)
-                                .put("default", "MCPocket Agent")))
+                                .put("default", "PickPico Agent")))
                 .put("required", new JSONArray().put("text"))
                 .put("additionalProperties", false);
     }
@@ -1461,7 +1461,7 @@ final class CommandRuntime {
                                 .put("type", "string")
                                 .put("minLength", 8)
                                 .put("maxLength", 4096)
-                                .put("description", "HTTP(S) URL for the candidate MCPocket APK."))
+                                .put("description", "HTTP(S) URL for the candidate PickPico APK."))
                         .put("sha256", new JSONObject()
                                 .put("type", "string")
                                 .put("minLength", 64)
@@ -1495,7 +1495,7 @@ final class CommandRuntime {
             throw new CommandInputException("workspace path is limited to 1024 characters");
         }
         if (path.startsWith("/") || path.startsWith("\\")) {
-            throw new CommandInputException("workspace paths must be relative to the MCPocket workspace root");
+            throw new CommandInputException("workspace paths must be relative to the PickPico workspace root");
         }
     }
 

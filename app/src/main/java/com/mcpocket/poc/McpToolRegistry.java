@@ -42,7 +42,7 @@ final class McpToolRegistry {
 
         register(
                 "task_runtime_info",
-                "Describe MCPocket's Agent task runtime and current retained task lifecycle state.",
+                "Describe PickPico's Agent task runtime and current retained task lifecycle state.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> tasks.info());
 
@@ -87,19 +87,19 @@ final class McpToolRegistry {
 
         register(
                 "command_list",
-                "List capability-oriented commands exposed by the MCPocket command runtime.",
+                "List capability-oriented commands exposed by the PickPico command runtime.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.list());
 
         register(
                 "capability_list",
-                "List all implemented MCPocket capabilities with current Core/Hyper availability and setup state.",
+                "List all implemented PickPico capabilities with current Core/Hyper availability and setup state.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("capability.list", arguments, callCount));
 
         register(
                 "capability_status",
-                "Inspect one MCPocket capability, including whether it is available, disabled, or requires local setup.",
+                "Inspect one PickPico capability, including whether it is available, disabled, or requires local setup.",
                 CommandRuntime.capabilityStatusSchema(),
                 (arguments, callCount) -> runtime.execute("capability.status", arguments, callCount));
 
@@ -111,7 +111,7 @@ final class McpToolRegistry {
 
         register(
                 "command_run",
-                "Run one MCPocket command by capability ID with structured JSON arguments. Use command_list to discover the current capability IDs.",
+                "Run one PickPico command by capability ID with structured JSON arguments. Use command_list to discover the current capability IDs.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
@@ -141,7 +141,7 @@ final class McpToolRegistry {
 
         register(
                 "exec_command",
-                "Execute a Linux shell command inside MCPocket's Android app sandbox. Relative cwd values resolve below the private workspace root; background=true returns a managed process session.",
+                "Execute a Linux shell command inside PickPico's Android app sandbox. Relative cwd values resolve below the private workspace root; background=true returns a managed process session.",
                 CommandRuntime.execCommandSchema(),
                 (arguments, callCount) -> runtime.execute("process.exec", arguments, callCount));
 
@@ -159,73 +159,73 @@ final class McpToolRegistry {
 
         register(
                 "workspace_info",
-                "Return MCPocket's private workspace root, free storage, execution features, and detected command-line runtimes.",
+                "Return PickPico's private workspace root, free storage, execution features, and detected command-line runtimes.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("workspace.info", arguments, callCount));
 
         register(
                 "workspace_list",
-                "List files and directories below MCPocket's private workspace root.",
+                "List files and directories below PickPico's private workspace root.",
                 CommandRuntime.workspaceListSchema(),
                 (arguments, callCount) -> runtime.execute("workspace.list", arguments, callCount));
 
         register(
                 "workspace_read_file",
-                "Read one UTF-8 text file below MCPocket's private workspace root.",
+                "Read one UTF-8 text file below PickPico's private workspace root.",
                 CommandRuntime.workspaceReadSchema(),
                 (arguments, callCount) -> runtime.execute("workspace.read", arguments, callCount));
 
         register(
                 "workspace_write_file",
-                "Write one UTF-8 text file below MCPocket's private workspace root.",
+                "Write one UTF-8 text file below PickPico's private workspace root.",
                 CommandRuntime.workspaceWriteSchema(),
                 (arguments, callCount) -> runtime.execute("workspace.write", arguments, callCount));
 
         register(
                 "node_start",
-                "Start a workspace JavaScript entry point inside MCPocket's isolated Node.js runtime process.",
+                "Start a workspace JavaScript entry point inside PickPico's isolated Node.js runtime process.",
                 CommandRuntime.nodeStartSchema(),
                 (arguments, callCount) -> runtime.execute("node.start", arguments, callCount));
 
         register(
                 "node_status",
-                "Return the current MCPocket Node.js runtime state.",
+                "Return the current PickPico Node.js runtime state.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("node.status", arguments, callCount));
 
         register(
                 "node_stop",
-                "Stop MCPocket's isolated Node.js runtime process.",
+                "Stop PickPico's isolated Node.js runtime process.",
                 CommandRuntime.nodeStopSchema(),
                 (arguments, callCount) -> runtime.execute("node.stop", arguments, callCount));
 
         register(
                 "app_update",
-                "Download a signed MCPocket APK, verify its SHA-256/package/signing certificate/version, then invoke Android's package installer.",
+                "Download a signed PickPico APK, verify its SHA-256/package/signing certificate/version, then invoke Android's package installer.",
                 CommandRuntime.appUpdateSchema(),
                 (arguments, callCount) -> runtime.execute("app.update", arguments, callCount));
 
         register(
                 "app_update_check",
-                "Check MCPocket's update channel and report the latest published version without installing it.",
+                "Check PickPico's update channel and report the latest published version without installing it.",
                 CommandRuntime.appUpdateChannelSchema(),
                 (arguments, callCount) -> runtime.execute("app.update_check", arguments, callCount));
 
         register(
                 "app_update_latest",
-                "Update MCPocket to the latest published signed APK without requiring the Agent to supply an APK URL or SHA-256.",
+                "Update PickPico to the latest published signed APK without requiring the Agent to supply an APK URL or SHA-256.",
                 CommandRuntime.appUpdateChannelSchema(),
                 (arguments, callCount) -> runtime.execute("app.update_latest", arguments, callCount));
 
         register(
                 "app_update_status",
-                "Return MCPocket self-update state and whether Android allows MCPocket to request package installs.",
+                "Return PickPico self-update state and whether Android allows PickPico to request package installs.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("app.update_status", arguments, callCount));
 
         register(
                 "server_info",
-                "Return safe MCPocket node, Android device, endpoint, uptime, and call-count information.",
+                "Return safe PickPico node, Android device, endpoint, uptime, and call-count information.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("node.info", arguments, callCount));
 
@@ -237,7 +237,7 @@ final class McpToolRegistry {
 
         register(
                 "camera_capture",
-                "Capture a JPEG image from the Android camera. Returns native MCP image content and stores the file in the MCPocket workspace.",
+                "Capture a JPEG image from the Android camera. Returns native MCP image content and stores the file in the PickPico workspace.",
                 CommandRuntime.cameraCaptureSchema(),
                 (arguments, callCount) -> runtime.execute("camera.capture", arguments, callCount));
 
@@ -255,7 +255,7 @@ final class McpToolRegistry {
 
         register(
                 "microphone_record",
-                "Record mono 16 kHz WAV audio from the Android microphone. Returns native MCP audio content and stores the file in the MCPocket workspace.",
+                "Record mono 16 kHz WAV audio from the Android microphone. Returns native MCP audio content and stores the file in the PickPico workspace.",
                 CommandRuntime.microphoneRecordSchema(),
                 (arguments, callCount) -> runtime.execute("microphone.record", arguments, callCount));
 

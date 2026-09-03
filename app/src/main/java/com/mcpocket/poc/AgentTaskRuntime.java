@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * In-memory Agent task lifecycle for MCPocket's Mobile Agent Node.
+ * In-memory Agent task lifecycle for PickPico's Mobile Agent Node.
  *
  * A command execution is a single action. A task is the longer-lived unit of work
  * that can span many commands, device capabilities, and human interactions.
@@ -32,7 +32,7 @@ final class AgentTaskRuntime {
             }
         }
         return new JSONObject()
-                .put("product", "MCPocket")
+                .put("product", "PickPico")
                 .put("role", "mobile_agent_node")
                 .put("taskLifecycle", true)
                 .put("taskStates", new JSONArray(VALID_STATES))
