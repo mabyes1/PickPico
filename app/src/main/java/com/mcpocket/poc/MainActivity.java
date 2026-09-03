@@ -91,6 +91,7 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         uiVisible = true;
+        refreshMediaForegroundTypesIfRunning();
         handler.post(refreshTask);
     }
 
@@ -505,12 +506,15 @@ public final class MainActivity extends Activity {
     private void refreshStatus() {
         SharedPreferences prefs = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE);
         boolean running = McpNodeService.isNodeRunning();
+        if (running && !prefs.getBoolean(McpNodeService.KEY_MEDIA_FOREGROUND_REQUESTED, false)) {
+            refreshMediaForegroundTypesIfRunning();
+        }
         if (!running && prefs.getBoolean(McpNodeService.KEY_RUNNING, false)) {
             prefs.edit()
                     .putBoolean(McpNodeService.KEY_RUNNING, false)
                     .putString(McpNodeService.KEY_ENDPOINT, "")
                     .putString(McpNodeService.KEY_REMOTE_ENDPOINT, "")
-                    .putString(McpNodeService.KEY_TOKEN, "")
+                    .putString(McpNodeService.KEY_RELAY_STATUS, "stopped")
                     .apply();
         }
         String error = prefs.getString(McpNodeService.KEY_ERROR, "");
@@ -606,6 +610,19 @@ public final class MainActivity extends Activity {
                             Toast.LENGTH_LONG).show();
                 }
             }
+        }
+    }
+
+    private void refreshMediaForegroundTypesIfRunning() {
+        if (!McpNodeService.isNodeRunning()) {
+            return;
+        }
+        Intent intent = new Intent(this, McpNodeService.class)
+                .setAction(McpNodeService.ACTION_REFRESH_MEDIA_FOREGROUND);
+        try {
+            startService(intent);
+        } catch (Throwable ignored) {
+            // The base MCP node remains usable even if Android declines a foreground-type refresh.
         }
     }
 

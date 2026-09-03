@@ -84,6 +84,14 @@
             android:name=".SelfUpdateInstallReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".NodeRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".McpNodeService"
             android:exported="false"

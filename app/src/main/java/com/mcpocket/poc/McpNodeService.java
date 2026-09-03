@@ -61,11 +61,14 @@ import java.util.concurrent.TimeUnit;
 public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
+    public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_ENABLE_MEDIA_FGS = "enableMediaForegroundCapabilities";
 
     public static final String PREFS = "mcpocket_node";
     public static final String KEY_RUNNING = "running";
+    public static final String KEY_DESIRED_RUNNING = "desired_running";
+    public static final String KEY_MEDIA_FOREGROUND_REQUESTED = "media_foreground_requested";
     public static final String KEY_ENDPOINT = "endpoint";
     public static final String KEY_REMOTE_ENDPOINT = "remote_endpoint";
     public static final String KEY_RELAY_BASE_URL = "relay_base_url";
@@ -103,7 +106,21 @@ public final class McpNodeService extends Service implements McpToolActions {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         if (ACTION_STOP.equals(action)) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(KEY_DESIRED_RUNNING, false)
+                    .putBoolean(KEY_MEDIA_FOREGROUND_REQUESTED, false)
+                    .apply();
             stopNode();
+            return START_NOT_STICKY;
+        }
+        if (ACTION_REFRESH_MEDIA_FOREGROUND.equals(action)) {
+            if (server != null && nodeActive) {
+                mediaForegroundRequested = true;
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                        .putBoolean(KEY_MEDIA_FOREGROUND_REQUESTED, true)
+                        .apply();
+                startAsForeground("Listening on " + endpoint);
+            }
             return START_NOT_STICKY;
         }
         if (!ACTION_START.equals(action) || server != null || nodeActive) {
@@ -127,6 +144,8 @@ public final class McpNodeService extends Service implements McpToolActions {
             startedElapsed = SystemClock.elapsedRealtime();
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(KEY_RUNNING, true)
+                    .putBoolean(KEY_DESIRED_RUNNING, true)
+                    .putBoolean(KEY_MEDIA_FOREGROUND_REQUESTED, mediaForegroundRequested)
                     .putString(KEY_ENDPOINT, endpoint)
                     .putString(KEY_TOKEN, token)
                     .putString(KEY_RECENT, "Node started at " + Instant.now())
@@ -1166,6 +1185,8 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(KEY_RUNNING, false)
+                .putBoolean(KEY_DESIRED_RUNNING, false)
+                .putBoolean(KEY_MEDIA_FOREGROUND_REQUESTED, false)
                 .putString(KEY_ENDPOINT, "")
                 .putString(KEY_REMOTE_ENDPOINT, "")
                 .putString(KEY_RELAY_STATUS, "stopped")
