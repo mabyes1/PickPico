@@ -769,9 +769,10 @@ final class CommandRuntime {
                     arguments == null ? new JSONObject() : arguments,
                     callCount);
             JSONObject publicResult = new JSONObject(result.toString());
-            if (publicResult.remove("_mcpContent") != null) {
-                publicResult.put("mediaContentOmitted", true);
-                publicResult.put("mediaHint", "Use the direct media MCP tool to receive image/audio content.");
+            JSONArray mediaContent = publicResult.optJSONArray("_mcpContent");
+            publicResult.remove("_mcpContent");
+            if (mediaContent != null) {
+                publicResult.put("mediaContentDelivered", true);
             }
             JSONObject execution = new JSONObject()
                     .put("executionId", executionId)
@@ -780,7 +781,11 @@ final class CommandRuntime {
                     .put("startedAt", startedAt)
                     .put("completedAt", Instant.now().toString())
                     .put("result", publicResult);
-            remember(executionId, execution);
+            JSONObject historyExecution = new JSONObject(execution.toString());
+            remember(executionId, historyExecution);
+            if (mediaContent != null) {
+                execution.put("_mcpContent", mediaContent);
+            }
             return execution;
         } catch (CommandInputException error) {
             JSONObject execution = new JSONObject()

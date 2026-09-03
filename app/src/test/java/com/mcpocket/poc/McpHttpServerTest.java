@@ -338,6 +338,36 @@ public final class McpHttpServerTest {
     }
 
     @Test
+    public void commandRunCanReturnNativeMcpMediaWithoutPersistingItInHistory() throws Exception {
+        HttpResult response = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":63,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"screen.capture\",\"arguments\":{}}}}",
+                authorizedHeaders());
+        assertEquals(200, response.status);
+        JSONObject result = new JSONObject(response.body).getJSONObject("result");
+        assertEquals("image", result.getJSONArray("content").getJSONObject(1).getString("type"));
+        assertEquals("image/jpeg", result.getJSONArray("content").getJSONObject(1).getString("mimeType"));
+
+        JSONObject execution = result.getJSONObject("structuredContent");
+        assertEquals("screen.capture", execution.getString("commandId"));
+        assertTrue(execution.getJSONObject("result").getBoolean("captured"));
+        assertTrue(execution.getJSONObject("result").getBoolean("mediaContentDelivered"));
+        assertTrue(!execution.has("_mcpContent"));
+
+        HttpResult status = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":64,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_status\",\"arguments\":{" +
+                        "\"executionId\":\"" + execution.getString("executionId") + "\"}}}",
+                authorizedHeaders());
+        JSONObject history = new JSONObject(status.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertTrue(!history.has("_mcpContent"));
+        assertTrue(!history.toString().contains("aW1hZ2U="));
+    }
+
+    @Test
     public void phoneExecOnlyAcceptsAllowlistedCommandIds() throws Exception {
         HttpResult accepted = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\"," +
