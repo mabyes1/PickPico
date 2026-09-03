@@ -94,9 +94,9 @@ Recommended runtime states:
 | `available` | Capability can currently run |
 | `temporarily_unavailable` | Runtime condition blocks it, such as no foreground activity |
 
-### Planned MCP surface
+### Current MCP surface
 
-P0:
+Implemented in the current Phase A runtime:
 
 - `capability.list`
 - `capability.status`
@@ -180,13 +180,13 @@ Device Admin                                      Ready
 
 ### 5.1 Existing capabilities that belong under Hyper governance
 
-These capabilities already exist in the codebase, but the unified Hyper Mode management layer is not implemented yet.
+These capabilities existed before the unified Hyper Mode work and are now governed by the same capability/Hyper model.
 
 | Capability | Current command | Android access | Current state |
 | --- | --- | --- | --- |
-| Notification observation | `notification.list/get` | Notification Listener Special Access | ✅ function exists; ⚠️ Hyper grouping pending |
-| Notification dismiss | `notification.dismiss` | Notification Listener Special Access | ✅ function exists; ⚠️ Hyper grouping pending |
-| Device lock | `phone.lock` | Device Admin opt-in | ✅ function exists; ⚠️ Hyper grouping pending |
+| Notification observation | `notification.list/get` | Notification Listener Special Access | ✅ implemented + Hyper governed |
+| Notification dismiss | `notification.dismiss` | Notification Listener Special Access | ✅ implemented + Hyper governed |
+| Device lock | `phone.lock` | Device Admin opt-in | ✅ implemented + Hyper governed |
 
 ### 5.2 Hyper capabilities still to develop
 
@@ -194,14 +194,15 @@ These capabilities already exist in the codebase, but the unified Hyper Mode man
 
 | Planned capability | Proposed MCP surface | Android mechanism | Notes |
 | --- | --- | --- | --- |
-| Hyper Mode manager | `hyper.status` or capability layer only | App settings + capability registry | One product switch, many independent access grants |
-| UI tree inspection | `ui.inspect` | AccessibilityService | Structured view of accessible UI nodes |
-| UI click/action | `ui.action` | AccessibilityNodeInfo actions | Click, focus, select, back where supported |
-| UI text entry | `ui.type` | Accessibility actions | Subject to app/widget support |
-| UI scroll | `ui.scroll` | Accessibility actions / gestures | Structured action first, gesture fallback later |
+| Hyper Mode manager | capability layer + local UI | App settings + capability registry | ✅ implemented; one product switch, many independent access grants |
+| UI tree inspection | `ui.inspect` | AccessibilityService | ✅ implemented in source; device validation pending |
+| UI click/action | `ui.action` | AccessibilityNodeInfo actions | ✅ implemented in source; click/focus/global back/home/recents |
+| UI text entry | `ui.type` | Accessibility actions | ✅ implemented in source; subject to app/widget support |
+| UI scroll | `ui.scroll` | Accessibility actions | ✅ implemented in source; structured scroll first |
 | Screen capture | `screen.capture` | MediaProjection | Explicit Android consent/session boundary |
-| Notification actions | `notification.actions` | Notification Listener | Expose buttons/actions supplied by notification |
-| Notification reply | `notification.reply` | RemoteInput where available | Only when the source notification supports reply |
+| Notification actions | `notification.actions` | Notification Listener | ✅ implemented in source; exposes buttons/RemoteInput metadata |
+| Invoke notification action | `notification.invoke_action` | Notification Listener + PendingIntent | ✅ implemented in source; Approval Policy applies |
+| Notification reply | `notification.reply` | RemoteInput where available | ✅ implemented in source; only when source supports reply |
 
 #### P1: advanced Hyper capabilities
 
@@ -489,7 +490,7 @@ Deep links                    Available
 | Deep-link handoff | ✅ | ✅ limited by platform | shared abstraction |
 | Persistent Agent node | ✅ | ❌ strict parity | Android Full Node advantage |
 | Other-app notification observation | ✅ | ❌ public parity | Hyper Android |
-| Cross-app UI accessibility automation | ✅ planned | ❌ public parity | Hyper Android |
+| Cross-app UI accessibility automation | ✅ implemented in source; device validation pending | ❌ public parity | Hyper Android |
 | App-sandbox shell / embedded Node | ✅ | ❌ strict parity | Android-specific |
 | Device lock/wake | ✅ partial | ❌ strict parity | Android-specific |
 | APK-style self-update | ✅ | ❌ | Android-specific |
@@ -520,9 +521,9 @@ Current priority is to demonstrate the strongest form of the product rather than
 
 | Access | Used by | Current / planned |
 | --- | --- | --- |
-| Notification Listener | notification read/dismiss/actions/reply | ✅ listener exists, ⏳ more actions planned |
+| Notification Listener | notification read/dismiss/actions/invoke/reply | ✅ implemented; device validation for new action/reply flow pending |
 | Device Admin | `phone.lock` | ✅ current |
-| Accessibility Service | `ui.*` | ⏳ P0 Hyper |
+| Accessibility Service | `ui.inspect/action/type/scroll` | ✅ implemented in source; device validation pending |
 | MediaProjection consent | `screen.capture` | ⏳ P0 Hyper |
 | Usage Access | `usage.*` | ⏳ P1 Hyper |
 
@@ -530,19 +531,19 @@ Current priority is to demonstrate the strongest form of the product rather than
 
 ### Phase A: capability framework
 
-1. Add capability registry/status model.
-2. Add Hyper Mode setting and UI shell.
-3. Group existing Notification Listener and Device Admin capabilities under Hyper presentation.
-4. Add Approval Mode setting: Ask Me / Auto-approve / YOLO.
-5. Reuse Human Help UI as generic Human Interaction UI for approvals.
+1. ✅ Add capability registry/status model.
+2. ✅ Add Hyper Mode setting and UI shell.
+3. ✅ Group existing Notification Listener and Device Admin capabilities under Hyper execution policy.
+4. ✅ Add Approval Mode setting: Ask Me / Auto-approve / YOLO.
+5. ✅ Reuse Human Help UI/runtime as generic Human Interaction UI for approvals.
 
 ### Phase B: Hyper MVP
 
-1. Accessibility Service setup.
-2. `ui.inspect`.
-3. `ui.action` / `ui.type` / `ui.scroll`.
-4. `screen.capture`.
-5. `notification.actions` / `notification.reply`.
+1. ✅ Accessibility Service setup in source; physical-device enable/test pending.
+2. ✅ `ui.inspect` implemented; physical-device validation pending.
+3. ✅ `ui.action` / `ui.type` / `ui.scroll` implemented; physical-device validation pending.
+4. ⏳ `screen.capture` remains the major P0 Hyper capability not yet implemented.
+5. ✅ `notification.actions` / `notification.invoke_action` / `notification.reply` implemented; physical-device validation pending.
 
 ### Phase C: Core personal-context capabilities
 

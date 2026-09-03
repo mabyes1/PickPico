@@ -7,5 +7,6 @@
     <string name="enable_remote_lock">Enable remote lock</string>
     <string name="device_admin_label">MCPocket remote lock</string>
     <string name="device_admin_description">Allows MCPocket to lock this phone when you explicitly request it through your authenticated MCP node.</string>
+    <string name="accessibility_service_description">Hyper Mode allows MCPocket to inspect and operate accessible UI elements in other Android apps when you explicitly enable this service.</string>
     <string name="tool_calls_format">%1$s\nTool calls: %2$d</string>
 </resources>

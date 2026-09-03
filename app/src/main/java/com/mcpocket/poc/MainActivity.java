@@ -23,7 +23,10 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,6 +51,7 @@ public final class MainActivity extends Activity {
     private TextView recentView;
     private TextView remoteLockView;
     private TextView notificationAccessView;
+    private TextView accessibilityAccessView;
     private TextView locationAccessView;
     private TextView appVersionView;
     private TextView updateStatusView;
@@ -55,10 +59,13 @@ public final class MainActivity extends Activity {
     private Button stopButton;
     private Button enableRemoteLockButton;
     private Button enableNotificationAccessButton;
+    private Button enableAccessibilityButton;
     private Button enableLocationButton;
     private Button agentInboxButton;
     private Button updateButton;
     private EditText relayUrlInput;
+    private Switch hyperModeSwitch;
+    private RadioGroup approvalModeGroup;
 
     private final Runnable refreshTask = new Runnable() {
         @Override
@@ -117,12 +124,59 @@ public final class MainActivity extends Activity {
         recentView = valueView();
         remoteLockView = valueView();
         notificationAccessView = valueView();
+        accessibilityAccessView = valueView();
         locationAccessView = valueView();
         appVersionView = valueView();
         updateStatusView = valueView();
 
         root.addView(label("STATUS"));
         root.addView(statusView);
+
+        root.addView(label("AGENT CONTROL"));
+        TextView controlNote = text(
+                "Hyper Mode controls advanced Android capabilities. Approval Mode controls whether the Agent must ask before side effects.",
+                13,
+                Typeface.NORMAL);
+        controlNote.setTextColor(Color.DKGRAY);
+        controlNote.setPadding(0, 0, 0, dp(8));
+        root.addView(controlNote);
+
+        hyperModeSwitch = new Switch(this);
+        hyperModeSwitch.setText("⚡ Hyper Mode");
+        hyperModeSwitch.setTextSize(17);
+        hyperModeSwitch.setChecked(McpocketPolicySettings.isHyperModeEnabled(this));
+        hyperModeSwitch.setOnCheckedChangeListener((button, checked) -> {
+            McpocketPolicySettings.setHyperModeEnabled(this, checked);
+            Toast.makeText(
+                    this,
+                    checked
+                            ? "Hyper Mode enabled. Grant each Android Special Access capability separately."
+                            : "Hyper Mode disabled. Android access may remain granted, but Hyper commands are hidden from the Agent.",
+                    Toast.LENGTH_LONG).show();
+            if (checked && !McpAccessibilityService.hasAccess(this)) {
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            }
+            refreshStatus();
+        });
+        root.addView(hyperModeSwitch, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        TextView approvalLabel = label("APPROVAL MODE");
+        approvalLabel.setPadding(0, dp(8), 0, dp(4));
+        root.addView(approvalLabel);
+        approvalModeGroup = new RadioGroup(this);
+        approvalModeGroup.setOrientation(RadioGroup.VERTICAL);
+        addApprovalOption(approvalModeGroup, "詢問我", McpocketPolicySettings.APPROVAL_ASK);
+        addApprovalOption(approvalModeGroup, "代我核准", McpocketPolicySettings.APPROVAL_AUTO);
+        addApprovalOption(approvalModeGroup, "YOLO Mode", McpocketPolicySettings.APPROVAL_YOLO);
+        approvalModeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            View selected = group.findViewById(checkedId);
+            if (selected != null && selected.getTag() instanceof String) {
+                McpocketPolicySettings.setApprovalMode(this, (String) selected.getTag());
+            }
+        });
+        root.addView(approvalModeGroup);
+
         root.addView(label("LOCAL MCP ENDPOINT"));
         root.addView(endpointView);
         root.addView(label("REMOTE RELAY"));
@@ -154,6 +208,15 @@ public final class MainActivity extends Activity {
         enableRemoteLockButton.setText(R.string.enable_remote_lock);
         enableRemoteLockButton.setOnClickListener(v -> requestDeviceAdmin());
         root.addView(enableRemoteLockButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(label("HYPER UI CONTROL / ACCESSIBILITY"));
+        root.addView(accessibilityAccessView);
+        enableAccessibilityButton = new Button(this);
+        enableAccessibilityButton.setText("ENABLE ACCESSIBILITY UI CONTROL");
+        enableAccessibilityButton.setOnClickListener(v ->
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        root.addView(enableAccessibilityButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
         root.addView(label("NOTIFICATION ACCESS"));
@@ -388,6 +451,13 @@ public final class MainActivity extends Activity {
                 : Color.rgb(170, 35, 35));
         enableNotificationAccessButton.setEnabled(!notificationAccess);
 
+        boolean accessibilityAccess = McpAccessibilityService.hasAccess(this);
+        accessibilityAccessView.setText(accessibilityAccess ? "ENABLED" : "NOT ENABLED");
+        accessibilityAccessView.setTextColor(accessibilityAccess
+                ? Color.rgb(0, 120, 60)
+                : Color.rgb(170, 35, 35));
+        enableAccessibilityButton.setEnabled(!accessibilityAccess);
+
         boolean locationAccess = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         locationAccessView.setText(locationAccess ? "ENABLED" : "NOT ENABLED");
@@ -470,6 +540,18 @@ public final class MainActivity extends Activity {
         view.setTextColor(Color.GRAY);
         view.setPadding(0, dp(14), 0, dp(4));
         return view;
+    }
+
+    private void addApprovalOption(RadioGroup group, String label, String mode) {
+        RadioButton option = new RadioButton(this);
+        option.setId(View.generateViewId());
+        option.setText(label);
+        option.setTextSize(16);
+        option.setTag(mode);
+        option.setChecked(mode.equals(McpocketPolicySettings.approvalMode(this)));
+        group.addView(option, new RadioGroup.LayoutParams(
+                RadioGroup.LayoutParams.MATCH_PARENT,
+                dp(46)));
     }
 
     private TextView valueView() {

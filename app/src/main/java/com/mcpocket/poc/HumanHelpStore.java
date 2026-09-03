@@ -44,11 +44,15 @@ final class HumanHelpStore {
     static JSONObject createAndWait(Context context, JSONObject arguments, long callCount) throws JSONException {
         cleanupStorageIfNeeded(context);
         String requestId = "hh-" + UUID.randomUUID();
+        String requestType = "approval".equals(arguments.optString("requestType", "help"))
+                ? "approval"
+                : "help";
         JSONArray actions = sanitizedActions(arguments.optJSONArray("actions"));
         int idleTimeoutSeconds = arguments.optInt("idleTimeoutSeconds", DEFAULT_IDLE_TIMEOUT_SECONDS);
         long createdAtEpochMs = System.currentTimeMillis();
         JSONObject request = new JSONObject()
                 .put("requestId", requestId)
+                .put("requestType", requestType)
                 .put("status", "waiting_human")
                 .put("title", arguments.optString("title", "AI needs your help"))
                 .put("instruction", arguments.optString("instruction", ""))
@@ -64,7 +68,7 @@ final class HumanHelpStore {
                 .put("openGraceUsed", false);
         AgentInboxStore.add(
                 context,
-                "human.help",
+                "approval".equals(requestType) ? "human.approval" : "human.help",
                 request.optString("title", "AI needs your help"),
                 request.optString("instruction", ""));
         save(context, request);
@@ -192,11 +196,12 @@ final class HumanHelpStore {
                 .put("completedAtEpochMs", System.currentTimeMillis())
                 .put("response", response);
         save(context, request);
+        boolean approval = "approval".equals(request.optString("requestType", "help"));
         postTerminalNotification(
                 context,
                 request,
-                "HUMAN_HELP 已完成",
-                "已收到你的回覆，AI 可以繼續處理。",
+                approval ? "核准已回覆" : "HUMAN_HELP 已完成",
+                approval ? "已收到你的核准決定，Agent 將依結果繼續處理。" : "已收到你的回覆，AI 可以繼續處理。",
                 android.R.drawable.checkbox_on_background);
     }
 
@@ -274,11 +279,12 @@ final class HumanHelpStore {
                     .put("timedOutAt", Instant.now().toString())
                     .put("timedOutAtEpochMs", System.currentTimeMillis());
             save(context, request);
+            boolean approval = "approval".equals(request.optString("requestType", "help"));
             postTerminalNotification(
                     context,
                     request,
-                    "HUMAN_HELP 已逾時",
-                    "AI 已停止等待這項協助，將自行決定下一步。",
+                    approval ? "核准請求已逾時" : "HUMAN_HELP 已逾時",
+                    approval ? "未取得你的核准，這項操作不會執行。" : "AI 已停止等待這項協助，將自行決定下一步。",
                     android.R.drawable.ic_dialog_alert);
         } catch (JSONException ignored) {
         }
@@ -432,9 +438,9 @@ final class HumanHelpStore {
         }
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Human help requests",
+                "Human interaction requests",
                 NotificationManager.IMPORTANCE_HIGH);
-        channel.setDescription("Requests from an Agent that need a nearby human response");
+        channel.setDescription("Help and approval requests from an Agent that need a nearby human response");
         manager.createNotificationChannel(channel);
 
         String requestId = request.optString("requestId");

@@ -2,8 +2,11 @@ package com.mcpocket.poc;
 
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.RemoteInput;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -130,6 +133,166 @@ public final class McpNotificationListenerService extends NotificationListenerSe
                 .put("toolCallCount", callCount);
     }
 
+    static JSONObject actions(Context context, String key, long callCount) throws JSONException {
+        JSONObject availability = availability(context, callCount);
+        if (!availability.optBoolean("available")) {
+            return availability;
+        }
+        StatusBarNotification sbn = findNotification(key);
+        if (sbn == null) {
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", false)
+                    .put("key", key)
+                    .put("actions", new JSONArray())
+                    .put("count", 0)
+                    .put("toolCallCount", callCount);
+        }
+        JSONArray items = actionDescriptors(sbn.getNotification());
+        return new JSONObject()
+                .put("available", true)
+                .put("found", true)
+                .put("key", key)
+                .put("actions", items)
+                .put("count", items.length())
+                .put("toolCallCount", callCount);
+    }
+
+    static JSONObject invokeAction(Context context, String key, int actionIndex, long callCount) throws JSONException {
+        JSONObject availability = availability(context, callCount);
+        if (!availability.optBoolean("available")) {
+            return availability;
+        }
+        StatusBarNotification sbn = findNotification(key);
+        Notification.Action action = actionAt(sbn, actionIndex);
+        if (action == null) {
+            return actionNotFound(key, actionIndex, callCount);
+        }
+        if (action.actionIntent == null) {
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", true)
+                    .put("invoked", false)
+                    .put("errorCode", "notification_action_has_no_intent")
+                    .put("key", key)
+                    .put("actionIndex", actionIndex)
+                    .put("toolCallCount", callCount);
+        }
+        try {
+            action.actionIntent.send();
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", true)
+                    .put("invoked", true)
+                    .put("key", key)
+                    .put("actionIndex", actionIndex)
+                    .put("title", chars(action.title))
+                    .put("toolCallCount", callCount);
+        } catch (PendingIntent.CanceledException error) {
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", true)
+                    .put("invoked", false)
+                    .put("errorCode", "notification_action_cancelled")
+                    .put("message", error.getMessage())
+                    .put("key", key)
+                    .put("actionIndex", actionIndex)
+                    .put("toolCallCount", callCount);
+        }
+    }
+
+    static JSONObject reply(
+            Context context,
+            String key,
+            Integer requestedActionIndex,
+            String text,
+            long callCount) throws JSONException {
+        JSONObject availability = availability(context, callCount);
+        if (!availability.optBoolean("available")) {
+            return availability;
+        }
+        StatusBarNotification sbn = findNotification(key);
+        if (sbn == null || sbn.getNotification() == null || sbn.getNotification().actions == null) {
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", false)
+                    .put("supportsReply", false)
+                    .put("replied", false)
+                    .put("key", key)
+                    .put("toolCallCount", callCount);
+        }
+
+        Notification.Action selected = null;
+        int selectedIndex = -1;
+        Notification.Action[] notificationActions = sbn.getNotification().actions;
+        if (requestedActionIndex != null) {
+            if (requestedActionIndex >= 0 && requestedActionIndex < notificationActions.length) {
+                Notification.Action candidate = notificationActions[requestedActionIndex];
+                RemoteInput[] inputs = candidate == null ? null : candidate.getRemoteInputs();
+                if (inputs != null && inputs.length > 0) {
+                    selected = candidate;
+                    selectedIndex = requestedActionIndex;
+                }
+            }
+        } else {
+            for (int index = 0; index < notificationActions.length; index++) {
+                Notification.Action candidate = notificationActions[index];
+                RemoteInput[] inputs = candidate == null ? null : candidate.getRemoteInputs();
+                if (inputs != null && inputs.length > 0) {
+                    selected = candidate;
+                    selectedIndex = index;
+                    break;
+                }
+            }
+        }
+
+        if (selected == null || selected.actionIntent == null) {
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", true)
+                    .put("supportsReply", false)
+                    .put("replied", false)
+                    .put("key", key)
+                    .put("actionIndex", requestedActionIndex == null ? JSONObject.NULL : requestedActionIndex)
+                    .put("toolCallCount", callCount);
+        }
+
+        RemoteInput[] remoteInputs = selected.getRemoteInputs();
+        Bundle results = new Bundle();
+        for (RemoteInput input : remoteInputs) {
+            results.putCharSequence(input.getResultKey(), text);
+        }
+        Intent fillIn = new Intent();
+        RemoteInput.addResultsToIntent(remoteInputs, fillIn, results);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            RemoteInput.setResultsSource(fillIn, RemoteInput.SOURCE_FREE_FORM_INPUT);
+        }
+        try {
+            selected.actionIntent.send(context, 0, fillIn);
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", true)
+                    .put("supportsReply", true)
+                    .put("replied", true)
+                    .put("key", key)
+                    .put("actionIndex", selectedIndex)
+                    .put("title", chars(selected.title))
+                    .put("textCharacters", text.length())
+                    .put("toolCallCount", callCount);
+        } catch (PendingIntent.CanceledException error) {
+            return new JSONObject()
+                    .put("available", true)
+                    .put("found", true)
+                    .put("supportsReply", true)
+                    .put("replied", false)
+                    .put("errorCode", "notification_reply_cancelled")
+                    .put("message", error.getMessage())
+                    .put("key", key)
+                    .put("actionIndex", selectedIndex)
+                    .put("toolCallCount", callCount);
+        }
+    }
+
     private static JSONObject availability(Context context, long callCount) throws JSONException {
         boolean granted = hasAccess(context);
         if (!granted) {
@@ -172,6 +335,77 @@ public final class McpNotificationListenerService extends NotificationListenerSe
         return result;
     }
 
+    private static StatusBarNotification findNotification(String key) {
+        for (StatusBarNotification sbn : activeNotifications()) {
+            if (key.equals(sbn.getKey())) {
+                return sbn;
+            }
+        }
+        return null;
+    }
+
+    private static Notification.Action actionAt(StatusBarNotification sbn, int actionIndex) {
+        if (sbn == null || sbn.getNotification() == null || sbn.getNotification().actions == null) {
+            return null;
+        }
+        Notification.Action[] actions = sbn.getNotification().actions;
+        if (actionIndex < 0 || actionIndex >= actions.length) {
+            return null;
+        }
+        return actions[actionIndex];
+    }
+
+    private static JSONArray actionDescriptors(Notification notification) throws JSONException {
+        JSONArray result = new JSONArray();
+        if (notification == null || notification.actions == null) {
+            return result;
+        }
+        for (int index = 0; index < notification.actions.length; index++) {
+            Notification.Action action = notification.actions[index];
+            if (action == null) {
+                continue;
+            }
+            RemoteInput[] remoteInputs = action.getRemoteInputs();
+            JSONArray inputs = new JSONArray();
+            if (remoteInputs != null) {
+                for (RemoteInput input : remoteInputs) {
+                    JSONArray choices = new JSONArray();
+                    CharSequence[] rawChoices = input.getChoices();
+                    if (rawChoices != null) {
+                        for (CharSequence choice : rawChoices) {
+                            choices.put(chars(choice));
+                        }
+                    }
+                    inputs.put(new JSONObject()
+                            .put("resultKey", input.getResultKey())
+                            .put("label", chars(input.getLabel()))
+                            .put("allowFreeFormInput", input.getAllowFreeFormInput())
+                            .put("choices", choices));
+                }
+            }
+            result.put(new JSONObject()
+                    .put("index", index)
+                    .put("title", chars(action.title))
+                    .put("semanticAction", action.getSemanticAction())
+                    .put("allowsGeneratedReplies", action.getAllowGeneratedReplies())
+                    .put("hasIntent", action.actionIntent != null)
+                    .put("supportsReply", inputs.length() > 0)
+                    .put("remoteInputs", inputs));
+        }
+        return result;
+    }
+
+    private static JSONObject actionNotFound(String key, int actionIndex, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("available", true)
+                .put("found", false)
+                .put("invoked", false)
+                .put("errorCode", "notification_action_not_found")
+                .put("key", key)
+                .put("actionIndex", actionIndex)
+                .put("toolCallCount", callCount);
+    }
+
     private static JSONObject toJson(Context context, StatusBarNotification sbn) throws JSONException {
         Notification notification = sbn.getNotification();
         Bundle extras = notification == null ? null : notification.extras;
@@ -199,6 +433,7 @@ public final class McpNotificationListenerService extends NotificationListenerSe
                 .put("subText", subText)
                 .put("clearable", sbn.isClearable())
                 .put("ongoing", notification != null && (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0)
+                .put("actionCount", notification == null || notification.actions == null ? 0 : notification.actions.length)
                 .put("category", notification == null || notification.category == null
                         ? JSONObject.NULL
                         : notification.category);

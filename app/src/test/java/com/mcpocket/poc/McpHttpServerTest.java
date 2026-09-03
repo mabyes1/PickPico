@@ -340,7 +340,10 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(36, listed.getInt("count"));
+        assertEquals(46, listed.getInt("count"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.wake"));
@@ -353,6 +356,13 @@ public final class McpHttpServerTest {
         assertTrue(listed.getJSONArray("commands").toString().contains("notification.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("notification.get"));
         assertTrue(listed.getJSONArray("commands").toString().contains("notification.dismiss"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("notification.actions"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("notification.invoke_action"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("notification.reply"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("ui.inspect"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("ui.action"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("ui.type"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("ui.scroll"));
         assertTrue(listed.getJSONArray("commands").toString().contains("app.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("app.launch"));
         assertTrue(listed.getJSONArray("commands").toString().contains("url.open"));
@@ -404,6 +414,43 @@ public final class McpHttpServerTest {
         assertEquals(180, idleTimeout.getInt("default"));
         assertEquals("[120,180,360]", idleTimeout.getJSONArray("enum").toString());
         assertTrue(idleTimeout.getString("description").contains("Human activity resets this timer"));
+    }
+
+    @Test
+    public void capabilityAndPolicyToolsExposeRuntimeState() throws Exception {
+        HttpResult list = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":24,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_list\",\"arguments\":{}}}",
+                authorizedHeaders());
+        assertEquals(200, list.status);
+        JSONObject capabilityList = new JSONObject(list.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(46, capabilityList.getInt("count"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
+
+        HttpResult status = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_status\",\"arguments\":{" +
+                        "\"id\":\"notification.reply\"}}}",
+                authorizedHeaders());
+        assertEquals(200, status.status);
+        JSONObject capability = new JSONObject(status.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals("notification.reply", capability.getString("id"));
+        assertTrue(capability.getBoolean("available"));
+
+        HttpResult policy = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":26,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"policy_status\",\"arguments\":{}}}",
+                authorizedHeaders());
+        assertEquals(200, policy.status);
+        assertEquals("yolo", new JSONObject(policy.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getJSONObject("approvalMode")
+                .getString("value"));
     }
 
     @Test

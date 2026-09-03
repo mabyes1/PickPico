@@ -92,6 +92,24 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.list());
 
         register(
+                "capability_list",
+                "List all implemented MCPocket capabilities with current Core/Hyper availability and setup state.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> runtime.execute("capability.list", arguments, callCount));
+
+        register(
+                "capability_status",
+                "Inspect one MCPocket capability, including whether it is available, disabled, or requires local setup.",
+                CommandRuntime.capabilityStatusSchema(),
+                (arguments, callCount) -> runtime.execute("capability.status", arguments, callCount));
+
+        register(
+                "policy_status",
+                "Return the locally controlled Hyper Mode and Agent approval policy. This tool is read-only.",
+                noArgumentsSchema(),
+                (arguments, callCount) -> runtime.execute("policy.status", arguments, callCount));
+
+        register(
                 "command_run",
                 "Run one MCPocket command by capability ID with structured JSON arguments. Use command_list to discover the current capability IDs.",
                 new JSONObject()

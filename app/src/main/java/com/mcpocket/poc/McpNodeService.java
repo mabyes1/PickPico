@@ -176,6 +176,65 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    public JSONObject capabilityState(String commandId) throws JSONException {
+        return AndroidCapabilityRegistry.state(this, commandId);
+    }
+
+    @Override
+    public boolean isCommandExposed(String commandId) {
+        return AndroidCapabilityRegistry.isCommandExposed(this, commandId);
+    }
+
+    @Override
+    public String approvalMode() {
+        return McpocketPolicySettings.approvalMode(this);
+    }
+
+    @Override
+    public JSONObject policyStatus(long callCount) throws JSONException {
+        return McpocketPolicySettings.status(this, callCount);
+    }
+
+    @Override
+    public JSONObject requestApproval(
+            String commandId,
+            String description,
+            String risk,
+            JSONObject arguments,
+            long callCount) throws JSONException {
+        JSONObject requestArguments = new JSONObject()
+                .put("requestType", "approval")
+                .put("title", "Agent approval required")
+                .put("instruction",
+                        description
+                                + "\n\nCommand: " + commandId
+                                + "\nRisk: " + risk
+                                + approvalArgumentSummary(commandId, arguments))
+                .put("actions", new JSONArray().put("允許").put("拒絕"))
+                .put("allowTextReply", false)
+                .put("allowImages", false)
+                .put("maxImages", 0)
+                .put("idleTimeoutSeconds", 120);
+        JSONObject response = HumanHelpStore.createAndWait(this, requestArguments, callCount);
+        JSONObject humanResponse = response.optJSONObject("response");
+        String action = humanResponse == null ? "" : humanResponse.optString("action", "");
+        boolean approved = "completed".equals(response.optString("status"))
+                && ("允許".equals(action) || "Allow".equalsIgnoreCase(action));
+        AgentInboxStore.add(
+                this,
+                "human.approval.result",
+                approved ? "Approval granted" : "Approval not granted",
+                commandId + " · " + response.optString("status", "unknown"));
+        return new JSONObject()
+                .put("approved", approved)
+                .put("status", response.optString("status", "unknown"))
+                .put("requestId", response.optString("requestId", ""))
+                .put("action", action)
+                .put("commandId", commandId)
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
     public JSONObject serverInfo(long callCount) throws JSONException {
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
@@ -936,6 +995,63 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    public JSONObject notificationActions(JSONObject arguments, long callCount) throws JSONException {
+        return McpNotificationListenerService.actions(this, arguments.optString("key", ""), callCount);
+    }
+
+    @Override
+    public JSONObject notificationInvokeAction(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = McpNotificationListenerService.invokeAction(
+                this,
+                arguments.optString("key", ""),
+                arguments.optInt("actionIndex", -1),
+                callCount);
+        recordCapabilityAction("notification.invoke_action", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject notificationReply(JSONObject arguments, long callCount) throws JSONException {
+        Integer actionIndex = arguments.has("actionIndex")
+                ? arguments.optInt("actionIndex", -1)
+                : null;
+        JSONObject result = McpNotificationListenerService.reply(
+                this,
+                arguments.optString("key", ""),
+                actionIndex,
+                arguments.optString("text", ""),
+                callCount);
+        recordCapabilityAction("notification.reply", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject uiInspect(JSONObject arguments, long callCount) throws JSONException {
+        return McpAccessibilityService.inspect(arguments, callCount);
+    }
+
+    @Override
+    public JSONObject uiAction(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = McpAccessibilityService.action(arguments, callCount);
+        recordCapabilityAction("ui.action", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject uiType(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = McpAccessibilityService.type(arguments, callCount);
+        recordCapabilityAction("ui.type", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject uiScroll(JSONObject arguments, long callCount) throws JSONException {
+        JSONObject result = McpAccessibilityService.scroll(arguments, callCount);
+        recordCapabilityAction("ui.scroll", result, callCount);
+        return result;
+    }
+
+    @Override
     public JSONObject appList(JSONObject arguments, long callCount) throws JSONException {
         return AndroidAgentActions.appList(this, arguments, callCount);
     }
@@ -969,6 +1085,54 @@ public final class McpNodeService extends Service implements McpToolActions {
         JSONObject result = AndroidAgentActions.clipboardSet(this, arguments, callCount);
         recordCapabilityAction("clipboard.set", result, callCount);
         return result;
+    }
+
+    private static String approvalArgumentSummary(String commandId, JSONObject arguments) {
+        if (arguments == null || arguments.length() == 0) {
+            return "";
+        }
+        try {
+            JSONObject summary = new JSONObject();
+            if ("process.exec".equals(commandId)) {
+                summary.put("command", arguments.optString("command", ""));
+                if (!arguments.optString("cwd", "").isEmpty()) {
+                    summary.put("cwd", arguments.optString("cwd", ""));
+                }
+            } else if ("workspace.write".equals(commandId)) {
+                summary.put("path", arguments.optString("path", ""));
+                summary.put("append", arguments.optBoolean("append", false));
+                summary.put("contentCharacters", arguments.optString("content", "").length());
+            } else if ("app.update".equals(commandId)) {
+                summary.put("url", arguments.optString("url", ""));
+                String sha = arguments.optString("sha256", "");
+                summary.put("sha256", sha.length() > 16 ? sha.substring(0, 16) + "…" : sha);
+            } else {
+                Iterator<String> keys = arguments.keys();
+                while (keys.hasNext() && summary.length() < 8) {
+                    String key = keys.next();
+                    String lower = key.toLowerCase();
+                    if (lower.contains("token")
+                            || lower.contains("secret")
+                            || lower.contains("password")
+                            || lower.contains("authorization")
+                            || "stdin".equals(lower)
+                            || "env".equals(lower)) {
+                        summary.put(key, "<redacted>");
+                        continue;
+                    }
+                    Object value = arguments.opt(key);
+                    String rendered = value == null || value == JSONObject.NULL
+                            ? "null"
+                            : String.valueOf(value);
+                    summary.put(key, rendered.length() > 240
+                            ? rendered.substring(0, 240) + "…"
+                            : rendered);
+                }
+            }
+            return summary.length() == 0 ? "" : "\nArguments: " + summary.toString();
+        } catch (JSONException ignored) {
+            return "";
+        }
     }
 
     private JSONObject capabilityRuntimeUnavailable(String resultKey, long callCount) throws JSONException {

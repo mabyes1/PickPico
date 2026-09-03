@@ -5,6 +5,47 @@ import org.json.JSONObject;
 
 /** Android-facing actions that can be exposed as MCP tools. */
 interface McpToolActions {
+    default JSONObject capabilityState(String commandId) throws JSONException {
+        return new JSONObject()
+                .put("platform", "test")
+                .put("group", "core")
+                .put("supported", true)
+                .put("enabled", true)
+                .put("available", true)
+                .put("state", "available")
+                .put("requiresSetup", false)
+                .put("userInteractionRequired", false);
+    }
+
+    default boolean isCommandExposed(String commandId) {
+        return true;
+    }
+
+    default String approvalMode() {
+        // Preserve current behavior for pure-Java tests and non-Android adapters.
+        return McpocketPolicySettings.APPROVAL_YOLO;
+    }
+
+    default JSONObject policyStatus(long callCount) throws JSONException {
+        return new JSONObject()
+                .put("hyperMode", new JSONObject().put("enabled", false))
+                .put("approvalMode", new JSONObject().put("value", approvalMode()))
+                .put("osBoundariesStillApply", true)
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject requestApproval(
+            String commandId,
+            String description,
+            String risk,
+            JSONObject arguments,
+            long callCount) throws JSONException {
+        return new JSONObject()
+                .put("approved", true)
+                .put("source", "adapter_default")
+                .put("toolCallCount", callCount);
+    }
+
     JSONObject serverInfo(long callCount) throws JSONException;
 
     JSONObject phoneStatus(long callCount) throws JSONException;
@@ -117,6 +158,55 @@ interface McpToolActions {
         return new JSONObject()
                 .put("supported", false)
                 .put("capability", "notification.dismiss")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject notificationActions(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "notification.actions")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject notificationInvokeAction(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "notification.invoke_action")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject notificationReply(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "notification.reply")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject uiInspect(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "ui.inspect")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject uiAction(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "ui.action")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject uiType(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "ui.type")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject uiScroll(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "ui.scroll")
                 .put("toolCallCount", callCount);
     }
 

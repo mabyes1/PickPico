@@ -117,7 +117,8 @@ public final class HumanHelpActivity extends Activity {
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
 
-        TextView eyebrow = text("HUMAN HELP", 12, Typeface.BOLD);
+        boolean approvalRequest = "approval".equals(request.optString("requestType", "help"));
+        TextView eyebrow = text(approvalRequest ? "APPROVAL REQUEST" : "HUMAN HELP", 12, Typeface.BOLD);
         eyebrow.setTextColor(Color.rgb(90, 90, 90));
         root.addView(eyebrow);
 
@@ -146,7 +147,9 @@ public final class HumanHelpActivity extends Activity {
             replyLabel.setPadding(0, dp(22), 0, dp(6));
             root.addView(replyLabel);
             replyInput = new EditText(this);
-            replyInput.setHint("Type anything the Agent should know…");
+            replyInput.setHint(approvalRequest
+                    ? "Optional note for the Agent…"
+                    : "Type anything the Agent should know…");
             replyInput.setMinLines(3);
             replyInput.setMaxLines(8);
             replyInput.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
@@ -370,6 +373,7 @@ public final class HumanHelpActivity extends Activity {
         if (request == null) {
             return;
         }
+        boolean approvalRequest = "approval".equals(request.optString("requestType", "help"));
         boolean waiting = "waiting_human".equals(request.optString("status"));
         String status = request.optString("status", "");
         if (countdownStatus != null) {
@@ -377,7 +381,8 @@ public final class HumanHelpActivity extends Activity {
                 long remainingMs = Math.max(0L,
                         request.optLong("expiresAtEpochMs", 0L) - System.currentTimeMillis());
                 long remainingSeconds = (remainingMs + 999L) / 1000L;
-                countdownStatus.setText("AI 等待中 · 剩餘 " + remainingSeconds + " 秒（操作會重置）");
+                countdownStatus.setText((approvalRequest ? "等待核准" : "AI 等待中")
+                        + " · 剩餘 " + remainingSeconds + " 秒（操作會重置）");
                 countdownStatus.setTextColor(Color.rgb(45, 85, 145));
                 countdownStatus.setVisibility(View.VISIBLE);
             } else if ("timed_out".equals(status)) {
@@ -394,12 +399,16 @@ public final class HumanHelpActivity extends Activity {
         }
         if (lifecycleStatus != null) {
             if ("timed_out".equals(status)) {
-                lifecycleStatus.setText("此請求已逾時 · AI 已停止等待，將自行決定下一步。");
+                lifecycleStatus.setText(approvalRequest
+                        ? "此核准請求已逾時 · 操作不會執行。"
+                        : "此請求已逾時 · AI 已停止等待，將自行決定下一步。");
                 lifecycleStatus.setTextColor(Color.rgb(145, 70, 35));
                 lifecycleStatus.setBackgroundColor(Color.rgb(255, 238, 226));
                 lifecycleStatus.setVisibility(View.VISIBLE);
             } else if ("completed".equals(status)) {
-                lifecycleStatus.setText("已完成 · AI 已收到你的回覆。");
+                lifecycleStatus.setText(approvalRequest
+                        ? "已完成 · Agent 已收到你的核准決定。"
+                        : "已完成 · AI 已收到你的回覆。");
                 lifecycleStatus.setTextColor(Color.rgb(35, 105, 55));
                 lifecycleStatus.setBackgroundColor(Color.rgb(230, 246, 234));
                 lifecycleStatus.setVisibility(View.VISIBLE);

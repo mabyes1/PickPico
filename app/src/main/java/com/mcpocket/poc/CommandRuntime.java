@@ -63,8 +63,10 @@ final class CommandRuntime {
 
     private final Map<String, Command> commands = new LinkedHashMap<>();
     private final LinkedHashMap<String, JSONObject> history = new LinkedHashMap<>();
+    private final McpToolActions actions;
 
     CommandRuntime(McpToolActions actions) throws JSONException {
+        this.actions = actions;
         register(
                 "node.info",
                 "Return MCPocket node and Android device information.",
@@ -82,6 +84,33 @@ final class CommandRuntime {
                 false,
                 noArgumentsSchema(),
                 (arguments, callCount) -> actions.phoneStatus(callCount));
+
+        register(
+                "capability.list",
+                "List all implemented MCPocket capabilities, including disabled/setup-required capabilities and their runtime state.",
+                "capability",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> capabilityList(callCount));
+
+        register(
+                "capability.status",
+                "Return runtime availability, capability group, and setup requirements for one MCPocket capability.",
+                "capability",
+                "read_only",
+                false,
+                capabilityStatusSchema(),
+                (arguments, callCount) -> capabilityStatus(arguments.optString("id", ""), callCount));
+
+        register(
+                "policy.status",
+                "Return the user-owned Hyper Mode and Agent approval policy. Policy changes are local UI actions, not remotely writable MCP commands.",
+                "policy",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.policyStatus(callCount));
 
         register(
                 "phone.ring",
@@ -320,6 +349,114 @@ final class CommandRuntime {
                     }
                     return actions.notificationDismiss(arguments, callCount);
                 });
+
+        register(
+                "notification.actions",
+                "List action buttons and RemoteInput reply capabilities exposed by one active Android notification.",
+                "notification",
+                "personal_data_read",
+                false,
+                notificationKeySchema(),
+                (arguments, callCount) -> actions.notificationActions(arguments, callCount));
+
+        register(
+                "notification.invoke_action",
+                "Invoke one action button exposed by an active Android notification.",
+                "notification",
+                "notification_write",
+                true,
+                notificationActionSchema(false),
+                (arguments, callCount) -> {
+                    int actionIndex = arguments.optInt("actionIndex", -1);
+                    if (actionIndex < 0 || actionIndex > 32) {
+                        throw new CommandInputException("notification.invoke_action actionIndex must be between 0 and 32");
+                    }
+                    return actions.notificationInvokeAction(arguments, callCount);
+                });
+
+        register(
+                "notification.reply",
+                "Reply through Android RemoteInput when an active notification exposes a compatible reply action.",
+                "notification",
+                "notification_write",
+                true,
+                notificationReplySchema(),
+                (arguments, callCount) -> {
+                    String text = arguments.optString("text", "");
+                    if (text.isEmpty() || text.length() > 4000) {
+                        throw new CommandInputException("notification.reply text must be 1-4000 characters");
+                    }
+                    if (arguments.has("actionIndex")) {
+                        int actionIndex = arguments.optInt("actionIndex", -1);
+                        if (actionIndex < 0 || actionIndex > 32) {
+                            throw new CommandInputException("notification.reply actionIndex must be between 0 and 32");
+                        }
+                    }
+                    return actions.notificationReply(arguments, callCount);
+                });
+
+        register(
+                "ui.inspect",
+                "Inspect the current Android accessibility UI tree and return semantic nodes with paths, text, IDs, bounds, and actions.",
+                "ui",
+                "personal_data_read",
+                false,
+                uiInspectSchema(),
+                (arguments, callCount) -> actions.uiInspect(arguments, callCount));
+
+        register(
+                "ui.action",
+                "Perform a semantic Accessibility action on the current Android UI, or a global back/home/recents action.",
+                "ui",
+                "ui_action",
+                true,
+                uiActionSchema(),
+                (arguments, callCount) -> {
+                    String action = arguments.optString("action", "");
+                    if (!"click".equals(action)
+                            && !"long_click".equals(action)
+                            && !"focus".equals(action)
+                            && !"accessibility_focus".equals(action)
+                            && !"back".equals(action)
+                            && !"home".equals(action)
+                            && !"recents".equals(action)) {
+                        throw new CommandInputException("ui.action has an unsupported action");
+                    }
+                    if (!"back".equals(action)
+                            && !"home".equals(action)
+                            && !"recents".equals(action)
+                            && arguments.optJSONObject("selector") == null) {
+                        throw new CommandInputException("ui.action requires selector for node actions");
+                    }
+                    return actions.uiAction(arguments, callCount);
+                });
+
+        register(
+                "ui.type",
+                "Set or append text in an editable Android accessibility node selected by path, view ID, text, or content description.",
+                "ui",
+                "ui_action",
+                true,
+                uiTypeSchema(),
+                (arguments, callCount) -> {
+                    if (arguments.optJSONObject("selector") == null) {
+                        throw new CommandInputException("ui.type requires selector");
+                    }
+                    String text = arguments.optString("text", "");
+                    if (text.length() > 8192) {
+                        throw new CommandInputException("ui.type text is limited to 8192 characters");
+                    }
+                    return actions.uiType(arguments, callCount);
+                });
+
+        register(
+                "ui.scroll",
+                "Scroll an Android accessibility node forward/backward or by directional alias. When selector is omitted, use the first scrollable node.",
+                "ui",
+                "ui_action",
+                true,
+                uiScrollSchema(),
+                (arguments, callCount) -> actions.uiScroll(arguments, callCount));
 
         register(
                 "app.list",
@@ -589,7 +726,12 @@ final class CommandRuntime {
     JSONObject list() throws JSONException {
         JSONArray result = new JSONArray();
         for (Command command : commands.values()) {
-            result.put(command.describe());
+            if (!actions.isCommandExposed(command.id)) {
+                continue;
+            }
+            JSONObject described = command.describe();
+            described.put("group", AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
+            result.put(described);
         }
         return new JSONObject()
                 .put("commands", result)
@@ -598,7 +740,7 @@ final class CommandRuntime {
 
     JSONObject execute(String commandId, JSONObject arguments, long callCount) throws JSONException {
         Command command = requireCommand(commandId);
-        return command.handler.call(arguments == null ? new JSONObject() : arguments, callCount);
+        return invoke(command, arguments == null ? new JSONObject() : arguments, callCount);
     }
 
     JSONObject run(String commandId, JSONObject arguments, long callCount) throws JSONException {
@@ -607,7 +749,8 @@ final class CommandRuntime {
         String startedAt = Instant.now().toString();
 
         try {
-            JSONObject result = command.handler.call(
+            JSONObject result = invoke(
+                    command,
                     arguments == null ? new JSONObject() : arguments,
                     callCount);
             JSONObject publicResult = new JSONObject(result.toString());
@@ -660,7 +803,98 @@ final class CommandRuntime {
         if (command == null) {
             throw new CommandInputException("Unknown command: " + commandId);
         }
+        if (!actions.isCommandExposed(commandId)) {
+            throw new CommandInputException(
+                    "Command is not currently available: " + commandId
+                            + ". Use capability.status to inspect setup or Hyper Mode requirements.");
+        }
         return command;
+    }
+
+    private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
+        if (requiresApproval(command)) {
+            JSONObject approval = actions.requestApproval(
+                    command.id,
+                    command.description,
+                    command.risk,
+                    arguments,
+                    callCount);
+            if (!approval.optBoolean("approved", false)) {
+                String status = approval.optString("status", "rejected");
+                throw new CommandInputException(
+                        "Human approval not granted for " + command.id + " (" + status + ")");
+            }
+        }
+        return command.handler.call(arguments, callCount);
+    }
+
+    private boolean requiresApproval(Command command) {
+        if (!command.sideEffect || "human.help".equals(command.id)) {
+            return false;
+        }
+        String mode = actions.approvalMode();
+        if (McpocketPolicySettings.APPROVAL_YOLO.equals(mode)) {
+            return false;
+        }
+        if (McpocketPolicySettings.APPROVAL_ASK.equals(mode)) {
+            return true;
+        }
+        return requiresApprovalInAutoMode(command);
+    }
+
+    private static boolean requiresApprovalInAutoMode(Command command) {
+        return "security_action".equals(command.risk)
+                || "software_update".equals(command.risk)
+                || "arbitrary_process".equals(command.risk)
+                || "filesystem_write".equals(command.risk)
+                || "notification_write".equals(command.risk);
+    }
+
+    private JSONObject capabilityList(long callCount) throws JSONException {
+        JSONArray capabilities = new JSONArray();
+        for (Command command : commands.values()) {
+            JSONObject item = capabilityDescriptor(command);
+            merge(item, actions.capabilityState(command.id));
+            capabilities.put(item);
+        }
+        return new JSONObject()
+                .put("capabilities", capabilities)
+                .put("count", capabilities.length())
+                .put("toolCallCount", callCount);
+    }
+
+    private JSONObject capabilityStatus(String capabilityId, long callCount) throws JSONException {
+        if (capabilityId == null || capabilityId.isEmpty()) {
+            throw new CommandInputException("capability.status requires a non-empty id");
+        }
+        Command command = commands.get(capabilityId);
+        if (command == null) {
+            throw new CommandInputException("Unknown capability: " + capabilityId);
+        }
+        JSONObject result = capabilityDescriptor(command);
+        merge(result, actions.capabilityState(command.id));
+        return result.put("toolCallCount", callCount);
+    }
+
+    private static JSONObject capabilityDescriptor(Command command) throws JSONException {
+        return new JSONObject()
+                .put("id", command.id)
+                .put("description", command.description)
+                .put("category", command.category)
+                .put("risk", command.risk)
+                .put("sideEffect", command.sideEffect)
+                .put("group", AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
+    }
+
+    private static void merge(JSONObject target, JSONObject source) throws JSONException {
+        if (source == null) {
+            return;
+        }
+        Iterator<String> keys = source.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            target.put(key, source.get(key));
+        }
     }
 
     private void register(
@@ -690,6 +924,19 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject())
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject capabilityStatusSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("id", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 160)
+                                .put("description", "Capability/command ID returned by capability.list.")))
+                .put("required", new JSONArray().put("id"))
                 .put("additionalProperties", false);
     }
 
@@ -901,6 +1148,139 @@ final class CommandRuntime {
                                 .put("minLength", 1)
                                 .put("maxLength", 1024)))
                 .put("required", new JSONArray().put("key"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject notificationActionSchema(boolean actionIndexOptional) throws JSONException {
+        JSONObject schema = new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("key", new JSONObject()
+                                .put("type", "string")
+                                .put("minLength", 1)
+                                .put("maxLength", 1024))
+                        .put("actionIndex", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 0)
+                                .put("maximum", 32)))
+                .put("additionalProperties", false);
+        JSONArray required = new JSONArray().put("key");
+        if (!actionIndexOptional) {
+            required.put("actionIndex");
+        }
+        return schema.put("required", required);
+    }
+
+    static JSONObject notificationReplySchema() throws JSONException {
+        JSONObject properties = notificationActionSchema(true).getJSONObject("properties");
+        properties.put("text", new JSONObject()
+                .put("type", "string")
+                .put("minLength", 1)
+                .put("maxLength", 4000));
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", properties)
+                .put("required", new JSONArray().put("key").put("text"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject uiInspectSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("maxNodes", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 1000)
+                                .put("default", 200))
+                        .put("maxDepth", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 30)
+                                .put("default", 12))
+                        .put("includeInvisible", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject uiActionSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("action", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray()
+                                        .put("click")
+                                        .put("long_click")
+                                        .put("focus")
+                                        .put("accessibility_focus")
+                                        .put("back")
+                                        .put("home")
+                                        .put("recents")))
+                        .put("selector", uiSelectorSchema()))
+                .put("required", new JSONArray().put("action"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject uiTypeSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("selector", uiSelectorSchema())
+                        .put("text", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 8192))
+                        .put("append", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)))
+                .put("required", new JSONArray().put("selector").put("text"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject uiScrollSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("selector", uiSelectorSchema())
+                        .put("direction", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray()
+                                        .put("forward")
+                                        .put("backward")
+                                        .put("up")
+                                        .put("down")
+                                        .put("left")
+                                        .put("right"))
+                                .put("default", "forward")))
+                .put("additionalProperties", false);
+    }
+
+    private static JSONObject uiSelectorSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("path", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 512)
+                                .put("description", "Tree path returned by ui.inspect, for example 0/2/1."))
+                        .put("viewId", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 512))
+                        .put("text", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 2048))
+                        .put("contentDescription", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 2048))
+                        .put("className", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 512))
+                        .put("instance", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 0)
+                                .put("maximum", 100)
+                                .put("default", 0)))
                 .put("additionalProperties", false);
     }
 

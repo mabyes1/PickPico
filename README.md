@@ -129,14 +129,15 @@ Agent --HTTPS--> MCPocket Relay --WSS--> Android MCPocket --HTTP loopback--> :87
 | --- | --- |
 | MCP / Runtime | Streamable HTTP、legacy + MCP `2026-07-28` discovery、tool registry、schema-stable `command_run` |
 | Execute | private workspace、UTF-8 file read/write/list、sandbox shell、background process、output/kill、embedded Node.js |
-| Sense | camera capture、microphone WAV、location、active notification list/get |
-| Interact | Android notification、TTS、ring、wake、App list/launch、URL/deep-link open、clipboard get/set |
-| Human-in-the-loop | HUMAN HELP task card、text/actions、gallery/camera attachments、renewable idle timeout、Agent Inbox |
+| Sense | camera capture、microphone WAV、location、active notification list/get、Hyper Accessibility UI tree inspection |
+| Interact | Android notification、TTS、ring、wake、App list/launch、URL/deep-link open、clipboard、Hyper UI action/type/scroll、notification action/reply |
+| Human-in-the-loop | HUMAN HELP + Approval 共用 request card/notification、text/actions、gallery/camera attachments、renewable idle timeout、Agent Inbox |
+| Agent policy | capability list/status、Core/Hyper availability、Ask Me / Auto-approve / YOLO approval policy |
 | Remote | phone-initiated WSS relay、Cloudflare Worker + Durable Object、stable capability URL、Wi-Fi/5G handoff reconnect |
 | Update | manifest check、signed APK verification、PackageInstaller、Cloudflare Workers KV release channel |
 | Safety boundaries | Android runtime permissions、Device Admin opt-in for lock、app sandbox for shell、separate relay secret/local bearer |
 
-目前 Android app 版本：**0.13.6** (`versionCode 30`)。
+目前 Android source 版本：**0.14.0** (`versionCode 31`)。尚未自動發佈到 project update channel；實機可能仍運行上一版，直到明確執行 publish / install。
 
 ## Current implementation snapshot
 
@@ -169,6 +170,9 @@ Current command IDs:
 
 - `node.info`
 - `phone.status`
+- `capability.list`
+- `capability.status`
+- `policy.status`
 - `phone.ring`
 - `phone.lock` (requires one-time Device Admin opt-in)
 - `phone.wake`
@@ -182,6 +186,13 @@ Current command IDs:
 - `notification.list`
 - `notification.get`
 - `notification.dismiss`
+- `notification.actions`
+- `notification.invoke_action`
+- `notification.reply`
+- `ui.inspect` (Hyper Mode + Accessibility Service)
+- `ui.action` (Hyper Mode + Accessibility Service)
+- `ui.type` (Hyper Mode + Accessibility Service)
+- `ui.scroll` (Hyper Mode + Accessibility Service)
 - `app.list`
 - `app.launch`
 - `url.open`
