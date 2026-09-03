@@ -1052,6 +1052,11 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
+    public JSONObject screenCapture(JSONObject arguments, long callCount) throws JSONException {
+        return ScreenCaptureService.capture(arguments, callCount);
+    }
+
+    @Override
     public JSONObject appList(JSONObject arguments, long callCount) throws JSONException {
         return AndroidAgentActions.appList(this, arguments, callCount);
     }

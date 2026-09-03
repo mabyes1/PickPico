@@ -196,10 +196,10 @@ These capabilities existed before the unified Hyper Mode work and are now govern
 | --- | --- | --- | --- |
 | Hyper Mode manager | capability layer + local UI | App settings + capability registry | ✅ implemented; one product switch, many independent access grants |
 | UI tree inspection | `ui.inspect` | AccessibilityService | ✅ implemented and capability availability validated on Samsung S23 / Android 16 |
-| UI click/action | `ui.action` | AccessibilityNodeInfo actions | ✅ implemented in source; click/focus/global back/home/recents |
+| UI click/action | `ui.action` | AccessibilityNodeInfo actions | ✅ implemented and physically validated cross-app on Samsung S23 / Android 16 |
 | UI text entry | `ui.type` | Accessibility actions | ✅ implemented in source; subject to app/widget support |
 | UI scroll | `ui.scroll` | Accessibility actions | ✅ implemented in source; structured scroll first |
-| Screen capture | `screen.capture` | MediaProjection | Explicit Android consent/session boundary |
+| Screen capture | `screen.capture` | MediaProjection | ✅ implemented in source; human-owned session consent; physical-device validation pending |
 | Notification actions | `notification.actions` | Notification Listener | ✅ implemented in source; exposes buttons/RemoteInput metadata |
 | Invoke notification action | `notification.invoke_action` | Notification Listener + PendingIntent | ✅ implemented in source; Approval Policy applies |
 | Notification reply | `notification.reply` | RemoteInput where available | ✅ implemented in source; only when source supports reply |
@@ -548,7 +548,7 @@ Current priority is to demonstrate the strongest form of the product rather than
 | Notification Listener | notification read/dismiss/actions/invoke/reply | ✅ implemented; device validation for new action/reply flow pending |
 | Device Admin | `phone.lock` | ✅ current |
 | Accessibility Service | `ui.inspect/action/type/scroll` | ✅ implemented; Restricted settings + Accessibility human setup validated on Android 16 |
-| MediaProjection consent | `screen.capture` | ⏳ P0 Hyper |
+| MediaProjection consent | `screen.capture` | ✅ source implemented; physical-device validation pending |
 | Usage Access | `usage.*` | ⏳ P1 Hyper |
 
 ## 13. Development priority from current state
@@ -565,8 +565,8 @@ Current priority is to demonstrate the strongest form of the product rather than
 
 1. ✅ Accessibility Service setup implemented and enabled on a physical Samsung S23 / Android 16.
 2. ✅ `ui.inspect` capability availability validated after the human-owned Restricted settings / Accessibility setup.
-3. ✅ `ui.action` / `ui.type` / `ui.scroll` implemented; physical-device validation pending.
-4. ⏳ `screen.capture` remains the major P0 Hyper capability not yet implemented.
+3. ✅ `ui.action` physically validated cross-app on 三竹股市; `ui.type` / `ui.scroll` remain implemented with physical-device validation pending.
+4. ✅ `screen.capture` implemented with a dedicated MediaProjection foreground session; physical-device validation pending.
 5. ✅ `notification.actions` / `notification.invoke_action` / `notification.reply` implemented; physical-device validation pending.
 
 ### Phase C: Core personal-context capabilities

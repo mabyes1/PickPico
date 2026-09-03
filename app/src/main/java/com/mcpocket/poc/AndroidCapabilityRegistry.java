@@ -71,6 +71,13 @@ final class AndroidCapabilityRegistry {
                     "accessibility_service",
                     "PickPico Accessibility Service is not enabled");
         }
+        if ("screen.capture".equals(commandId)) {
+            return setupState(
+                    result,
+                    ScreenCaptureService.isActive(),
+                    "media_projection",
+                    "No user-authorized MediaProjection screen-capture session is active");
+        }
         if ("phone.lock".equals(commandId)) {
             DevicePolicyManager manager = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
             ComponentName receiver = new ComponentName(context, McpDeviceAdminReceiver.class);
@@ -102,7 +109,8 @@ final class AndroidCapabilityRegistry {
                 || "ui.inspect".equals(commandId)
                 || "ui.action".equals(commandId)
                 || "ui.type".equals(commandId)
-                || "ui.scroll".equals(commandId);
+                || "ui.scroll".equals(commandId)
+                || "screen.capture".equals(commandId);
     }
 
     private static JSONObject permissionState(

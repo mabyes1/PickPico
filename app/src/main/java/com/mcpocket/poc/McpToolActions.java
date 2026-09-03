@@ -210,6 +210,13 @@ interface McpToolActions {
                 .put("toolCallCount", callCount);
     }
 
+    default JSONObject screenCapture(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "screen.capture")
+                .put("toolCallCount", callCount);
+    }
+
     default JSONObject appList(JSONObject arguments, long callCount) throws JSONException {
         return new JSONObject()
                 .put("supported", false)

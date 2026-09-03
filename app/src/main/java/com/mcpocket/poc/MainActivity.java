@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.media.projection.MediaProjectionManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -41,6 +42,7 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATION = 100;
     private static final int REQUEST_NODE_MEDIA = 101;
     private static final int REQUEST_LOCATION = 102;
+    private static final int REQUEST_SCREEN_CAPTURE = 103;
     private static volatile boolean uiVisible;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -53,6 +55,7 @@ public final class MainActivity extends Activity {
     private TextView remoteLockView;
     private TextView notificationAccessView;
     private TextView accessibilityAccessView;
+    private TextView screenCaptureAccessView;
     private TextView locationAccessView;
     private TextView appVersionView;
     private TextView updateStatusView;
@@ -61,6 +64,7 @@ public final class MainActivity extends Activity {
     private Button enableRemoteLockButton;
     private Button enableNotificationAccessButton;
     private Button enableAccessibilityButton;
+    private Button screenCaptureButton;
     private Button enableLocationButton;
     private Button agentInboxButton;
     private Button updateButton;
@@ -126,6 +130,7 @@ public final class MainActivity extends Activity {
         remoteLockView = valueView();
         notificationAccessView = valueView();
         accessibilityAccessView = valueView();
+        screenCaptureAccessView = valueView();
         locationAccessView = valueView();
         appVersionView = valueView();
         updateStatusView = valueView();
@@ -238,6 +243,20 @@ public final class MainActivity extends Activity {
         root.addView(enableAccessibilityButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
+        root.addView(label("HYPER SCREEN CAPTURE / MEDIAPROJECTION"));
+        root.addView(screenCaptureAccessView);
+        TextView screenCaptureNote = text(
+                "Android requires the phone owner to confirm screen sharing. PickPico can use screenshots only while this user-authorized session is active.",
+                13,
+                Typeface.NORMAL);
+        screenCaptureNote.setTextColor(Color.DKGRAY);
+        screenCaptureNote.setPadding(0, 0, 0, dp(6));
+        root.addView(screenCaptureNote);
+        screenCaptureButton = new Button(this);
+        screenCaptureButton.setOnClickListener(v -> toggleScreenCapture());
+        root.addView(screenCaptureButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
         root.addView(label("NOTIFICATION ACCESS"));
         root.addView(notificationAccessView);
         enableNotificationAccessButton = new Button(this);
@@ -348,6 +367,51 @@ public final class MainActivity extends Activity {
         } else if (requestCode == REQUEST_LOCATION && McpNodeService.isNodeRunning()) {
             Toast.makeText(this, "Restart the node to apply background location access", Toast.LENGTH_LONG).show();
         }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_SCREEN_CAPTURE) {
+            return;
+        }
+        if (resultCode != RESULT_OK || data == null) {
+            Toast.makeText(this, "Screen capture was not authorized", Toast.LENGTH_LONG).show();
+            refreshStatus();
+            return;
+        }
+        Intent serviceIntent = new Intent(this, ScreenCaptureService.class)
+                .setAction(ScreenCaptureService.ACTION_START)
+                .putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, resultCode)
+                .putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, data);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        Toast.makeText(this, "Starting Hyper screen capture session…", Toast.LENGTH_SHORT).show();
+        handler.postDelayed(this::refreshStatus, 500L);
+    }
+
+    private void toggleScreenCapture() {
+        if (ScreenCaptureService.isActive()) {
+            Intent stop = new Intent(this, ScreenCaptureService.class)
+                    .setAction(ScreenCaptureService.ACTION_STOP);
+            startService(stop);
+            handler.postDelayed(this::refreshStatus, 250L);
+            return;
+        }
+        if (!McpocketPolicySettings.isHyperModeEnabled(this)) {
+            Toast.makeText(this, "Turn on Hyper Mode first", Toast.LENGTH_LONG).show();
+            return;
+        }
+        MediaProjectionManager manager =
+                (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        if (manager == null) {
+            Toast.makeText(this, "MediaProjection is unavailable on this device", Toast.LENGTH_LONG).show();
+            return;
+        }
+        startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_SCREEN_CAPTURE);
     }
 
     private void stopNode() {
@@ -483,6 +547,15 @@ public final class MainActivity extends Activity {
                 ? Color.rgb(0, 120, 60)
                 : Color.rgb(170, 35, 35));
         enableAccessibilityButton.setEnabled(!accessibilityAccess);
+
+        boolean screenCaptureActive = ScreenCaptureService.isActive();
+        screenCaptureAccessView.setText(screenCaptureActive ? "ACTIVE" : "NOT ACTIVE");
+        screenCaptureAccessView.setTextColor(screenCaptureActive
+                ? Color.rgb(0, 120, 60)
+                : Color.rgb(150, 90, 0));
+        screenCaptureButton.setText(screenCaptureActive
+                ? "STOP SCREEN CAPTURE SESSION"
+                : "START SCREEN CAPTURE SESSION");
 
         boolean locationAccess = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;

@@ -340,7 +340,7 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(46, listed.getInt("count"));
+        assertEquals(47, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
@@ -363,6 +363,7 @@ public final class McpHttpServerTest {
         assertTrue(listed.getJSONArray("commands").toString().contains("ui.action"));
         assertTrue(listed.getJSONArray("commands").toString().contains("ui.type"));
         assertTrue(listed.getJSONArray("commands").toString().contains("ui.scroll"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("screen.capture"));
         assertTrue(listed.getJSONArray("commands").toString().contains("app.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("app.launch"));
         assertTrue(listed.getJSONArray("commands").toString().contains("url.open"));
@@ -426,8 +427,9 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(46, capabilityList.getInt("count"));
+        assertEquals(47, capabilityList.getInt("count"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
 
         HttpResult status = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\"," +

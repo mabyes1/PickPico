@@ -459,6 +459,21 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.uiScroll(arguments, callCount));
 
         register(
+                "screen.capture",
+                "Capture the current Android screen from a user-authorized MediaProjection Hyper session and persist it in the PickPico workspace.",
+                "ui",
+                "screen_read",
+                false,
+                screenCaptureSchema(),
+                (arguments, callCount) -> {
+                    int quality = arguments.optInt("quality", 82);
+                    if (quality < 50 || quality > 100) {
+                        throw new CommandInputException("screen.capture quality must be between 50 and 100");
+                    }
+                    return actions.screenCapture(arguments, callCount);
+                });
+
+        register(
                 "app.list",
                 "List launchable Android apps with labels and package names.",
                 "app",
@@ -1253,6 +1268,22 @@ final class CommandRuntime {
                                         .put("left")
                                         .put("right"))
                                 .put("default", "forward")))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject screenCaptureSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("quality", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 50)
+                                .put("maximum", 100)
+                                .put("default", 82)
+                                .put("description", "JPEG quality for the returned screen frame."))
+                        .put("returnContent", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true)))
                 .put("additionalProperties", false);
     }
 
