@@ -25,8 +25,11 @@ final class McpProtocol {
         this.callCount = callCount;
     }
 
-    Response handle(JSONObject request, String headerProtocolVersion) throws JSONException {
+    Response handle(JSONObject request, String headerProtocolVersion, String requestedToolProfile) throws JSONException {
         Object id = request.has("id") ? request.opt("id") : JSONObject.NULL;
+        String toolProfile = McpToolRegistry.PROFILE_THIN.equals(requestedToolProfile)
+                ? McpToolRegistry.PROFILE_THIN
+                : "full";
         boolean notification = !request.has("id");
         if (!"2.0".equals(request.optString("jsonrpc"))) {
             return new Response(400, error(id, -32600, "Invalid JSON-RPC request"), selectedVersion(headerProtocolVersion));
@@ -48,11 +51,11 @@ final class McpProtocol {
         JSONObject result;
         switch (method) {
             case "initialize":
-                result = initialize(request.optJSONObject("params"));
+                result = initialize(request.optJSONObject("params"), toolProfile);
                 selectedVersion = result.getString("protocolVersion");
                 break;
             case "server/discover":
-                result = discover();
+                result = discover(toolProfile);
                 modern = true;
                 selectedVersion = MODERN_VERSION;
                 break;
@@ -60,10 +63,10 @@ final class McpProtocol {
                 result = new JSONObject();
                 break;
             case "tools/list":
-                result = listTools(modern);
+                result = listTools(modern, toolProfile);
                 break;
             case "tools/call":
-                result = callTool(request.optJSONObject("params"), modern);
+                result = callTool(request.optJSONObject("params"), modern, toolProfile);
                 break;
             default:
                 return new Response(200, error(id, -32601, "Method not found: " + method), selectedVersion);
@@ -74,37 +77,48 @@ final class McpProtocol {
         return new Response(200, success(id, result), selectedVersion);
     }
 
-    private JSONObject initialize(JSONObject params) throws JSONException {
+    private JSONObject initialize(JSONObject params, String toolProfile) throws JSONException {
         String requested = params == null ? "" : params.optString("protocolVersion", "");
         String selected = LEGACY_VERSIONS.contains(requested) ? requested : DEFAULT_LEGACY_VERSION;
         return new JSONObject()
                 .put("protocolVersion", selected)
                 .put("capabilities", capabilities())
                 .put("serverInfo", implementation())
-                .put("instructions",
-                        "PickPico is a user-started Android Mobile Agent Node. It lets an external Agent " +
-                                "execute work, sense through phone hardware, and interact with people nearby. " +
-                                "Use server_info or phone_status for node and capability state.");
+                .put("instructions", instructions(toolProfile));
     }
 
-    private JSONObject discover() throws JSONException {
+    private JSONObject discover(String toolProfile) throws JSONException {
         return new JSONObject()
                 .put("supportedVersions", new JSONArray().put(MODERN_VERSION).put(DEFAULT_LEGACY_VERSION))
                 .put("capabilities", capabilities())
-                .put("instructions",
-                        "PickPico exposes Android device capabilities plus sandboxed workspace/process execution. " +
-                                "Camera and microphone require user-granted Android permissions and a user-started node.")
+                .put("instructions", instructions(toolProfile))
+                .put("toolProfile", toolProfile)
                 .put("ttlMs", 0)
                 .put("cacheScope", "private");
     }
 
-    private JSONObject listTools(boolean modern) throws JSONException {
-        return tools.list(modern);
+    private JSONObject listTools(boolean modern, String toolProfile) throws JSONException {
+        return tools.list(modern, toolProfile);
     }
 
-    private JSONObject callTool(JSONObject params, boolean modern) throws JSONException {
+    private JSONObject callTool(JSONObject params, boolean modern, String toolProfile) throws JSONException {
         long currentCall = callCount.incrementAndGet();
-        return tools.call(params, modern, currentCall);
+        return tools.call(params, modern, toolProfile, currentCall);
+    }
+
+    private static String instructions(String toolProfile) {
+        if (McpToolRegistry.PROFILE_THIN.equals(toolProfile)) {
+            return "PickPico is a dynamic Mobile Agent Node. The small top-level MCP tool list is a stable gateway, "
+                    + "not the complete device capability set. Before saying that a phone, app, screen, sensor, file, "
+                    + "contact, calendar, notification, physical-world, or human-assisted action cannot be performed, "
+                    + "call capability_search first. Execute discovered abilities with command_run. Representative "
+                    + "capabilities include screen.capture, camera.capture, ui.inspect, ui.action, human.help, "
+                    + "notification.reply, app.launch, location.get, workspace.read, and process.exec; examples are not exhaustive. "
+                    + "Capability results report available/setup-required/disabled state, so guide required human setup rather than refusing prematurely.";
+        }
+        return "PickPico is a user-started Android Mobile Agent Node. It lets an external Agent execute work, "
+                + "sense through phone hardware, and interact with people nearby. The full compatibility profile "
+                + "exposes direct tools plus the dynamic capability runtime.";
     }
 
     private static JSONObject capabilities() throws JSONException {

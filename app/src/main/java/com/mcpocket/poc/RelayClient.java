@@ -70,8 +70,9 @@ final class RelayClient {
         // Keep the node transport on v1, but version the public MCP endpoint separately.
         // ChatGPT/OpenAI may retain a tool schema for a previously seen MCP URL, so a
         // deliberate public-schema version bump gives schema-breaking changes a clean
-        // cache boundary without rotating the node identity or relay secret.
-        this.remoteEndpoint = this.relayBaseUrl + "/v2/nodes/" + nodeId + "/mcp";
+        // cache boundary without rotating the node identity or relay secret. v3 is the
+        // Thin MCP profile; v1/v2 remain relay-compatible for existing clients.
+        this.remoteEndpoint = this.relayBaseUrl + "/v3/nodes/" + nodeId + "/mcp";
     }
 
     void start() {
@@ -177,6 +178,7 @@ final class RelayClient {
             copyHeader(incomingHeaders, request, "mcp-protocol-version");
             copyHeader(incomingHeaders, request, "mcp-method");
             copyHeader(incomingHeaders, request, "mcp-name");
+            copyHeader(incomingHeaders, request, "x-pickpico-tool-profile");
 
             try (Response response = client.newCall(request.build()).execute()) {
                 String responseBody = response.body() == null ? "" : response.body().string();
@@ -239,6 +241,7 @@ final class RelayClient {
         if ("mcp-protocol-version".equals(lowerName)) return "MCP-Protocol-Version";
         if ("mcp-method".equals(lowerName)) return "Mcp-Method";
         if ("mcp-name".equals(lowerName)) return "Mcp-Name";
+        if ("x-pickpico-tool-profile".equals(lowerName)) return "X-PickPico-Tool-Profile";
         return lowerName;
     }
 

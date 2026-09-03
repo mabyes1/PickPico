@@ -1,14 +1,14 @@
-# MCPocket Hackathon Demo Runbook
+# PickPico Hackathon Demo Runbook
 
 這份文件的目標只有一個：**現場不要靠臨場記憶。**
 
 ## Primary demo
 
-主 Demo 應該在 2–3 分鐘內證明三件事：MCPocket 是遠端 Agent node、能感知/操作手機、AI 遇到物理世界阻礙時能向人類求助後繼續。
+主 Demo 應該在 2–3 分鐘內證明三件事：PickPico 是遠端 Agent node、能動態發現並使用手機能力、AI 遇到物理世界阻礙時能向人類求助後繼續。
 
 ### 0. 上場前
 
-- MCPocket node 已啟動。
+- PickPico node 已啟動。
 - `RELAY STATUS = CONNECTED`。
 - 手機與 Agent 端刻意不依賴同一個 LAN；可用 5G 作為最有辨識度的展示。
 - Camera / microphone / location / notification access 依 Demo 需求事先授權。
@@ -17,28 +17,32 @@
 
 ### 1. 證明這是一個活的手機 Agent Node
 
-Agent 呼叫：
+Thin MCP Demo 優先讓 Agent 自己 discover，而不是把底層 capability 當 top-level tool 背給模型。例如使用者說「看看手機現在的狀態」，Agent 可先：
 
 ```text
-phone.status
+capability_search("phone status battery network")
+  -> phone.status
+command_run("phone.status")
 ```
 
-或：
+若使用者說「看看現在手機畫面」，則：
 
 ```text
-location.get
+capability_search("see current phone screen screenshot")
+  -> screen.capture / ui.inspect
+command_run("screen.capture")
 ```
 
-一句話講法：**「這不是手機畫面串流，而是手機本身成為 MCP runtime。」**
+一句話講法：**「Agent 一開始只看到穩定的 PickPico protocol；真正的手機能力是執行時動態發現的。」**
 
 ### 2. Sense / Interact
 
 擇一或兩個即可，不要把 Demo 變工具型錄：
 
 - `camera.capture`：看見現場。
-- `phone.speak`：Agent 直接透過手機說話。
-- `phone.notify`：送出可見 Android notification。
-- `url.open`：開啟網頁 / deep link。
+- `screen.capture` + `ui.inspect`：像素 + semantic UI observation。
+- `ui.action` / `ui.scroll`：跨 App 操作並再次 observation 驗證結果。
+- `phone.speak` / `phone.notify`：Agent 對附近的人產生可見/可聽互動。
 
 ### 3. HUMAN HELP 核心橋段
 
@@ -66,6 +70,18 @@ location.get
 ### 4. Agent 繼續
 
 收到 HUMAN HELP 結果後，Agent 必須再做一個後續動作，例如 `phone.notify` 或完成原本 workflow，證明 HUMAN HELP 不是獨立表單，而是真的把控制權交回 Agent。
+
+### Thin MCP refusal regression
+
+正式 Demo 前至少用實際參賽 Agent 跑以下語句，確認模型不會因 top-level tool list 很小而先說「我做不到」：
+
+```text
+幫我截一下現在手機畫面
+幫我把這頁往下滑
+幫我看看手機現在在哪裡
+```
+
+成功標準：模型在 capability 尚未知時主動呼叫 `capability_search`，找到對應 capability 後用 `command_run` 執行；不得在 discovery 前直接以「我是語言模型／無法存取手機」拒絕。
 
 ## Failure ladder
 

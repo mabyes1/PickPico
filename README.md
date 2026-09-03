@@ -131,7 +131,7 @@ Agent --HTTPS--> PickPico Relay --WSS--> Android PickPico --HTTP loopback--> :87
 
 | 類別 | 已完成 |
 | --- | --- |
-| MCP / Runtime | Streamable HTTP、legacy + MCP `2026-07-28` discovery、tool registry、schema-stable `command_run` |
+| MCP / Runtime | Streamable HTTP、legacy + MCP `2026-07-28` discovery、v3 Thin MCP (10 stable gateway tools)、dynamic `capability_search` + schema-stable `command_run` |
 | Execute | private workspace、UTF-8 file read/write/list、sandbox shell、background process、output/kill、embedded Node.js |
 | Sense | camera capture、microphone WAV、location、active notification list/get、Hyper Accessibility UI tree inspection |
 | Interact | Android notification、TTS、ring、wake、App list/launch、URL/deep-link open、clipboard、Hyper UI action/type/scroll、notification action/reply |
@@ -141,11 +141,36 @@ Agent --HTTPS--> PickPico Relay --WSS--> Android PickPico --HTTP loopback--> :87
 | Update | manifest check、signed APK verification、PackageInstaller、Cloudflare Workers KV release channel |
 | Safety boundaries | Android runtime permissions、Device Admin opt-in for lock、app sandbox for shell、separate relay secret/local bearer |
 
-目前 Android source 版本：**0.15.3** (`versionCode 36`)。`0.14.0` (`versionCode 31`) 已驗證實機可從舊品牌版本 `0.13.6` (`versionCode 30`) 經 SHA-256、package identity、signing certificate 與 Android 安裝確認原地升級為 PickPico；0.14.1 追加 Hyper Mode 的 Restricted settings / Accessibility 人工授權導引，0.15.0 加入 user-authorized MediaProjection `screen.capture`，0.15.1 再把它暴露成 direct MCP media tool，0.15.2 讓 schema-stable `command_run` 也能原生回傳 image/audio content，0.15.3 追加 package-replaced Node/Relay continuity：若更新前 Node 正在運行，更新後會自動恢復 base runtime，PickPico UI 再回前景時補回完整 media foreground types。
+目前 Android source 版本：**0.16.0** (`versionCode 37`)。`0.14.0` (`versionCode 31`) 已驗證實機可從舊品牌版本 `0.13.6` (`versionCode 30`) 經 SHA-256、package identity、signing certificate 與 Android 安裝確認原地升級為 PickPico；0.14.1 追加 Hyper Mode 的 Restricted settings / Accessibility 人工授權導引，0.15.0 加入 user-authorized MediaProjection `screen.capture`，0.15.1–0.15.2 完成 native media + dynamic `command_run` passthrough，0.15.3 追加 package-replaced Node/Relay continuity，0.16.0 新增 `/v3` Thin MCP profile 與 `capability_search`，把 public top-level MCP surface 收斂為 10 個穩定 gateway tools。
+
+## Thin MCP / dynamic capability runtime
+
+PickPico 的新 public MCP profile 不再讓每個手機能力都變成一顆 top-level MCP tool。`/v3` 只暴露 10 個穩定 gateway tools：
+
+```text
+server_info
+capability_search
+capability_status
+policy_status
+command_run
+command_status
+task_runtime_info
+task_create
+task_update
+task_status
+```
+
+真正的裝置能力存在 Capability Runtime，例如 `screen.capture`、`camera.capture`、`ui.inspect`、`ui.action`、`human.help`、`notification.reply`、`location.get`、`workspace.read`、`process.exec`，以及之後加入的 Contacts / Calendar / Picker 能力。
+
+Agent 對陌生裝置需求應先呼叫 `capability_search`。搜尋結果只回傳少量相關 capability，包含 current availability/setup state、risk 與 `inputSchema`，再由 `command_run` 執行。`command_run` 本身可直接傳回 native MCP image/audio，因此新增 media capability 也不需要增加 top-level tool。
+
+Thin MCP server instructions 明確要求：**不要因為 top-level tool list 沒有對應名稱，就先聲稱做不到；對手機、App、畫面、感測器、檔案、聯絡人、日曆、通知、實體世界或 HUMAN HELP 類需求，先做 capability discovery。**
+
+`/v1` / `/v2` 暫時保留 full compatibility registry，供舊 client 使用；新連線資訊會指向 `/v3`。
 
 ## Current implementation snapshot
 
-- Treat MCPocket as a Mobile Agent Node rather than only a bag of phone-specific MCP tools.
+- Treat PickPico as a Mobile Agent Node rather than only a bag of phone-specific MCP tools.
 - Organize the node around three jobs: **Execute**, **Sense**, and **Interact**.
 - Let Agents capture Android camera frames through `camera_capture` / `camera.capture`; images are stored under the private workspace and returned as native MCP image content.
 - Let Agents post Android notifications through `phone_notify` / `phone.notify`.
@@ -160,17 +185,17 @@ Agent --HTTPS--> PickPico Relay --WSS--> Android PickPico --HTTP loopback--> :87
   the current reference backend is a Cloudflare Worker + Durable Object deployment.
 - Authenticate every MCP POST with a per-start bearer token.
 - Keep compatibility tools including `server_info`, `phone_status`, `phone_ring`, restricted `phone_exec`, and `phone_echo`.
-- Expose a capability-oriented command runtime through `command_list`, `command_run`, and `command_status`.
-- Keep a persistent private workspace under the MCPocket app data directory.
+- Expose a capability-oriented runtime through `capability_search`, `command_run`, and `command_status`; keep `command_list` only in the full compatibility profile.
+- Keep a persistent private workspace under the PickPico app data directory (Android package identity remains legacy `com.mcpocket.poc` for in-place update compatibility).
 - Read, write, and recursively list workspace files without shell-escaping file contents.
 - Resolve relative `exec_command.cwd` values below the workspace root.
 - Keep long-running commands alive as managed background sessions with `read_output` and `kill_session`.
 - Run workspace JavaScript through an APK-embedded Node.js runtime in an isolated `:node` Android process.
-- Download and verify self-update APKs, then expose a foreground **Update MCPocket** button so Android's required install confirmation is user-initiated instead of relying on background popups.
+- Download and verify self-update APKs, then expose a foreground **Update PickPico** button so Android's required install confirmation is user-initiated instead of relying on background popups.
 - Support the legacy initialize flow and the MCP `2026-07-28` stateless discovery flow.
 - Keep MCP protocol/transport separate from Android tool implementations through a tool registry.
 
-Current command IDs:
+Current dynamic capability IDs (not top-level v3 MCP tools):
 
 - `node.info`
 - `phone.status`
@@ -521,7 +546,8 @@ https://relay.mcpocket.workers.dev
 GET  /health
 GET  /v1/nodes/<node-id>/status
 GET  /v1/nodes/<node-id>/connect       # phone WSS upgrade
-POST /v2/nodes/<node-id>/mcp           # current remote MCP endpoint
+POST /v3/nodes/<node-id>/mcp           # current Thin MCP endpoint (10 gateway tools)
+POST /v2/nodes/<node-id>/mcp           # compatibility full-tool endpoint
 GET  /v1/update/latest
 GET  /v1/update/files/releases/<apk>
 ```

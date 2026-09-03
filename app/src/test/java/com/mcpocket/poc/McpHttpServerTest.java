@@ -310,6 +310,60 @@ public final class McpHttpServerTest {
     }
 
     @Test
+    public void thinProfileExposesStableGatewayAndDiscoversHiddenCapabilities() throws Exception {
+        HttpResult list = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":52,\"method\":\"tools/list\"}",
+                thinHeaders());
+        assertEquals(200, list.status);
+        JSONObject listed = new JSONObject(list.body).getJSONObject("result");
+        JSONArray tools = listed.getJSONArray("tools");
+        assertEquals(10, tools.length());
+        assertEquals("thin-v1", listed.getString("toolProfile"));
+        String toolText = tools.toString();
+        assertTrue(toolText.contains("capability_search"));
+        assertTrue(toolText.contains("command_run"));
+        assertTrue(toolText.contains("task_create"));
+        assertTrue(toolText.contains("server_info"));
+        assertTrue(!toolText.contains("camera_capture"));
+        assertTrue(!toolText.contains("exec_command"));
+
+        HttpResult search = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":53,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
+                        "\"query\":\"take a screenshot of the current display\"}}}",
+                thinHeaders());
+        assertEquals(200, search.status);
+        JSONObject discovery = new JSONObject(search.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertTrue(discovery.getJSONArray("matches").length() > 0);
+        assertEquals("screen.capture", discovery.getJSONArray("matches").getJSONObject(0).getString("id"));
+        assertTrue(discovery.getJSONArray("matches").getJSONObject(0).has("inputSchema"));
+
+        HttpResult chineseSearch = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":531,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
+                        "\"query\":\"幫我截圖看看手機畫面\"}}}",
+                thinHeaders());
+        assertEquals(200, chineseSearch.status);
+        JSONObject chineseDiscovery = new JSONObject(chineseSearch.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(
+                "screen.capture",
+                chineseDiscovery.getJSONArray("matches").getJSONObject(0).getString("id"));
+
+        HttpResult directLegacyTool = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":54,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"camera_capture\",\"arguments\":{}}}",
+                thinHeaders());
+        assertEquals(200, directLegacyTool.status);
+        assertTrue(new JSONObject(directLegacyTool.body)
+                .getJSONObject("result")
+                .getBoolean("isError"));
+    }
+
+    @Test
     public void cameraCaptureReturnsNativeMcpImageContent() throws Exception {
         HttpResult response = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":61,\"method\":\"tools/call\"," +
@@ -684,6 +738,12 @@ public final class McpHttpServerTest {
     private Map<String, String> authorizedHeaders() {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Bearer " + TOKEN);
+        return headers;
+    }
+
+    private Map<String, String> thinHeaders() {
+        Map<String, String> headers = authorizedHeaders();
+        headers.put("X-PickPico-Tool-Profile", "thin-v1");
         return headers;
     }
 

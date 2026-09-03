@@ -1,4 +1,4 @@
-# MCPocket Product Spec v0.1
+# PickPico Product Spec v0.1
 
 > Status: Draft / Hackathon development spec  
 > Platform strategy: **Android-first Full Mobile Agent Node**  
@@ -7,7 +7,7 @@
 
 ## 1. Product definition
 
-MCPocket turns a phone into an MCP-capable Agent node.
+PickPico turns a phone into an MCP-capable Agent node.
 
 The product is intentionally split into two capability layers:
 
@@ -30,8 +30,8 @@ Human interaction = what a person must approve or physically complete
 
 ```mermaid
 flowchart TD
-    A[External Agent / MCP Client] --> B[MCP Transport]
-    B --> C[Capability Runtime]
+    A[External Agent / MCP Client] --> B[Thin MCP Gateway]
+    B --> C[Capability Discovery + Runtime]
 
     C --> D[Core Mode]
     C --> E[Hyper Mode]
@@ -53,6 +53,103 @@ flowchart TD
     K --> A
 ```
 
+### 2.1 Thin MCP gateway
+
+PickPico separates the **stable MCP protocol surface** from the **growing device capability set**.
+
+The public Thin MCP profile targets **10–15 top-level tools maximum**. The current `v3` profile exposes 10:
+
+```text
+server_info
+capability_search
+capability_status
+policy_status
+command_run
+command_status
+task_runtime_info
+task_create
+task_update
+task_status
+```
+
+These tools are gateways, not the complete action inventory. Device abilities such as:
+
+```text
+screen.capture
+camera.capture
+ui.inspect
+ui.action
+human.help
+notification.reply
+app.launch
+location.get
+workspace.read
+process.exec
+contacts.search        # planned Core P0
+calendar.create        # planned Core P0
+```
+
+live in the dynamic Capability Runtime and are discovered only when relevant.
+
+Architecture rule:
+
+> **MCP tool count should remain nearly constant while capability count is allowed to grow.**
+
+This avoids turning every new Android/iOS/device feature into a new top-level MCP schema and reduces client schema-cache churn, prompt/tool-selection noise, and platform-specific tool explosion.
+
+The current compatibility boundary is:
+
+- `/v1` / `/v2`: full compatibility tool registry for existing clients.
+- `/v3`: Thin MCP profile backed by the same Capability Runtime.
+
+`command_run` can return native MCP image/audio content, so media capabilities do not need dedicated top-level tools.
+
+### 2.2 Capability discovery policy
+
+Thin MCP must not cause an Agent to incorrectly assume that hidden capabilities do not exist.
+
+Therefore the protocol contract is:
+
+> **Before telling the user that PickPico cannot perform a requested device/physical-world action, the Agent should search capabilities unless the capability state is already known.**
+
+`capability_search` accepts a natural-language need and returns a small ranked set containing:
+
+- capability ID
+- description/category/group
+- risk and side-effect metadata
+- `available` / `setup_required` / `disabled` state
+- setup reason when applicable
+- the capability's current `inputSchema`
+
+Its search vocabulary includes intent aliases for important device affordances. For example, `screenshot`, `display`, `see`, or `visual` can lead to `screen.capture`; UI interaction terms can lead to `ui.inspect`, `ui.action`, `ui.type`, or `ui.scroll`.
+
+The Thin MCP server instructions and `command_run` description intentionally seed a **small representative set** of capability names. This is affordance priming, not an exhaustive API list. Exact discovery remains runtime-driven.
+
+Two execution paths are valid:
+
+```text
+Known/common capability
+  -> command_run (fast path)
+
+Unknown/uncertain device operation
+  -> capability_search
+  -> inspect availability + input schema
+  -> command_run (discovery path)
+```
+
+Required Agent behavior test cases include:
+
+```text
+"Take a screenshot"
+  -> discover/use screen.capture, not "I cannot access your phone"
+
+"Find a contact"
+  -> discover contacts.search when implemented
+
+"Scroll this page"
+  -> discover/use ui.scroll
+```
+
 ### Architecture rule
 
 `Hyper Mode` and `Approval Mode` must remain independent.
@@ -60,7 +157,7 @@ flowchart TD
 Examples:
 
 - Hyper Mode ON + Ask Me: UI automation exists, but side-effect actions still ask first.
-- Hyper Mode ON + YOLO: MCPocket adds no extra approval prompt, but Android / biometric / Wallet / OS security boundaries still apply.
+- Hyper Mode ON + YOLO: PickPico adds no extra approval prompt, but Android / biometric / Wallet / OS security boundaries still apply.
 - Hyper Mode OFF + YOLO: Agent still cannot use Hyper-only capabilities because the capability does not exist in the exposed registry.
 
 ## 3. Capability lifecycle
@@ -94,14 +191,15 @@ Recommended runtime states:
 | `available` | Capability can currently run |
 | `temporarily_unavailable` | Runtime condition blocks it, such as no foreground activity |
 
-### Current MCP surface
+### Current capability discovery surface
 
-Implemented in the current Phase A runtime:
+Implemented in the current runtime:
 
 - `capability.list`
 - `capability.status`
+- `capability_search` (Thin MCP top-level discovery gateway)
 
-`command_list` remains the execution catalog. `capability.*` explains why a command is or is not currently usable.
+`command_list` remains available through the full compatibility profile. New Thin MCP clients should prefer `capability_search` and execute results through `command_run`. `capability.*` explains why a command is or is not currently usable.
 
 ## 4. Core Mode
 
@@ -166,7 +264,7 @@ Hyper Mode unlocks Android special-access or deeper cross-app/device capabilitie
 
 Hyper Mode is a **product switch**, not a single Android permission.
 
-When enabled, MCPocket should show the setup state of each Hyper capability individually.
+When enabled, PickPico should show the setup state of each Hyper capability individually.
 
 ```text
 ⚡ Hyper Mode                                      ON
@@ -294,7 +392,7 @@ Proposed user modes:
 | --- | --- | --- |
 | 🛡️ Ask Me | 詢問我 | Side-effect actions require approval according to policy |
 | 🤖 Auto-approve | 代我核准 | Low/medium-risk actions can run automatically; sensitive actions still ask according to policy |
-| ☠️ YOLO Mode | YOLO MODE | MCPocket adds no optional approval gate; OS/app/human-only boundaries remain |
+| ☠️ YOLO Mode | YOLO MODE | PickPico adds no optional approval gate; OS/app/human-only boundaries remain |
 
 ### Approval flow
 
@@ -395,7 +493,7 @@ HumanResponse
 
 **Approval** means:
 
-> The Agent knows how to perform the action, but MCPocket wants permission before executing it.
+> The Agent knows how to perform the action, but PickPico wants permission before executing it.
 
 **HUMAN HELP** means:
 
@@ -421,13 +519,16 @@ Agent observes result and continues
 
 Target behavior:
 
-1. `command_list` should expose only commands that exist in the current build/platform.
-2. Hyper-only commands should not be exposed when the Hyper module is absent.
-3. When the Hyper module exists but the user has Hyper Mode OFF, preferred behavior is to hide Hyper execution commands and expose their status through `capability.list/status`.
-4. When access is missing but Hyper Mode is ON, capability status should report `setup_required` with setup guidance.
-5. Approval Policy must not alter static capability support. It only changes execution authorization.
+1. New public clients should use the Thin MCP profile; the top-level surface has a soft target of 10–15 tools and must not grow one-for-one with capabilities.
+2. `capability_search` should return only a small relevant subset by default, with current state and input schema.
+3. The full compatibility profile may keep direct tools and `command_list` for existing clients, but new capability work should not add new top-level tools unless there is a strong protocol-level reason.
+4. Hyper-only commands should not be executable when the Hyper module is absent.
+5. When the Hyper module exists but the user has Hyper Mode OFF, discovery may report the capability as disabled rather than pretending it does not exist.
+6. When access is missing but Hyper Mode is ON, discovery/status should report `setup_required` with setup guidance.
+7. Approval Policy must not alter static capability support. It only changes execution authorization.
+8. The Agent should not conclude that a requested device action is impossible solely because there is no matching top-level MCP tool.
 
-This prevents an Agent from repeatedly calling commands that the current node can never perform.
+This prevents both failure modes: repeatedly calling impossible commands **and** prematurely refusing capabilities hidden behind the Thin MCP gateway.
 
 ## 10. Android build modularity
 
@@ -436,7 +537,7 @@ Hyper capabilities should be removable as a build-time module, not merely hidden
 Target conceptual layout:
 
 ```text
-MCPocket
+PickPico
 ├─ core-agent
 ├─ human-interaction
 ├─ core-capabilities
@@ -472,7 +573,7 @@ Product role:
 
 > **Full Mobile Agent Node**
 
-Android is the primary platform for the Hackathon and initial product development because it allows the deeper device capabilities required by MCPocket's core concept.
+Android is the primary platform for the Hackathon and initial product development because it allows the deeper device capabilities required by PickPico's core concept.
 
 ### iOS
 
@@ -589,7 +690,7 @@ Current priority is to demonstrate the strongest form of the product rather than
 
 Only after the core product is stable:
 
-- MCPocket Financial Agent
+- PickPico Financial Agent
 - transaction preparation
 - HUMAN approval/handoff
 - Wallet deep link
@@ -604,7 +705,7 @@ It is reached when this complete flow works:
 
 ```mermaid
 flowchart TD
-    A[Agent receives a real task] --> B[Discover MCPocket capabilities]
+    A[Agent receives a real task] --> B[Discover PickPico capabilities]
     B --> C[Use Core or Hyper capability]
     C --> D[Observe Android / another app]
     D --> E[Take an action]

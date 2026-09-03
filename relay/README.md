@@ -38,9 +38,9 @@ https://relay.mcpocket.workers.dev
 
 That endpoint is demo infrastructure, not an unlimited public relay commitment. Open-source users
 should deploy this reference relay into their own Cloudflare account or use a temporary Wrangler
-deployment for evaluation, then paste the returned URL into MCPocket.
+deployment for evaluation, then paste the returned URL into PickPico.
 
-The important product boundary is the MCPocket relay protocol, not Cloudflare itself. A different
+The important product boundary is the PickPico relay protocol, not Cloudflare itself. A different
 backend can implement the same remote-transport contract later.
 
 Useful checks:
@@ -49,12 +49,13 @@ Useful checks:
 GET /health
 GET /v1/nodes/<node-id>/status
 POST /v1/nodes/<node-id>/mcp   # legacy public schema URL
-POST /v2/nodes/<node-id>/mcp   # current public schema URL
+POST /v2/nodes/<node-id>/mcp   # full compatibility schema URL
+POST /v3/nodes/<node-id>/mcp   # current Thin MCP schema URL
 ```
 
 ## Update channel
 
-The same Worker serves MCPocket's stable self-update channel from a dedicated Workers KV binding
+The same Worker serves PickPico's stable self-update channel from a dedicated Workers KV binding
 named `UPDATE_KV`:
 
 ```text

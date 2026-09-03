@@ -5,10 +5,28 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** Pure-Java registry for MCP tool metadata, validation, and dispatch. */
 final class McpToolRegistry {
+    static final String PROFILE_THIN = "thin-v1";
+
+    private static final Set<String> THIN_TOOLS = new HashSet<>();
+
+    static {
+        THIN_TOOLS.add("server_info");
+        THIN_TOOLS.add("capability_search");
+        THIN_TOOLS.add("capability_status");
+        THIN_TOOLS.add("policy_status");
+        THIN_TOOLS.add("command_run");
+        THIN_TOOLS.add("command_status");
+        THIN_TOOLS.add("task_runtime_info");
+        THIN_TOOLS.add("task_create");
+        THIN_TOOLS.add("task_update");
+        THIN_TOOLS.add("task_status");
+    }
     private interface Handler {
         JSONObject call(JSONObject arguments, long callCount) throws JSONException;
     }
@@ -92,6 +110,12 @@ final class McpToolRegistry {
                 (arguments, callCount) -> runtime.list());
 
         register(
+                "capability_search",
+                "Search the connected PickPico device's dynamic abilities. Use this before concluding that a phone, app, screen, sensor, file, contact, calendar, notification, physical-world, or human-assisted action cannot be performed. Returns matching capability IDs, current availability/setup state, risk metadata, and input schemas.",
+                capabilitySearchSchema(),
+                (arguments, callCount) -> runtime.search(arguments));
+
+        register(
                 "capability_list",
                 "List all implemented PickPico capabilities with current Core/Hyper availability and setup state.",
                 noArgumentsSchema(),
@@ -111,14 +135,14 @@ final class McpToolRegistry {
 
         register(
                 "command_run",
-                "Run one PickPico command by capability ID with structured JSON arguments. Use command_list to discover the current capability IDs.",
+                "Execute one dynamic PickPico capability by ID. Representative capabilities include screen.capture, camera.capture, ui.inspect, ui.action, human.help, notification.reply, app.launch, location.get, workspace.read, and process.exec; these are examples, not the complete set. Use capability_search before unfamiliar device operations or when the exact ID/schema is not already known. Native image/audio results are returned directly when a capability produces media.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
                                 .put("commandId", new JSONObject()
                                         .put("type", "string")
                                         .put("minLength", 1)
-                                        .put("description", "Capability ID returned by command_list."))
+                                        .put("description", "Dynamic capability ID returned by capability_search or already known from PickPico discovery."))
                                 .put("arguments", new JSONObject()
                                         .put("type", "object")
                                         .put("default", new JSONObject())))
@@ -329,19 +353,26 @@ final class McpToolRegistry {
                 });
     }
 
-    JSONObject list(boolean modern) throws JSONException {
+    JSONObject list(boolean modern, String profile) throws JSONException {
+        boolean thin = PROFILE_THIN.equals(profile);
         JSONArray resultTools = new JSONArray();
         for (Tool tool : tools.values()) {
+            if (thin && !THIN_TOOLS.contains(tool.name)) {
+                continue;
+            }
             resultTools.put(tool.describe());
         }
-        JSONObject result = new JSONObject().put("tools", resultTools);
+        JSONObject result = new JSONObject()
+                .put("tools", resultTools)
+                .put("toolProfile", thin ? PROFILE_THIN : "full")
+                .put("toolCount", resultTools.length());
         if (modern) {
             result.put("ttlMs", 0).put("cacheScope", "private");
         }
         return result;
     }
 
-    JSONObject call(JSONObject params, boolean modern, long callCount) throws JSONException {
+    JSONObject call(JSONObject params, boolean modern, String profile, long callCount) throws JSONException {
         if (params == null) {
             return toolError("Missing tool parameters", modern);
         }
@@ -349,6 +380,12 @@ final class McpToolRegistry {
         Tool tool = tools.get(name);
         if (tool == null) {
             return toolError("Unknown tool: " + name, modern);
+        }
+        if (PROFILE_THIN.equals(profile) && !THIN_TOOLS.contains(name)) {
+            return toolError(
+                    "Tool is not exposed by the Thin MCP profile: " + name
+                            + ". Use capability_search and command_run instead.",
+                    modern);
         }
         JSONObject arguments = params.optJSONObject("arguments");
         if (arguments == null) {
@@ -384,6 +421,37 @@ final class McpToolRegistry {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject())
+                .put("additionalProperties", false);
+    }
+
+    private static JSONObject capabilitySearchSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("query", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 512)
+                                .put("description",
+                                        "Natural-language capability need, for example 'take a screenshot', 'find a contact', 'create a calendar event', or 'scroll the current app'. Empty query browses capabilities."))
+                        .put("category", new JSONObject()
+                                .put("type", "string")
+                                .put("maxLength", 80)
+                                .put("description", "Optional exact capability category filter."))
+                        .put("group", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray().put("core").put("hyper")))
+                        .put("availableOnly", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)
+                                .put("description", "False also returns setup-required/disabled matches so the Agent can guide setup instead of incorrectly refusing."))
+                        .put("includeSchema", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", true))
+                        .put("limit", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 1)
+                                .put("maximum", 20)
+                                .put("default", 8)))
                 .put("additionalProperties", false);
     }
 

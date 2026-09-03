@@ -35,24 +35,27 @@ Android MCPocket
 127.0.0.1:8765/mcp
 ```
 
-The Cloudflare implementation is a reference backend, not part of MCPocket's conceptual identity.
+The Cloudflare implementation is a reference backend, not part of PickPico's conceptual identity.
 The Android side should continue to treat it as a relay/remote-transport endpoint rather than as a
 Cloudflare-specific core dependency.
 
 ## Routing
 
-Each MCPocket installation owns a persistent random node ID. The reference relay exposes routes of
+Each PickPico installation owns a persistent random node ID. The reference relay exposes routes of
 the form:
 
 ```text
 GET  /health
 GET  /v1/nodes/<node-id>/status
 POST /v1/nodes/<node-id>/mcp   # legacy public schema URL
-POST /v2/nodes/<node-id>/mcp   # current public schema URL
+POST /v2/nodes/<node-id>/mcp   # full compatibility schema URL
+POST /v3/nodes/<node-id>/mcp   # current Thin MCP schema URL
 ```
 
 The Android client opens an outbound WebSocket associated with its node ID. Incoming MCP requests
-are correlated with that live socket and forwarded to MCPocket's local MCP server.
+are correlated with that live socket and forwarded to PickPico's local MCP server. For `/v3`, the
+relay adds `X-PickPico-Tool-Profile: thin-v1` to the loopback request so the same Android runtime can
+serve a small stable top-level MCP registry while `/v1` and `/v2` retain compatibility behavior.
 
 ## Authentication boundaries
 
@@ -60,7 +63,7 @@ There are deliberately two separate credentials with different jobs:
 
 1. **Relay secret**: authenticates the phone when it registers its outbound relay WebSocket. It never
    appears in the public MCP URL.
-2. **Local MCP bearer token**: authenticates the private loopback request at MCPocket's Android MCP
+2. **Local MCP bearer token**: authenticates the private loopback request at PickPico's Android MCP
    server. It stays on the phone and is injected by `RelayClient` only for the
    `127.0.0.1:8765/mcp` hop.
 

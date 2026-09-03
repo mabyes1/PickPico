@@ -103,7 +103,7 @@ final class McpHttpServer {
                 Map<String, String> headers = corsHeaders(origin);
                 headers.put("Access-Control-Allow-Methods", "POST, OPTIONS");
                 headers.put("Access-Control-Allow-Headers",
-                        "Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name");
+                        "Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name, X-PickPico-Tool-Profile");
                 writeText(output, 204, "No Content", null, "", headers);
                 return;
             }
@@ -160,7 +160,8 @@ final class McpHttpServer {
                 }
             }
 
-            McpProtocol.Response response = protocol.handle(json, protocolVersion);
+            String toolProfile = request.header("x-pickpico-tool-profile");
+            McpProtocol.Response response = protocol.handle(json, protocolVersion, toolProfile);
             Map<String, String> headers = corsHeaders(origin);
             headers.put("MCP-Protocol-Version", response.protocolVersion);
             if (response.body == null) {

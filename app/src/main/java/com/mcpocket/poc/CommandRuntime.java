@@ -5,8 +5,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -753,6 +757,84 @@ final class CommandRuntime {
                 .put("count", result.length());
     }
 
+    JSONObject search(JSONObject arguments) throws JSONException {
+        String query = arguments == null ? "" : arguments.optString("query", "").trim();
+        String category = arguments == null ? "" : arguments.optString("category", "").trim();
+        String group = arguments == null ? "" : arguments.optString("group", "").trim();
+        boolean availableOnly = arguments != null && arguments.optBoolean("availableOnly", false);
+        boolean includeSchema = arguments == null || arguments.optBoolean("includeSchema", true);
+        int limit = arguments == null ? 8 : arguments.optInt("limit", 8);
+        limit = Math.max(1, Math.min(20, limit));
+
+        List<SearchMatch> matches = new ArrayList<>();
+        for (Command command : commands.values()) {
+            JSONObject state = actions.capabilityState(command.id);
+            String commandGroup = state.optString(
+                    "group",
+                    AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
+            if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
+                continue;
+            }
+            if (!group.isEmpty() && !group.equalsIgnoreCase(commandGroup)) {
+                continue;
+            }
+            if (availableOnly && !state.optBoolean("available", false)) {
+                continue;
+            }
+
+            int score = searchScore(query, command);
+            if (!query.isEmpty() && score <= 0) {
+                continue;
+            }
+            matches.add(new SearchMatch(command, state, score));
+        }
+
+        matches.sort(Comparator
+                .comparingInt((SearchMatch match) -> match.score).reversed()
+                .thenComparing(match -> match.command.id));
+
+        JSONArray result = new JSONArray();
+        for (SearchMatch match : matches) {
+            if (result.length() >= limit) {
+                break;
+            }
+            Command command = match.command;
+            JSONObject state = match.state;
+            JSONObject item = new JSONObject()
+                    .put("id", command.id)
+                    .put("description", command.description)
+                    .put("category", command.category)
+                    .put("risk", command.risk)
+                    .put("sideEffect", command.sideEffect)
+                    .put("group", state.optString("group", "core"))
+                    .put("supported", state.optBoolean("supported", true))
+                    .put("enabled", state.optBoolean("enabled", true))
+                    .put("available", state.optBoolean("available", false))
+                    .put("state", state.optString("state", "unknown"))
+                    .put("requiresSetup", state.optBoolean("requiresSetup", false))
+                    .put("userInteractionRequired", state.optBoolean("userInteractionRequired", false))
+                    .put("score", match.score);
+            if (state.has("setupType")) {
+                item.put("setupType", state.opt("setupType"));
+            }
+            if (state.has("reason")) {
+                item.put("reason", state.optString("reason", ""));
+            }
+            if (includeSchema) {
+                item.put("inputSchema", command.inputSchema);
+            }
+            result.put(item);
+        }
+
+        return new JSONObject()
+                .put("query", query)
+                .put("matches", result)
+                .put("count", result.length())
+                .put("totalCandidates", matches.size())
+                .put("discoveryHint",
+                        "Capabilities are dynamic. Search before concluding that a requested device action is unsupported.");
+    }
+
     JSONObject execute(String commandId, JSONObject arguments, long callCount) throws JSONException {
         Command command = requireCommand(commandId);
         return invoke(command, arguments == null ? new JSONObject() : arguments, callCount);
@@ -829,6 +911,138 @@ final class CommandRuntime {
                             + ". Use capability.status to inspect setup or Hyper Mode requirements.");
         }
         return command;
+    }
+
+    private static int searchScore(String rawQuery, Command command) {
+        if (rawQuery == null || rawQuery.trim().isEmpty()) {
+            return 1;
+        }
+        String query = normalizeSearchText(rawQuery);
+        String id = normalizeSearchText(command.id);
+        String description = normalizeSearchText(command.description);
+        String aliases = normalizeSearchText(searchAliases(command.id));
+        String haystack = id + " " + description + " " + normalizeSearchText(command.category)
+                + " " + normalizeSearchText(command.risk) + " " + aliases;
+
+        int score = 0;
+        if (id.equals(query)) {
+            score += 1000;
+        } else if (id.contains(query)) {
+            score += 220;
+        }
+        if (description.contains(query) || aliases.contains(query)) {
+            score += 180;
+        }
+
+        // CJK queries commonly arrive without whitespace segmentation (for example
+        // "幫我截圖看看手機畫面"). Match individual alias intents as substrings of
+        // the full query so discovery does not depend on an English-style tokenizer.
+        for (String alias : aliases.split("\\s+")) {
+            if (alias.length() >= 2 && query.contains(alias)) {
+                score += 70;
+            }
+        }
+
+        String[] tokens = query.split("\\s+");
+        for (String token : tokens) {
+            if (token.length() < 2 || isSearchStopWord(token)) {
+                continue;
+            }
+            if (id.contains(token)) {
+                score += 80;
+            }
+            if (aliases.contains(token)) {
+                score += 55;
+            }
+            if (description.contains(token)) {
+                score += 35;
+            }
+            if (haystack.contains(token)) {
+                score += 10;
+            }
+        }
+        return score;
+    }
+
+    private static String normalizeSearchText(String value) {
+        return value == null
+                ? ""
+                : value.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+    }
+
+    private static boolean isSearchStopWord(String token) {
+        return "the".equals(token)
+                || "a".equals(token)
+                || "an".equals(token)
+                || "to".equals(token)
+                || "for".equals(token)
+                || "of".equals(token)
+                || "on".equals(token)
+                || "in".equals(token)
+                || "my".equals(token)
+                || "current".equals(token)
+                || "phone".equals(token)
+                || "device".equals(token)
+                || "need".equals(token)
+                || "want".equals(token);
+    }
+
+    private static String searchAliases(String commandId) {
+        switch (commandId) {
+            case "screen.capture":
+                return "screenshot display screen pixels see look observe visual app canvas image 截圖 螢幕 畫面 看 看看 視覺";
+            case "camera.capture":
+                return "camera photo picture photograph see physical world lens 相機 拍照 照片 攝影";
+            case "ui.inspect":
+                return "accessibility semantic ui tree inspect understand app screen controls text 介面 結構 元件 讀畫面";
+            case "ui.action":
+                return "click tap press back home recents control interact app ui 點 點擊 按 操作 返回 首頁";
+            case "ui.type":
+                return "type text enter input edit field keyboard form ui 輸入 打字 文字 表單";
+            case "ui.scroll":
+                return "scroll swipe move page feed list up down left right ui 捲動 滾動 下滑 上滑 左滑 右滑";
+            case "human.help":
+                return "human help ask person handoff physical action assistance nearby owner 人類 求助 幫忙 協助 請人";
+            case "notification.list":
+            case "notification.get":
+                return "notification notifications alert message inbox read";
+            case "notification.reply":
+                return "notification reply respond message remoteinput chat";
+            case "notification.invoke_action":
+            case "notification.actions":
+                return "notification action button interact approve dismiss open";
+            case "app.list":
+            case "app.launch":
+                return "application apps installed launch open start package";
+            case "location.get":
+                return "gps location position where map coordinates latitude longitude 定位 位置 在哪裡 地圖 經緯度";
+            case "clipboard.get":
+            case "clipboard.set":
+                return "clipboard copy paste text";
+            case "workspace.list":
+            case "workspace.read":
+            case "workspace.write":
+                return "file files filesystem workspace storage read write";
+            case "process.exec":
+            case "process.run":
+            case "process.output":
+            case "process.stop":
+                return "shell process command terminal execute linux script runtime";
+            default:
+                return "";
+        }
+    }
+
+    private static final class SearchMatch {
+        final Command command;
+        final JSONObject state;
+        final int score;
+
+        SearchMatch(Command command, JSONObject state, int score) {
+            this.command = command;
+            this.state = state;
+            this.score = score;
+        }
     }
 
     private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
