@@ -530,13 +530,22 @@ MCPocket/
 ├─ relay/                       # Cloudflare Worker + Durable Object + KV update channel
 ├─ docs/remote-transport.md     # remote transport/security design
 ├─ docs/demo-runbook.md         # hackathon primary demo / fallback / readiness checklist
+├─ docs/product-spec-v0.1.md    # Core/Hyper capabilities, approval policy and platform roadmap
 ├─ scripts/                     # build, debug and update publishing helpers
 └─ README.md
 ```
 
-## Hackathon readiness / 80% checkpoint
+## Product spec / 開發規格
 
-目前的「80%」定義不是功能數量，而是主作品已具備可重複驗證的展示路徑：
+目前 Core Mode、⚡ Hyper Mode、Android 權限能力、Approval Policy、HUMAN HELP 共用 UI、Android-first / iOS Companion 策略與後續開發順序，統一整理在：
+
+- [`docs/product-spec-v0.1.md`](docs/product-spec-v0.1.md)
+
+這份文件是目前黑客松開發的產品規格基準；實作狀態會明確區分「已完成」與「規劃中」，避免把 roadmap 當成現成功能。
+
+## Hackathon readiness infrastructure
+
+這一節只描述目前已建立的展示與驗證基礎設施，**不代表產品整體完成度**。目前產品仍在功能收斂、Hyper Mode、Approval Policy 與 UI/UX 開發階段。
 
 - [x] Android Mobile Agent Node 核心能力
 - [x] HUMAN HELP 人機 handoff
