@@ -57,6 +57,34 @@ MCPocket 的做法不是再做一個「手機遙控器」，而是把 Android �
 
 HUMAN HELP 的 timeout 是「人類閒置時間」而不是死板的總時限。打字、開啟請求、選圖或拍照都會續租等待時間；目前每次可選 120 / 180 / 360 秒，Relay 另外保留較長的 transport safety timeout，避免人在操作時 HTTP request 被提前切掉。
 
+### Optional Sponsor Bounty：MCPocket Financial Agent
+
+> **有多餘時間才做。不得為了 Sponsor Bounty 犧牲 MCPocket 主 Demo 的穩定度。**
+
+若核心作品、影片與現場備援都已穩定，可額外把既有 MCPocket 能力組成金融 Agent workflow，作為企業命題延伸，而不是修改 MCPocket 核心定位：
+
+```text
+支付需求
+  ↓
+Agent 查詢鏈上價格 / balance / fee
+  ↓
+準備 stablecoin transaction（不持有私鑰、不自行簽署）
+  ↓
+human.help 顯示金額、收款人、chain、fee，要求本人確認
+  ↓
+url.open / app.launch 開啟既有 Wallet
+  ↓
+使用者在 Wallet 內親自簽署
+  ↓
+Agent 監看 transaction status / Android notification
+  ↓
+繼續 invoice、付款確認或後續企業 workflow
+```
+
+實作原則：優先使用 **testnet 或 mock stablecoin**；MCPocket 不實作 wallet custody、不保存私鑰、不代替使用者簽章。這個情境要展示的是「Agent 可以代理流程，但高風險授權仍能乾淨地 hand off 給人類」。
+
+**提醒：只有在主 Demo、README、2 分鐘影片、真機備援都完成後，才開始這顆 Sponsor DLC。**
+
 ## 系統架構
 
 ```mermaid
@@ -501,9 +529,41 @@ MCPocket/
 │     └─ McpNotificationListenerService.java
 ├─ relay/                       # Cloudflare Worker + Durable Object + KV update channel
 ├─ docs/remote-transport.md     # remote transport/security design
+├─ docs/demo-runbook.md         # hackathon primary demo / fallback / readiness checklist
 ├─ scripts/                     # build, debug and update publishing helpers
 └─ README.md
 ```
+
+## Hackathon readiness / 80% checkpoint
+
+目前的「80%」定義不是功能數量，而是主作品已具備可重複驗證的展示路徑：
+
+- [x] Android Mobile Agent Node 核心能力
+- [x] HUMAN HELP 人機 handoff
+- [x] Cloudflare 跨網路 relay
+- [x] build + unit tests
+- [x] README / 架構 / 來源揭露 / LICENSE
+- [x] 主 Demo 與 fallback runbook
+- [x] 一鍵 readiness script
+- [ ] 現場連續跑至少 3 次完整主 Demo
+- [ ] 錄製 2 分鐘評選影片
+- [ ] 最後公開 repo / 權限檢查
+- [ ] Optional：Financial Agent Sponsor Bounty
+
+開發或上場前可先跑：
+
+```powershell
+pwsh scripts/hackathon-readiness.ps1
+```
+
+有 Android debug 裝置接著時，可進一步驗真機：
+
+```powershell
+pwsh scripts/hackathon-readiness.ps1 -Device
+pwsh scripts/hackathon-readiness.ps1 -Device -HumanHelp
+```
+
+完整展示順序與失敗切換方式見 `docs/demo-runbook.md`。
 
 ## 黑客松既有開發 / 來源揭露
 
