@@ -1208,6 +1208,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                     .apply();
             return;
         }
+        relayBaseUrl = RelayClient.migrateLegacyRelayIfNeeded(prefs, relayBaseUrl);
         stopRelay();
         relayClient = new RelayClient(this, relayBaseUrl, new RelayClient.Listener() {
             @Override

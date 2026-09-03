@@ -33,12 +33,16 @@ import okhttp3.WebSocketListener;
  * loopback hop so clients such as ChatGPT do not need custom HTTP-header authentication support.
  */
 final class RelayClient {
+    static final String LEGACY_RELAY_BASE_URL = "https://relay.mcpocket.workers.dev";
+    static final String DEFAULT_RELAY_BASE_URL = "https://pickpico-relay.mcpocket.workers.dev";
+
     interface Listener {
         void onRelayState(String status, String remoteEndpoint, String detail);
     }
 
     private static final String PREF_NODE_ID = "relay_node_id";
     private static final String PREF_NODE_SECRET = "relay_node_secret";
+    private static final String PREF_PICKPICO_RELAY_MIGRATED = "pickpico_relay_migrated_v1";
     private static final long[] RECONNECT_DELAYS_MS = {1000L, 2000L, 4000L, 8000L, 16000L, 30000L};
 
     private final Context context;
@@ -73,6 +77,22 @@ final class RelayClient {
         // cache boundary without rotating the node identity or relay secret. v3 is the
         // Thin MCP profile; v1/v2 remain relay-compatible for existing clients.
         this.remoteEndpoint = this.relayBaseUrl + "/v3/nodes/" + nodeId + "/mcp";
+    }
+
+    static String migrateLegacyRelayIfNeeded(SharedPreferences prefs, String relayBaseUrl) {
+        String normalized = normalizeBaseUrl(relayBaseUrl);
+        if (!LEGACY_RELAY_BASE_URL.equals(normalized)
+                || prefs.getBoolean(PREF_PICKPICO_RELAY_MIGRATED, false)) {
+            return normalized;
+        }
+
+        prefs.edit()
+                .putString(McpNodeService.KEY_RELAY_BASE_URL, DEFAULT_RELAY_BASE_URL)
+                .remove(PREF_NODE_ID)
+                .remove(PREF_NODE_SECRET)
+                .putBoolean(PREF_PICKPICO_RELAY_MIGRATED, true)
+                .apply();
+        return DEFAULT_RELAY_BASE_URL;
     }
 
     void start() {

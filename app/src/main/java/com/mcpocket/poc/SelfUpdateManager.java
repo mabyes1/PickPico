@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class SelfUpdateManager {
     private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;
     private static final long MAX_MANIFEST_BYTES = 256L * 1024L;
-    private static final String DEFAULT_UPDATE_RELAY = "https://relay.mcpocket.workers.dev";
+    private static final String DEFAULT_UPDATE_RELAY = RelayClient.DEFAULT_RELAY_BASE_URL;
     private static final String UPDATE_CHANNEL_ID = "mcpocket_self_update";
     private static final int UPDATE_NOTIFICATION_ID = 8768;
     private static final AtomicBoolean ACTIVE = new AtomicBoolean(false);

@@ -57,6 +57,14 @@ are correlated with that live socket and forwarded to PickPico's local MCP serve
 relay adds `X-PickPico-Tool-Profile: thin-v1` to the loopback request so the same Android runtime can
 serve a small stable top-level MCP registry while `/v1` and `/v2` retain compatibility behavior.
 
+Canonical reference Worker from Android `0.16.1` onward:
+
+```text
+https://pickpico-relay.mcpocket.workers.dev
+```
+
+When a device first migrates from the historical `https://relay.mcpocket.workers.dev` base URL, PickPico rotates its persisted relay Node ID and relay secret before connecting to the new Worker. The old capability URL therefore stops identifying the migrated phone, while unrelated app settings and the local MCP bearer remain untouched.
+
 ## Authentication boundaries
 
 There are deliberately two separate credentials with different jobs:

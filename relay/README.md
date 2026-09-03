@@ -33,7 +33,7 @@ remote HTTPS endpoint instead of the LAN endpoint.
 For the current hackathon/demo environment, the project-operated relay is:
 
 ```text
-https://relay.mcpocket.workers.dev
+https://pickpico-relay.mcpocket.workers.dev
 ```
 
 That endpoint is demo infrastructure, not an unlimited public relay commitment. Open-source users

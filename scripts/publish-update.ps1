@@ -1,5 +1,5 @@
 param(
-    [string]$RelayBaseUrl = 'https://relay.mcpocket.workers.dev',
+    [string]$RelayBaseUrl = 'https://pickpico-relay.mcpocket.workers.dev',
     [string]$KvBinding = 'UPDATE_KV',
     [int]$ChunkSizeMiB = 20,
     [switch]$SkipBuild,
