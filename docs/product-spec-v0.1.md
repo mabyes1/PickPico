@@ -102,9 +102,7 @@ The current compatibility boundary is:
 - `/v1` / `/v2`: full compatibility tool registry for existing clients.
 - `/v3`: Thin MCP profile backed by the same Capability Runtime.
 
-Transport branding is migrated separately from protocol versioning. Starting with Android `0.16.1`, the reference Worker is named `pickpico-relay`. Devices still configured for the legacy `https://relay.mcpocket.workers.dev` bridge migrate once to `https://pickpico-relay.mcpocket.workers.dev`, rotate only the persisted relay Node ID and relay secret, and reconnect with a fresh `/v3/nodes/<new-id>/mcp` capability URL. The legacy Worker remains an upgrade bridge during the transition and shares the update KV channel; it is not the canonical endpoint for new clients.
-
-The remaining `mcpocket` label inside `*.mcpocket.workers.dev` is the Cloudflare account-wide `workers.dev` namespace, not the PickPico Worker name. It cannot be renamed per Worker without changing URLs for unrelated Workers in the same account. A future PickPico-owned custom domain should replace this infrastructure namespace for the public production endpoint.
+Transport branding is migrated separately from protocol versioning. Android `0.16.1` first introduced an intermediate `https://pickpico-relay.mcpocket.workers.dev` bridge. Starting with Android `0.16.3`, PickPico has its own Cloudflare account and canonical reference Worker at `https://relay.pickpico.workers.dev`. Devices still configured for either historical `https://relay.mcpocket.workers.dev` or the intermediate bridge rotate only the persisted relay Node ID and relay secret, then reconnect with a fresh `/v3/nodes/<new-id>/mcp` capability URL. Historical Workers remain temporary upgrade bridges only; they are not canonical endpoints for new clients.
 
 `command_run` can return native MCP image/audio content, so media capabilities do not need dedicated top-level tools.
 

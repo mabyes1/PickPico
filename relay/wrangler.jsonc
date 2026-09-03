@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pickpico-relay",
+  "account_id": "4fb4cc61ab103b04cac2e15a8e6e4a09",
+  "name": "relay",
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",
   "durable_objects": {
@@ -14,7 +15,7 @@
   "kv_namespaces": [
     {
       "binding": "UPDATE_KV",
-      "id": "d1fcd248606a43f6a9a11fc9d1f8cbd7"
+      "id": "c92655d154da45eebace142612f17780"
     }
   ],
   "migrations": [

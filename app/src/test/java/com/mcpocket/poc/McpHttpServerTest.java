@@ -364,6 +364,13 @@ public final class McpHttpServerTest {
     }
 
     @Test
+    public void relayMigrationRecognizesBothHistoricalProjectEndpoints() {
+        assertTrue(RelayClient.isProjectLegacyRelayBaseUrl("https://relay.mcpocket.workers.dev"));
+        assertTrue(RelayClient.isProjectLegacyRelayBaseUrl("https://pickpico-relay.mcpocket.workers.dev/"));
+        assertTrue(!RelayClient.isProjectLegacyRelayBaseUrl("https://relay.pickpico.workers.dev"));
+    }
+
+    @Test
     public void cameraCaptureReturnsNativeMcpImageContent() throws Exception {
         HttpResult response = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":61,\"method\":\"tools/call\"," +

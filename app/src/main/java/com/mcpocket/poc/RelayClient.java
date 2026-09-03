@@ -34,7 +34,8 @@ import okhttp3.WebSocketListener;
  */
 final class RelayClient {
     static final String LEGACY_RELAY_BASE_URL = "https://relay.mcpocket.workers.dev";
-    static final String DEFAULT_RELAY_BASE_URL = "https://pickpico-relay.mcpocket.workers.dev";
+    static final String INTERMEDIATE_RELAY_BASE_URL = "https://pickpico-relay.mcpocket.workers.dev";
+    static final String DEFAULT_RELAY_BASE_URL = "https://relay.pickpico.workers.dev";
 
     interface Listener {
         void onRelayState(String status, String remoteEndpoint, String detail);
@@ -42,7 +43,6 @@ final class RelayClient {
 
     private static final String PREF_NODE_ID = "relay_node_id";
     private static final String PREF_NODE_SECRET = "relay_node_secret";
-    private static final String PREF_PICKPICO_RELAY_MIGRATED = "pickpico_relay_migrated_v1";
     private static final long[] RECONNECT_DELAYS_MS = {1000L, 2000L, 4000L, 8000L, 16000L, 30000L};
 
     private final Context context;
@@ -81,8 +81,7 @@ final class RelayClient {
 
     static String migrateLegacyRelayIfNeeded(SharedPreferences prefs, String relayBaseUrl) {
         String normalized = normalizeBaseUrl(relayBaseUrl);
-        if (!LEGACY_RELAY_BASE_URL.equals(normalized)
-                || prefs.getBoolean(PREF_PICKPICO_RELAY_MIGRATED, false)) {
+        if (!isProjectLegacyRelayBaseUrl(normalized)) {
             return normalized;
         }
 
@@ -90,9 +89,14 @@ final class RelayClient {
                 .putString(McpNodeService.KEY_RELAY_BASE_URL, DEFAULT_RELAY_BASE_URL)
                 .remove(PREF_NODE_ID)
                 .remove(PREF_NODE_SECRET)
-                .putBoolean(PREF_PICKPICO_RELAY_MIGRATED, true)
                 .apply();
         return DEFAULT_RELAY_BASE_URL;
+    }
+
+    static boolean isProjectLegacyRelayBaseUrl(String relayBaseUrl) {
+        String normalized = normalizeBaseUrl(relayBaseUrl);
+        return LEGACY_RELAY_BASE_URL.equals(normalized)
+                || INTERMEDIATE_RELAY_BASE_URL.equals(normalized);
     }
 
     void start() {

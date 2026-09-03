@@ -1,16 +1,16 @@
-# MCPocket Relay
+# PickPico Relay
 
-The relay makes a phone-hosted MCPocket node reachable across NATs and unrelated networks without
+The relay makes a phone-hosted PickPico node reachable across NATs and unrelated networks without
 opening an inbound port on Android.
 
 ```text
-Agent --HTTPS--> Cloudflare Worker / Durable Object --WSS--> MCPocket --HTTP loopback--> :8765/mcp
+Agent --HTTPS--> Cloudflare Worker / Durable Object --WSS--> PickPico --HTTP loopback--> :8765/mcp
 ```
 
-Each MCPocket installation generates a persistent random node ID and a separate relay secret. The
+Each PickPico installation generates a persistent random node ID and a separate relay secret. The
 secret authenticates the phone's outbound WebSocket. The node ID is also the high-entropy capability
 component of the public MCP URL. Remote clients therefore use the endpoint without HTTP
-authentication; MCPocket injects its local bearer token only when replaying the request against the
+authentication; PickPico injects its local bearer token only when replaying the request against the
 phone's loopback MCP server.
 
 ## Deploy
@@ -26,14 +26,14 @@ npx wrangler login
 npx wrangler deploy
 ```
 
-Then paste the resulting `https://...workers.dev` URL into **REMOTE RELAY** in MCPocket and restart
+Then paste the resulting `https://...workers.dev` URL into **REMOTE RELAY** in PickPico and restart
 the node. Once **RELAY STATUS** is `CONNECTED`, **COPY CONNECTION JSON** automatically uses the
 remote HTTPS endpoint instead of the LAN endpoint.
 
 For the current hackathon/demo environment, the project-operated relay is:
 
 ```text
-https://pickpico-relay.mcpocket.workers.dev
+https://relay.pickpico.workers.dev
 ```
 
 That endpoint is demo infrastructure, not an unlimited public relay commitment. Open-source users
