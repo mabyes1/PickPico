@@ -522,6 +522,12 @@ public final class MainActivity extends Activity {
         statusView.setTextColor(running ? Color.rgb(0, 120, 60) : Color.rgb(170, 35, 35));
         endpointView.setText(orDash(prefs.getString(McpNodeService.KEY_ENDPOINT, "")));
         remoteEndpointView.setText(orDash(prefs.getString(McpNodeService.KEY_REMOTE_ENDPOINT, "")));
+        String relayBaseUrl = prefs.getString(McpNodeService.KEY_RELAY_BASE_URL, "");
+        if (relayUrlInput != null
+                && !relayUrlInput.hasFocus()
+                && !TextUtils.equals(relayUrlInput.getText().toString(), relayBaseUrl)) {
+            relayUrlInput.setText(relayBaseUrl);
+        }
         String relayStatus = prefs.getString(McpNodeService.KEY_RELAY_STATUS, "disabled");
         relayStatusView.setText(relayStatus.toUpperCase());
         relayStatusView.setTextColor("connected".equals(relayStatus)
