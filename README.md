@@ -141,7 +141,7 @@ Agent --HTTPS--> PickPico Relay --WSS--> Android PickPico --HTTP loopback--> :87
 | Update | manifest check、signed APK verification、PackageInstaller、Cloudflare Workers KV release channel |
 | Safety boundaries | Android runtime permissions、Device Admin opt-in for lock、app sandbox for shell、separate relay secret/local bearer |
 
-目前 Android source 版本：**0.14.0** (`versionCode 31`)。此版本已發佈到 project update channel，並已驗證實機可從舊品牌版本 `0.13.6` (`versionCode 30`) 經 SHA-256、package identity、signing certificate 與 Android 安裝確認原地升級為 PickPico 0.14.0。
+目前 Android source 版本：**0.14.1** (`versionCode 32`)。`0.14.0` (`versionCode 31`) 已驗證實機可從舊品牌版本 `0.13.6` (`versionCode 30`) 經 SHA-256、package identity、signing certificate 與 Android 安裝確認原地升級為 PickPico；0.14.1 追加 Hyper Mode 的 Restricted settings / Accessibility 人工授權導引。
 
 ## Current implementation snapshot
 
