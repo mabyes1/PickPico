@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,6 +40,34 @@ final class HumanHelpStore {
     private static final long TARGET_STORAGE_BYTES = 80L * 1024L * 1024L;
 
     private HumanHelpStore() {
+    }
+
+    /** Creates a non-blocking Human Help sample used only by the preview build UI. */
+    static synchronized String createPreviewRequest(Context context) throws JSONException {
+        cleanupStorageIfNeeded(context);
+        String requestId = "preview-" + UUID.randomUUID();
+        long createdAtEpochMs = System.currentTimeMillis();
+        int idleTimeoutSeconds = 360;
+        JSONObject request = new JSONObject()
+                .put("requestId", requestId)
+                .put("requestType", "approval")
+                .put("status", "waiting_human")
+                .put("title", "Physical Inspection Required")
+                .put("instruction", "Codex needs a live camera view to identify the device in front of you and continue.")
+                .put("actions", new JSONArray().put("Approve").put("Reject").put("Voice").put("Ask Human"))
+                .put("customAction", "Ask Human")
+                .put("allowTextReply", true)
+                .put("allowImages", true)
+                .put("maxImages", 3)
+                .put("attachments", new JSONArray())
+                .put("createdAt", Instant.now().toString())
+                .put("createdAtEpochMs", createdAtEpochMs)
+                .put("idleTimeoutSeconds", idleTimeoutSeconds)
+                .put("expiresAtEpochMs", createdAtEpochMs + idleTimeoutSeconds * 1000L)
+                .put("openGraceUsed", false)
+                .put("preview", true);
+        save(context, request);
+        return requestId;
     }
 
     static JSONObject createAndWait(Context context, JSONObject arguments, long callCount) throws JSONException {
@@ -57,6 +86,7 @@ final class HumanHelpStore {
                 .put("title", arguments.optString("title", "AI needs your help"))
                 .put("instruction", arguments.optString("instruction", ""))
                 .put("actions", actions)
+                .put("customAction", sanitizedAction(arguments.optString("customAction", "")))
                 .put("allowTextReply", arguments.optBoolean("allowTextReply", true))
                 .put("allowImages", arguments.optBoolean("allowImages", true))
                 .put("maxImages", arguments.optInt("maxImages", 3))
@@ -372,6 +402,69 @@ final class HumanHelpStore {
             result.put("完成").put("做不到");
         }
         return result;
+    }
+
+    static String approveAction(JSONObject request) {
+        return matchingAction(
+                request,
+                new String[]{"允許", "核准", "同意", "完成", "繼續", "allow", "approve", "yes", "ok"},
+                0,
+                "確認繼續");
+    }
+
+    static String rejectAction(JSONObject request) {
+        return matchingAction(
+                request,
+                new String[]{"拒絕", "否決", "做不到", "deny", "reject", "no", "cancel"},
+                1,
+                "拒絕");
+    }
+
+    static String customAction(JSONObject request) {
+        if (request == null) {
+            return "";
+        }
+        String explicit = sanitizedAction(request.optString("customAction", ""));
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+        JSONArray actions = request.optJSONArray("actions");
+        if (actions == null) {
+            return "";
+        }
+        String approve = approveAction(request);
+        String reject = rejectAction(request);
+        for (int index = 0; index < actions.length(); index++) {
+            String action = sanitizedAction(actions.optString(index, ""));
+            String normalized = action.toLowerCase(Locale.ROOT);
+            boolean voice = normalized.contains("voice") || normalized.contains("語音");
+            if (!action.isEmpty() && !action.equals(approve) && !action.equals(reject) && !voice) {
+                return action;
+            }
+        }
+        return "";
+    }
+
+    private static String matchingAction(JSONObject request, String[] words, int fallbackIndex, String fallbackValue) {
+        JSONArray actions = request == null ? null : request.optJSONArray("actions");
+        if (actions == null || actions.length() == 0) {
+            return fallbackValue;
+        }
+        for (int index = 0; index < actions.length(); index++) {
+            String action = sanitizedAction(actions.optString(index, ""));
+            String normalized = action.toLowerCase(Locale.ROOT);
+            for (String word : words) {
+                if (normalized.contains(word.toLowerCase(Locale.ROOT))) {
+                    return action;
+                }
+            }
+        }
+        return sanitizedAction(actions.optString(Math.min(fallbackIndex, actions.length() - 1), fallbackValue));
+    }
+
+    private static String sanitizedAction(String action) {
+        String value = action == null ? "" : action.trim();
+        return value.length() > 80 ? value.substring(0, 80) : value;
     }
 
     private static JSONObject requireWaiting(Context context, String requestId) throws JSONException {

@@ -262,7 +262,7 @@ final class BleButtonBridge {
                 handlePreset(false);
                 break;
             case EVENT_DETAIL:
-                handleDetail();
+                handleCustom();
                 break;
             case EVENT_VOICE_DOWN:
                 handleVoiceDown();
@@ -284,7 +284,9 @@ final class BleButtonBridge {
             }
             cancelVoice();
             String requestId = request.optString("requestId", "");
-            String action = presetAction(request, approve);
+            String action = approve
+                    ? HumanHelpStore.approveAction(request)
+                    : HumanHelpStore.rejectAction(request);
             HumanHelpStore.complete(service, requestId, action, "");
             recordRecent("Button pad: " + (approve ? "approved" : "rejected") + " " + requestId);
         } catch (Exception error) {
@@ -292,22 +294,23 @@ final class BleButtonBridge {
         }
     }
 
-    private void handleDetail() {
+    private void handleCustom() {
         try {
             JSONObject request = HumanHelpStore.latestWaiting(service);
             if (request == null) {
-                recordRecent("Button pad: no pending detail");
+                recordRecent("Button pad: no pending custom action");
                 return;
             }
             String requestId = request.optString("requestId", "");
-            HumanHelpStore.renewHumanActivity(service, requestId, "ble_detail", false);
-            Intent intent = new Intent(service, HumanHelpActivity.class)
-                    .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            service.startActivity(intent);
-            recordRecent("Button pad: opened human-help detail");
+            String action = HumanHelpStore.customAction(request);
+            if (action.isEmpty()) {
+                recordRecent("Button pad: custom action unavailable for " + requestId);
+                return;
+            }
+            HumanHelpStore.complete(service, requestId, action, "");
+            recordRecent("Button pad: custom action " + action + " for " + requestId);
         } catch (Exception error) {
-            recordRecent("Button pad detail failed: " + safeMessage(error));
+            recordRecent("Button pad custom action failed: " + safeMessage(error));
         }
     }
 
@@ -542,27 +545,6 @@ final class BleButtonBridge {
             destroyVoiceSpeechRecognizer();
             voiceRecognitionFinished = true;
         });
-    }
-
-    private String presetAction(JSONObject request, boolean approve) {
-        JSONArray actions = request.optJSONArray("actions");
-        if (actions == null || actions.length() == 0) {
-            return approve ? "允許" : "拒絕";
-        }
-        String[] approveWords = {"允許", "核准", "同意", "完成", "allow", "approve", "yes", "ok"};
-        String[] rejectWords = {"拒絕", "否決", "做不到", "deny", "reject", "no", "cancel"};
-        String[] words = approve ? approveWords : rejectWords;
-        for (int index = 0; index < actions.length(); index++) {
-            String action = actions.optString(index, "");
-            String normalized = action.toLowerCase(Locale.ROOT);
-            for (String word : words) {
-                if (normalized.contains(word.toLowerCase(Locale.ROOT))) {
-                    return action;
-                }
-            }
-        }
-        int fallback = approve ? 0 : Math.min(1, actions.length() - 1);
-        return actions.optString(fallback, approve ? "允許" : "拒絕");
     }
 
     private boolean hasBluetoothPermissions() {

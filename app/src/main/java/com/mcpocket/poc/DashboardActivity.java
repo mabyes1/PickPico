@@ -40,6 +40,7 @@ import android.view.Window;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -77,15 +78,16 @@ public final class DashboardActivity extends Activity {
     static final int PAGE_SETTINGS = 2;
     private static final int PAGE_REMOTE = 3;
     private static final int PAGE_DEVELOPER = 4;
+    private static final int PAGE_APPEARANCE = 5;
 
-    private static final int BG = Color.rgb(6, 8, 10);
-    private static final int TEXT = Color.rgb(242, 246, 248);
-    private static final int MUTED = Color.rgb(139, 149, 158);
-    private static final int DIM = Color.rgb(91, 101, 111);
-    private static final int GREEN = Color.rgb(61, 214, 129);
-    private static final int AMBER = Color.rgb(246, 169, 69);
-    private static final int RED = Color.rgb(255, 91, 99);
-    private static final int BLUE = Color.rgb(92, 177, 255);
+    private static final int BG = Color.rgb(18, 21, 24);
+    private static final int TEXT = Color.rgb(244, 247, 249);
+    private static final int MUTED = Color.rgb(184, 195, 203);
+    private static final int DIM = Color.rgb(125, 136, 153);
+    private static final int GREEN = Color.rgb(116, 199, 165);
+    private static final int AMBER = Color.rgb(230, 182, 106);
+    private static final int RED = Color.rgb(240, 113, 120);
+    private static final int BLUE = Color.rgb(174, 230, 255);
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable refreshTask = new Runnable() {
@@ -98,6 +100,7 @@ public final class DashboardActivity extends Activity {
 
     private FrameLayout contentHost;
     private TextView topBack;
+    private ImageView topBrandLogo;
     private TextView topTitle;
     private TextView topMeta;
     private TextView topStatusDot;
@@ -138,6 +141,7 @@ public final class DashboardActivity extends Activity {
     private TextView screenCaptureDetail;
 
     // Settings / update
+    private TextView settingsApprovalState;
     private TextView settingsRemoteState;
     private TextView settingsVersionState;
     private TextView settingsUpdateState;
@@ -200,7 +204,7 @@ public final class DashboardActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (currentPage == PAGE_REMOTE || currentPage == PAGE_DEVELOPER) {
+        if (currentPage == PAGE_REMOTE || currentPage == PAGE_DEVELOPER || currentPage == PAGE_APPEARANCE) {
             showPage(PAGE_SETTINGS);
             return;
         }
@@ -246,15 +250,17 @@ public final class DashboardActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         shell.addView(buildTopBar(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(88)));
 
         contentHost = new FrameLayout(this);
         shell.addView(contentHost, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         bottomNav = buildBottomNav();
-        shell.addView(bottomNav, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
+        LinearLayout.LayoutParams navLayout = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(76));
+        navLayout.setMargins(dp(18), 0, dp(18), dp(8));
+        shell.addView(bottomNav, navLayout);
         return stage;
     }
 
@@ -262,29 +268,41 @@ public final class DashboardActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(16), dp(8), dp(16), 0);
+        bar.setPadding(dp(24), dp(14), dp(24), dp(4));
 
         topBack = text("‹", 34, Typeface.NORMAL, TEXT);
         topBack.setGravity(Gravity.CENTER);
         topBack.setVisibility(View.GONE);
         topBack.setOnClickListener(v -> onBackPressed());
-        bar.addView(topBack, new LinearLayout.LayoutParams(dp(38), dp(48)));
+        bar.addView(topBack, new LinearLayout.LayoutParams(dp(34), dp(50)));
+
+        topBrandLogo = new ImageView(this);
+        topBrandLogo.setImageBitmap(PickPicoBrand.whiteLogo());
+        topBrandLogo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        topBrandLogo.setAdjustViewBounds(true);
+        topBrandLogo.setVisibility(View.GONE);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+        logoParams.rightMargin = dp(10);
+        bar.addView(topBrandLogo, logoParams);
 
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         titles.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
 
-        topTitle = text("PickPico", 23, Typeface.BOLD, TEXT);
+        topTitle = text("PickPico", 27, Typeface.BOLD, TEXT);
         titles.addView(topTitle);
 
-        topMeta = text("MOBILE AGENT NODE", 10, Typeface.BOLD, DIM);
-        topMeta.setLetterSpacing(0.08f);
+        topMeta = text("", 10, Typeface.BOLD, BLUE);
+        topMeta.setLetterSpacing(0.10f);
+        topMeta.setPadding(0, dp(4), 0, 0);
         titles.addView(topMeta);
 
-        topStatusDot = text("●", 13, Typeface.BOLD, DIM);
+        topStatusDot = text("● ACTIVE", 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
-        bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(28), dp(48)));
+        topStatusDot.setLetterSpacing(.035f);
+        topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
+        bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(84), dp(34)));
         return bar;
     }
 
@@ -297,15 +315,15 @@ public final class DashboardActivity extends Activity {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER_VERTICAL);
-        nav.setPadding(dp(10), dp(7), dp(10), dp(8));
-        nav.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
-        nav.setElevation(dp(16));
+        nav.setPadding(dp(8), dp(7), dp(8), dp(7));
+        nav.setBackground(PickPicoTheme.strongGlass(theme, dp(26)));
+        nav.setElevation(dp(8));
 
-        navHome = navItem("HOME", () -> showPage(PAGE_HOME));
-        TextView navInbox = navItem("INBOX", () ->
+        navHome = navItem("⌂", "HOME", () -> showPage(PAGE_HOME));
+        TextView navInbox = navItem("◷", "ACTIVITY", () ->
                 startActivity(new Intent(this, AgentInboxActivity.class)));
-        navCapabilities = navItem("CAPABILITIES", () -> showPage(PAGE_CAPABILITIES));
-        navSettings = navItem("SETTINGS", () -> showPage(PAGE_SETTINGS));
+        navCapabilities = navItem("▦", "CAPABILITIES", () -> showPage(PAGE_CAPABILITIES));
+        navSettings = navItem("⚙", "SETTINGS", () -> showPage(PAGE_SETTINGS));
 
         nav.addView(navHome, navParams());
         nav.addView(navInbox, navParams());
@@ -318,10 +336,11 @@ public final class DashboardActivity extends Activity {
         return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
     }
 
-    private TextView navItem(String label, Runnable action) {
-        TextView item = text(label, 10, Typeface.BOLD, MUTED);
+    private TextView navItem(String icon, String label, Runnable action) {
+        TextView item = text(icon + "\n" + label, 10, Typeface.BOLD, MUTED);
         item.setGravity(Gravity.CENTER);
-        item.setLetterSpacing(0.04f);
+        item.setLetterSpacing(0.055f);
+        item.setLineSpacing(0f, 1.18f);
         item.setOnClickListener(v -> action.run());
         return item;
     }
@@ -338,16 +357,19 @@ public final class DashboardActivity extends Activity {
             configureTopBar("Capabilities", "WHAT AGENTS CAN DO", false);
         } else if (page == PAGE_SETTINGS) {
             content = buildSettingsPage();
-            configureTopBar("Settings", "PICKPICO", false);
+            configureTopBar("Settings", "", false);
         } else if (page == PAGE_REMOTE) {
             content = buildRemoteAccessPage();
             configureTopBar("Remote Access", "CONNECT FROM ANYWHERE", true);
         } else if (page == PAGE_DEVELOPER) {
             content = buildDeveloperPage();
             configureTopBar("Developer / Diagnostics", "ADVANCED", true);
+        } else if (page == PAGE_APPEARANCE) {
+            content = buildAppearancePage();
+            configureTopBar("Appearance", "PERSONALIZATION", true);
         } else {
             content = buildHomePage();
-            configureTopBar("PickPico", "MOBILE AGENT NODE", false);
+            configureTopBar("PickPico", "", false);
         }
 
         contentHost.addView(content, new FrameLayout.LayoutParams(
@@ -358,14 +380,17 @@ public final class DashboardActivity extends Activity {
     }
 
     private void configureTopBar(String title, String meta, boolean back) {
+        boolean homeBrand = currentPage == PAGE_HOME && !back;
+        topBrandLogo.setVisibility(homeBrand ? View.VISIBLE : View.GONE);
         topTitle.setText(title);
         topMeta.setText(meta);
+        topMeta.setVisibility(TextUtils.isEmpty(meta) ? View.GONE : View.VISIBLE);
         topBack.setVisibility(back ? View.VISIBLE : View.GONE);
     }
 
     private void updateBottomNav() {
         int active = currentPage;
-        if (active == PAGE_REMOTE || active == PAGE_DEVELOPER) {
+        if (active == PAGE_REMOTE || active == PAGE_DEVELOPER || active == PAGE_APPEARANCE) {
             active = PAGE_SETTINGS;
         }
         setNavActive(navHome, active == PAGE_HOME);
@@ -375,7 +400,7 @@ public final class DashboardActivity extends Activity {
 
     private void setNavActive(TextView view, boolean active) {
         applyTextColor(view, active ? GREEN : MUTED);
-        view.setBackground(active ? pillDrawable(Color.argb(28, 61, 214, 129), Color.argb(80, 61, 214, 129)) : null);
+        view.setBackground(active ? PickPicoTheme.control(theme, dp(14), GREEN, true) : null);
     }
 
     private void clearPageReferences() {
@@ -402,6 +427,7 @@ public final class DashboardActivity extends Activity {
         screenCaptureSwitch = null;
         screenCaptureDetail = null;
 
+        settingsApprovalState = null;
         settingsRemoteState = null;
         settingsVersionState = null;
         settingsUpdateState = null;
@@ -423,6 +449,9 @@ public final class DashboardActivity extends Activity {
     private View buildHomePage() {
         LinearLayout root = pageRoot();
 
+        TextView nodeHeading = sectionLabel("NODE STATUS");
+        root.addView(nodeHeading);
+
         LinearLayout readyCard = glassCard(true);
         LinearLayout readyHeading = new LinearLayout(this);
         readyHeading.setOrientation(LinearLayout.HORIZONTAL);
@@ -431,74 +460,95 @@ public final class DashboardActivity extends Activity {
 
         TextView readyDot = text("●", 18, Typeface.BOLD, GREEN);
         readyHeading.addView(readyDot, new LinearLayout.LayoutParams(dp(28), ViewGroup.LayoutParams.WRAP_CONTENT));
-        homeReadyTitle = text("READY · LOCAL", 19, Typeface.BOLD, GREEN);
+        homeReadyTitle = text("READY", 19, Typeface.BOLD, GREEN);
         readyHeading.addView(homeReadyTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        homeReadyDetail = text("PickPico is available to agents on this network.", 13, Typeface.NORMAL, MUTED);
+        homeReadyDetail = text("Local connection available · PickPico is ready for agents.", 13, Typeface.NORMAL, MUTED);
         homeReadyDetail.setPadding(0, dp(7), 0, dp(12));
         readyCard.addView(homeReadyDetail);
 
-        homeCopyAction = actionButton("COPY CONNECTION", false, false);
+        LinearLayout nodeActions = new LinearLayout(this);
+        nodeActions.setOrientation(LinearLayout.HORIZONTAL);
+        readyCard.addView(nodeActions);
+
+        homeCopyAction = actionButton("COPY", false, false);
         homeCopyAction.setOnClickListener(v -> copyConnection());
-        readyCard.addView(homeCopyAction, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+        nodeActions.addView(homeCopyAction, new LinearLayout.LayoutParams(0, dp(42), 1f));
+
+        homeNodeAction = actionButton("STOP", true, true);
+        homeNodeAction.setOnClickListener(v -> toggleNodeFromHome());
+        LinearLayout.LayoutParams nodeActionParams = new LinearLayout.LayoutParams(dp(92), dp(42));
+        nodeActionParams.leftMargin = dp(8);
+        nodeActions.addView(homeNodeAction, nodeActionParams);
         root.addView(readyCard, cardParams(0));
 
+        TextView setupHeading = sectionLabel("YOUR SETUP");
+        setupHeading.setPadding(0, dp(20), 0, dp(7));
+        root.addView(setupHeading);
+
         LinearLayout remote = homeRowCard(
-                "REMOTE ACCESS",
-                "Let cloud agents reach this phone outside your local network.",
+                "⌁",
+                "CONNECTION",
+                "Local access is ready. Remote access is optional.",
                 () -> showPage(PAGE_REMOTE));
         homeRemoteState = rowState(remote, "NOT CONFIGURED", AMBER);
         homeRemoteDetail = findDetail(remote);
         root.addView(remote, cardParams(12));
 
         LinearLayout approval = homeRowCard(
-                "APPROVAL MODE",
-                "Controls how much autonomy PickPico gives an agent.",
-                this::showApprovalModeDialog);
+                "✓",
+                "AGENT APPROVAL",
+                "Choose when an agent must ask before acting.",
+                () -> showPage(PAGE_SETTINGS));
         homeApprovalState = rowState(approval, "AUTO APPROVE", GREEN);
         root.addView(approval, cardParams(12));
 
-        LinearLayout inbox = homeRowCard(
-                "AGENT INBOX",
-                "Messages and requests kept by PickPico.",
-                () -> startActivity(new Intent(this, AgentInboxActivity.class)));
-        homeInboxState = rowState(inbox, "0 MESSAGES", BLUE);
-        root.addView(inbox, cardParams(12));
-
         LinearLayout capabilities = homeRowCard(
-                "CAPABILITIES",
-                "Manage what agents can use on this device.",
+                "▦",
+                "AGENT ACCESS",
+                "Review the phone features available to agents.",
                 () -> showPage(PAGE_CAPABILITIES));
         homeCapabilitiesState = rowState(capabilities, "CHECKING", MUTED);
         root.addView(capabilities, cardParams(12));
 
-        LinearLayout node = glassCard(false);
-        LinearLayout nodeLine = new LinearLayout(this);
-        nodeLine.setOrientation(LinearLayout.HORIZONTAL);
-        nodeLine.setGravity(Gravity.CENTER_VERTICAL);
-        node.addView(nodeLine);
+        TextView activityHeading = sectionLabel("ACTIVITY");
+        activityHeading.setPadding(0, dp(20), 0, dp(7));
+        root.addView(activityHeading);
 
-        LinearLayout nodeText = new LinearLayout(this);
-        nodeText.setOrientation(LinearLayout.VERTICAL);
-        nodeLine.addView(nodeText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView nodeTitle = text("NODE", 12, Typeface.BOLD, TEXT);
-        nodeTitle.setLetterSpacing(0.05f);
-        nodeText.addView(nodeTitle);
-        homeNodeState = text("RUNNING", 13, Typeface.BOLD, GREEN);
-        homeNodeState.setPadding(0, dp(5), 0, 0);
-        nodeText.addView(homeNodeState);
+        LinearLayout inbox = homeRowCard(
+                "◷",
+                "RECENT ACTIVITY",
+                "Requests, messages, and human handoffs.",
+                () -> startActivity(new Intent(this, AgentInboxActivity.class)));
+        homeInboxState = rowState(inbox, "0 ITEMS", BLUE);
+        root.addView(inbox, cardParams(7));
 
-        homeNodeAction = actionButton("STOP", true, true);
-        homeNodeAction.setOnClickListener(v -> toggleNodeFromHome());
-        nodeLine.addView(homeNodeAction, new LinearLayout.LayoutParams(dp(92), dp(42)));
-        root.addView(node, cardParams(12));
+        if ("preview".equals(BuildConfig.BUILD_TYPE)) {
+            LinearLayout preview = homeRowCard(
+                    "✦",
+                    "OPEN HUMAN HELP PREVIEW",
+                    "See the live Human Help experience.",
+                    this::openHumanHelpPreview);
+            preview.setBackground(PickPicoTheme.card(theme, dp(22), true));
+            rowState(preview, "PREVIEW", BLUE);
+            root.addView(preview, cardParams(12));
+        }
 
         addBottomSpace(root);
         return pageScroll(root);
     }
 
-    private LinearLayout homeRowCard(String title, String detail, Runnable action) {
+    private void openHumanHelpPreview() {
+        try {
+            String requestId = HumanHelpStore.createPreviewRequest(this);
+            startActivity(new Intent(this, HumanHelpActivity.class)
+                    .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId));
+        } catch (Exception error) {
+            Toast.makeText(this, "Unable to open Human Help preview", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private LinearLayout homeRowCard(String icon, String title, String detail, Runnable action) {
         LinearLayout card = glassCard(false);
         card.setOnClickListener(v -> action.run());
 
@@ -507,8 +557,16 @@ public final class DashboardActivity extends Activity {
         heading.setGravity(Gravity.CENTER_VERTICAL);
         card.addView(heading);
 
+        TextView badge = text(icon, 19, Typeface.NORMAL, BLUE);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(PickPicoTheme.control(theme, dp(14), BLUE, false));
+        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(46), dp(46));
+        badgeParams.rightMargin = dp(14);
+        heading.addView(badge, badgeParams);
+
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setTag("copy");
         heading.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView titleView = text(title, 14, Typeface.BOLD, TEXT);
@@ -528,7 +586,7 @@ public final class DashboardActivity extends Activity {
 
     private TextView rowState(LinearLayout card, String initial, int color) {
         LinearLayout heading = (LinearLayout) card.getChildAt(0);
-        LinearLayout copy = (LinearLayout) heading.getChildAt(0);
+        LinearLayout copy = findCopyColumn(heading);
         TextView state = text(initial, 11, Typeface.BOLD, color);
         state.setLetterSpacing(0.035f);
         state.setPadding(0, dp(8), 0, 0);
@@ -538,7 +596,7 @@ public final class DashboardActivity extends Activity {
 
     private TextView findDetail(LinearLayout card) {
         LinearLayout heading = (LinearLayout) card.getChildAt(0);
-        LinearLayout copy = (LinearLayout) heading.getChildAt(0);
+        LinearLayout copy = findCopyColumn(heading);
         for (int i = 0; i < copy.getChildCount(); i++) {
             View child = copy.getChildAt(i);
             if (child instanceof TextView && "detail".equals(child.getTag())) {
@@ -548,66 +606,103 @@ public final class DashboardActivity extends Activity {
         return null;
     }
 
+    private LinearLayout findCopyColumn(LinearLayout heading) {
+        for (int i = 0; i < heading.getChildCount(); i++) {
+            View child = heading.getChildAt(i);
+            if (child instanceof LinearLayout && "copy".equals(child.getTag())) {
+                return (LinearLayout) child;
+            }
+        }
+        return (LinearLayout) heading.getChildAt(0);
+    }
+
     private View buildCapabilitiesPage() {
         LinearLayout root = pageRoot();
 
-        TextView intro = text("PickPico only exposes capabilities you allow. Android system grants remain the final security boundary.", 13, Typeface.NORMAL, MUTED);
+        TextView intro = text("Control what agents can access on this phone. Android permissions remain the final boundary.", 13, Typeface.NORMAL, MUTED);
         intro.setPadding(dp(2), 0, dp(2), dp(14));
         root.addView(intro);
 
-        TextView deviceHeading = sectionLabel("DEVICE CONTROLS");
-        root.addView(deviceHeading);
+        TextView runtimeHeading = sectionLabel("EXECUTE · CORE RUNTIME");
+        root.addView(runtimeHeading);
 
-        LinearLayout deviceCard = glassCard(false);
-        cameraSwitch = capabilityRow(deviceCard, "Camera", "Allow agents to capture photos.", checked -> {
+        LinearLayout runtimeCard = glassCard(false);
+        runtimeCard.setOrientation(LinearLayout.HORIZONTAL);
+        runtimeCard.setGravity(Gravity.CENTER_VERTICAL);
+        TextView runtimeBadge = text(">_", 15, Typeface.BOLD, GREEN);
+        runtimeBadge.setGravity(Gravity.CENTER);
+        runtimeBadge.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
+        runtimeCard.addView(runtimeBadge, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        LinearLayout runtimeCopy = new LinearLayout(this);
+        runtimeCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams runtimeCopyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        runtimeCopyParams.leftMargin = dp(14);
+        runtimeCard.addView(runtimeCopy, runtimeCopyParams);
+        runtimeCopy.addView(text("Workspace, shell, background sessions, and embedded Node", 14, Typeface.BOLD, TEXT));
+        TextView runtimeDetail = text("Built into PickPico and available while the Node is running.", 12, Typeface.NORMAL, MUTED);
+        runtimeDetail.setPadding(0, dp(5), 0, 0);
+        runtimeCopy.addView(runtimeDetail);
+        root.addView(runtimeCard, cardParams(7));
+
+        TextView senseHeading = sectionLabel("SENSE · PHONE DATA");
+        senseHeading.setPadding(0, dp(20), 0, dp(7));
+        root.addView(senseHeading);
+
+        LinearLayout senseCard = glassCard(false);
+        cameraSwitch = capabilityRow(senseCard, "Camera", "Allow agents to capture photos.", checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
             else openAppPermissionSettings("Disable Camera permission in Android settings.");
         });
-        addDivider(deviceCard);
+        addDivider(senseCard);
 
-        microphoneSwitch = capabilityRow(deviceCard, "Microphone", "Allow agents to record short audio clips.", checked -> {
+        microphoneSwitch = capabilityRow(senseCard, "Microphone", "Allow agents to record short audio clips.", checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
             else openAppPermissionSettings("Disable Microphone permission in Android settings.");
         });
-        addDivider(deviceCard);
+        addDivider(senseCard);
 
-        locationSwitch = capabilityRow(deviceCard, "Location", "Allow agents to read this phone's location.", checked -> {
+        locationSwitch = capabilityRow(senseCard, "Location", "Allow agents to read this phone's location.", checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
             else openAppPermissionSettings("Disable Location permission in Android settings.");
         });
-        addDivider(deviceCard);
+        addDivider(senseCard);
 
-        contactsSwitch = capabilityRow(deviceCard, "Contacts", "Allow agents to search and read contacts.", checked -> {
+        contactsSwitch = capabilityRow(senseCard, "Contacts", "Allow agents to search and read contacts.", checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, REQUEST_CONTACTS);
             else openAppPermissionSettings("Disable Contacts permission in Android settings.");
         });
-        addDivider(deviceCard);
+        addDivider(senseCard);
 
-        calendarSwitch = capabilityRow(deviceCard, "Calendar", "Allow agents to read and manage calendar events.", checked -> {
+        calendarSwitch = capabilityRow(senseCard, "Calendar", "Allow agents to read and manage calendar events.", checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR}, REQUEST_CALENDAR);
             else openAppPermissionSettings("Disable Calendar permission in Android settings.");
         });
-        addDivider(deviceCard);
+        addDivider(senseCard);
 
-        notificationSwitch = capabilityRow(deviceCard, "Read notifications", "Allow agents to inspect active Android notifications.", checked -> {
+        notificationSwitch = capabilityRow(senseCard, "Notifications", "Allow agents to inspect active Android notifications.", checked -> {
             if (updatingUi) return;
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
-        addDivider(deviceCard);
+        root.addView(senseCard, cardParams(7));
 
-        lockPhoneSwitch = capabilityRow(deviceCard, "Lock phone", "Allow agents to lock this device.", checked -> {
+        TextView interactHeading = sectionLabel("INTERACT · DEVICE ACTIONS");
+        interactHeading.setPadding(0, dp(20), 0, dp(7));
+        root.addView(interactHeading);
+
+        LinearLayout interactCard = glassCard(false);
+        lockPhoneSwitch = capabilityRow(interactCard, "Lock phone", "Allow agents to lock this device.", checked -> {
             if (updatingUi) return;
             if (checked) requestDeviceAdmin();
             else disableDeviceAdmin();
         });
-        root.addView(deviceCard, cardParams(7));
+        root.addView(interactCard, cardParams(7));
 
-        TextView advancedHeading = sectionLabel("ADVANCED CAPABILITIES");
+        TextView advancedHeading = sectionLabel("HYPER · ADVANCED ACCESS");
         advancedHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(advancedHeading);
 
@@ -654,10 +749,17 @@ public final class DashboardActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(7), 0, dp(7));
+        row.setPadding(0, dp(9), 0, dp(9));
         parent.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView badge = text(capabilityGlyph(title), 18, Typeface.NORMAL, BLUE);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(PickPicoTheme.control(theme, dp(14), BLUE, false));
+        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+        badgeParams.rightMargin = dp(13);
+        row.addView(badge, badgeParams);
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -677,10 +779,36 @@ public final class DashboardActivity extends Activity {
         return toggle;
     }
 
+    private String capabilityGlyph(String title) {
+        String value = title == null ? "" : title.toLowerCase(Locale.ROOT);
+        if (value.contains("camera")) return "◉";
+        if (value.contains("microphone")) return "◍";
+        if (value.contains("location")) return "⌖";
+        if (value.contains("contact")) return "○";
+        if (value.contains("calendar")) return "▣";
+        if (value.contains("notification")) return "♢";
+        if (value.contains("lock")) return "◇";
+        if (value.contains("hyper")) return "⚡";
+        if (value.contains("accessibility")) return "◎";
+        if (value.contains("screen")) return "▤";
+        return "•";
+    }
+
     private View buildSettingsPage() {
         LinearLayout root = pageRoot();
 
+        TextView behaviorHeading = sectionLabel("AGENT BEHAVIOR");
+        root.addView(behaviorHeading);
+
+        LinearLayout approval = settingsRow(
+                "Approval Policy",
+                "Choose when an agent must ask before it performs an action.",
+                this::showApprovalModeDialog);
+        settingsApprovalState = rowState(approval, "AUTO APPROVE", GREEN);
+        root.addView(approval, cardParams(7));
+
         TextView connectionHeading = sectionLabel("CONNECTION");
+        connectionHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(connectionHeading);
 
         LinearLayout remote = settingsRow(
@@ -693,13 +821,18 @@ public final class DashboardActivity extends Activity {
         TextView appearanceHeading = sectionLabel("APPEARANCE");
         appearanceHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(appearanceHeading);
-        root.addView(buildAppearanceCard(), cardParams(7));
+        LinearLayout appearance = settingsRow(
+                "Theme",
+                "Background color, glass style, transparency, and highlights.",
+                () -> showPage(PAGE_APPEARANCE));
+        rowState(appearance, "CUSTOMIZE", DIM);
+        root.addView(appearance, cardParams(7));
 
         TextView appHeading = sectionLabel("APP");
         appHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(appHeading);
 
-        LinearLayout update = glassCard(false);
+        LinearLayout update = glassCard(true);
         TextView updateTitle = text("PickPico Update", 14, Typeface.BOLD, TEXT);
         update.addView(updateTitle);
         settingsVersionState = text("Version —", 12, Typeface.NORMAL, MUTED);
@@ -708,7 +841,7 @@ public final class DashboardActivity extends Activity {
         settingsUpdateState = text("Checking update state…", 11, Typeface.BOLD, DIM);
         settingsUpdateState.setPadding(0, dp(8), 0, dp(11));
         update.addView(settingsUpdateState);
-        updateAction = actionButton("CHECK / INSTALL UPDATE", false, false);
+        updateAction = actionButton("CHECK FOR UPDATE", false, false);
         updateAction.setOnClickListener(v -> checkOrInstallUpdate());
         update.addView(updateAction, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
@@ -725,6 +858,16 @@ public final class DashboardActivity extends Activity {
         rowState(diagnostics, "ADVANCED", DIM);
         root.addView(diagnostics, cardParams(7));
 
+        addBottomSpace(root);
+        return pageScroll(root);
+    }
+
+    private View buildAppearancePage() {
+        LinearLayout root = pageRoot();
+        TextView intro = text("Appearance changes apply immediately across PickPico. These controls do not affect Agent permissions or behavior.", 13, Typeface.NORMAL, MUTED);
+        intro.setPadding(dp(2), 0, dp(2), dp(14));
+        root.addView(intro);
+        root.addView(buildAppearanceCard(), cardParams(0));
         addBottomSpace(root);
         return pageScroll(root);
     }
@@ -1145,7 +1288,20 @@ public final class DashboardActivity extends Activity {
     }
 
     private LinearLayout settingsRow(String title, String detail, Runnable action) {
-        return homeRowCard(title.toUpperCase(), detail, action);
+        String normalized = title.toLowerCase(Locale.ROOT);
+        String icon;
+        if (normalized.contains("approval")) {
+            icon = "✓";
+        } else if (normalized.contains("remote")) {
+            icon = "☁";
+        } else if (normalized.contains("theme")) {
+            icon = "✦";
+        } else if (normalized.contains("developer")) {
+            icon = "</>";
+        } else {
+            icon = "•";
+        }
+        return homeRowCard(icon, title.toUpperCase(), detail, action);
     }
 
     private View buildRemoteAccessPage() {
@@ -1280,7 +1436,7 @@ public final class DashboardActivity extends Activity {
     private LinearLayout pageRoot() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(8), dp(16), dp(18));
+        root.setPadding(dp(24), dp(14), dp(24), dp(26));
         return root;
     }
 
@@ -1298,9 +1454,9 @@ public final class DashboardActivity extends Activity {
     private LinearLayout glassCard(boolean accented) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(15), dp(14), dp(15), dp(14));
-        card.setBackground(PickPicoTheme.card(theme, dp(18), accented));
-        card.setElevation(dp(14));
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        card.setBackground(PickPicoTheme.card(theme, dp(22), accented));
+        card.setElevation(dp(6));
         themedCards.add(new ThemedCardRef(card, accented));
         return card;
     }
@@ -1314,9 +1470,9 @@ public final class DashboardActivity extends Activity {
     }
 
     private TextView sectionLabel(String value) {
-        TextView view = text(value, 10, Typeface.BOLD, MUTED);
-        view.setLetterSpacing(0.08f);
-        view.setPadding(dp(2), 0, 0, dp(7));
+        TextView view = text(value, 10, Typeface.BOLD, DIM);
+        view.setLetterSpacing(0.12f);
+        view.setPadding(dp(2), 0, 0, dp(9));
         return view;
     }
 
@@ -1374,10 +1530,10 @@ public final class DashboardActivity extends Activity {
 
     private TextView actionButton(String label, boolean danger, boolean compact) {
         int accent = danger ? RED : GREEN;
-        TextView button = text(label, compact ? 11 : 11, Typeface.BOLD, danger ? RED : TEXT);
+        TextView button = text(label, 11, Typeface.BOLD, danger ? RED : TEXT);
         button.setGravity(Gravity.CENTER);
-        button.setLetterSpacing(0.05f);
-        button.setBackground(PickPicoTheme.control(theme, dp(12), accent, true));
+        button.setLetterSpacing(0.065f);
+        button.setBackground(PickPicoTheme.control(theme, dp(13), accent, true));
         return button;
     }
 
@@ -1437,7 +1593,9 @@ public final class DashboardActivity extends Activity {
             String dotState = !running
                     ? "Node stopped"
                     : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready";
+            topStatusDot.setText(running ? "● ACTIVE" : "● STOPPED");
             applyTextColor(topStatusDot, dotColor);
+            topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), dotColor, false));
             topStatusDot.setContentDescription(dotState);
         }
 
@@ -1460,13 +1618,13 @@ public final class DashboardActivity extends Activity {
 
         if (homeRemoteState != null) {
             if (!relayConfigured) {
-                setState(homeRemoteState, "NOT CONFIGURED", AMBER);
-                if (homeRemoteDetail != null) homeRemoteDetail.setText("Set up a relay to allow remote agents to connect.");
+                setState(homeRemoteState, "LOCAL READY", GREEN);
+                if (homeRemoteDetail != null) homeRemoteDetail.setText("Remote access is not configured (optional).");
             } else if (relayConnected) {
-                setState(homeRemoteState, "CONNECTED", GREEN);
+                setState(homeRemoteState, "LOCAL + RELAY", GREEN);
                 if (homeRemoteDetail != null) homeRemoteDetail.setText("Cloud agents can reach this phone from outside your LAN.");
             } else {
-                setState(homeRemoteState, relayStatus.toUpperCase(), AMBER);
+                setState(homeRemoteState, "LOCAL · RELAY " + relayStatus.toUpperCase(), AMBER);
                 if (homeRemoteDetail != null) homeRemoteDetail.setText("Relay is configured but not currently connected.");
             }
         }
@@ -1482,9 +1640,20 @@ public final class DashboardActivity extends Activity {
             }
         }
 
+        if (settingsApprovalState != null) {
+            String approval = McpocketPolicySettings.approvalMode(this);
+            if (McpocketPolicySettings.APPROVAL_ASK.equals(approval)) {
+                setState(settingsApprovalState, "ASK ME", BLUE);
+            } else if (McpocketPolicySettings.APPROVAL_YOLO.equals(approval)) {
+                setState(settingsApprovalState, "YOLO MODE", RED);
+            } else {
+                setState(settingsApprovalState, "AUTO APPROVE", GREEN);
+            }
+        }
+
         if (homeInboxState != null) {
             int inbox = AgentInboxStore.count(this);
-            setState(homeInboxState, inbox == 1 ? "1 MESSAGE" : inbox + " MESSAGES", inbox > 0 ? BLUE : DIM);
+            setState(homeInboxState, inbox == 1 ? "1 ITEM" : inbox + " ITEMS", inbox > 0 ? BLUE : DIM);
         }
 
         if (homeCapabilitiesState != null) {
@@ -1493,8 +1662,10 @@ public final class DashboardActivity extends Activity {
             setState(homeCapabilitiesState, value, needSetup > 0 ? AMBER : GREEN);
         }
 
-        if (homeNodeState != null) {
-            setState(homeNodeState, running ? "RUNNING" : "STOPPED", running ? GREEN : RED);
+        if (homeNodeAction != null) {
+            if (homeNodeState != null) {
+                setState(homeNodeState, running ? "RUNNING" : "STOPPED", running ? GREEN : RED);
+            }
             homeNodeAction.setText(running ? "STOP" : "START");
             applyTextColor(homeNodeAction, running ? RED : GREEN);
             homeNodeAction.setBackground(pillDrawable(

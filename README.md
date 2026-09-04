@@ -113,7 +113,8 @@ HUMAN HELP 是 Agent 面對真實世界阻礙時的標準出口：
   "arguments": {
     "title": "請協助確認設備狀態",
     "instruction": "請查看面板上的綠燈是否亮起；若不確定，可以直接拍照。",
-    "actions": ["綠燈有亮", "沒有亮", "無法確認"],
+    "actions": ["綠燈有亮", "沒有亮"],
+    "customAction": "無法確認",
     "allowTextReply": true,
     "allowImages": true,
     "maxImages": 3,
