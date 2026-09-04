@@ -18,11 +18,13 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -80,7 +82,8 @@ final class AndroidDeviceCapabilities {
                 .put("microphonePermission", hasPermission(Manifest.permission.RECORD_AUDIO))
                 .put("notificationPermission", notificationPermissionGranted())
                 .put("cameraForegroundType", foregroundTypeActive(ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA))
-                .put("microphoneForegroundType", foregroundTypeActive(ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE));
+                .put("microphoneForegroundType", foregroundTypeActive(ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE))
+                .put("audio", inspectMediaAudio(false));
         if (ttsReady.getCount() == 0L) {
             result.put("ttsReady", ttsInitStatus == TextToSpeech.SUCCESS);
         } else {
@@ -352,11 +355,14 @@ final class AndroidDeviceCapabilities {
         }
         tts.setSpeechRate(rate);
         tts.setPitch(pitch);
+        JSONObject audioState = inspectMediaAudio(true);
         String utteranceId = "mcpocket-" + UUID.randomUUID();
+        Bundle speechParameters = new Bundle();
+        speechParameters.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
         int result = tts.speak(
                 text,
                 "add".equals(queue) ? TextToSpeech.QUEUE_ADD : TextToSpeech.QUEUE_FLUSH,
-                null,
+                speechParameters,
                 utteranceId);
         if (result != TextToSpeech.SUCCESS) {
             return failure("tts_speak_failed", "Android rejected the TTS request", callCount);
@@ -369,8 +375,109 @@ final class AndroidDeviceCapabilities {
                 .put("rate", rate)
                 .put("pitch", pitch)
                 .put("queue", queue)
+                .put("audio", audioState)
                 .put("timestamp", Instant.now().toString())
                 .put("toolCallCount", callCount);
+    }
+
+    private JSONObject inspectMediaAudio(boolean autoAdjust) throws JSONException {
+        AudioManager audio = (AudioManager) service.getSystemService(Service.AUDIO_SERVICE);
+        if (audio == null) {
+            return new JSONObject()
+                    .put("available", false)
+                    .put("stream", "music")
+                    .put("autoBoostRecommended", false)
+                    .put("volumeAdjusted", false)
+                    .put("decision", "audio_unavailable");
+        }
+
+        int currentVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+        int maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int ringerMode = audio.getRingerMode();
+        int interruptionFilter = currentInterruptionFilter();
+        boolean quietMode = ringerMode == AudioManager.RINGER_MODE_SILENT
+                || interruptionFilter == NotificationManager.INTERRUPTION_FILTER_NONE
+                || interruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS;
+        AudioVolumePolicy.Decision decision = AudioVolumePolicy.decide(
+                currentVolume,
+                maxVolume,
+                quietMode);
+
+        boolean adjusted = false;
+        int appliedVolume = currentVolume;
+        String decisionReason = decision.reason;
+        if (autoAdjust && decision.shouldAdjust) {
+            try {
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, decision.targetVolume, 0);
+                appliedVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+                adjusted = appliedVolume > currentVolume;
+                decisionReason = adjusted ? "raised_low_media_volume" : "volume_adjustment_not_applied";
+            } catch (SecurityException | IllegalArgumentException error) {
+                decisionReason = "volume_adjustment_failed";
+            }
+        }
+
+        return new JSONObject()
+                .put("available", true)
+                .put("stream", "music")
+                .put("volume", appliedVolume)
+                .put("maxVolume", maxVolume)
+                .put("volumePercent", volumePercent(appliedVolume, maxVolume))
+                .put("previousVolume", currentVolume)
+                .put("recommendedVolume", decision.targetVolume)
+                .put("autoBoostRecommended", decision.shouldAdjust)
+                .put("volumeAdjusted", adjusted)
+                .put("ringerMode", ringerModeName(ringerMode))
+                .put("interruptionFilter", interruptionFilterName(interruptionFilter))
+                .put("quietModeRespected", quietMode)
+                .put("decision", decisionReason);
+    }
+
+    private int currentInterruptionFilter() {
+        NotificationManager manager = (NotificationManager) service.getSystemService(Service.NOTIFICATION_SERVICE);
+        if (manager == null) {
+            return NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+        }
+        try {
+            return manager.getCurrentInterruptionFilter();
+        } catch (RuntimeException ignored) {
+            return NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+        }
+    }
+
+    private static int volumePercent(int volume, int maxVolume) {
+        if (maxVolume <= 0) {
+            return 0;
+        }
+        return Math.round((volume * 100f) / maxVolume);
+    }
+
+    private static String ringerModeName(int ringerMode) {
+        switch (ringerMode) {
+            case AudioManager.RINGER_MODE_SILENT:
+                return "silent";
+            case AudioManager.RINGER_MODE_VIBRATE:
+                return "vibrate";
+            case AudioManager.RINGER_MODE_NORMAL:
+                return "normal";
+            default:
+                return "unknown";
+        }
+    }
+
+    private static String interruptionFilterName(int interruptionFilter) {
+        switch (interruptionFilter) {
+            case NotificationManager.INTERRUPTION_FILTER_ALL:
+                return "all";
+            case NotificationManager.INTERRUPTION_FILTER_PRIORITY:
+                return "priority";
+            case NotificationManager.INTERRUPTION_FILTER_NONE:
+                return "none";
+            case NotificationManager.INTERRUPTION_FILTER_ALARMS:
+                return "alarms";
+            default:
+                return "unknown";
+        }
     }
 
     JSONObject recordMicrophone(JSONObject arguments, long callCount) throws JSONException {

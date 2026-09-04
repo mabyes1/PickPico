@@ -17,14 +17,12 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class McpHttpServerTest {
     private static final String TOKEN = "unit-test-token";
 
     private McpHttpServer server;
     private int port;
-    private final AtomicReference<String> echoed = new AtomicReference<>();
 
     @Before
     public void setUp() throws Exception {
@@ -185,12 +183,6 @@ public final class McpHttpServerTest {
             }
 
             @Override
-            public JSONObject phoneEcho(String text, long callCount) throws org.json.JSONException {
-                echoed.set(text);
-                return new JSONObject().put("echo", text).put("toolCallCount", callCount);
-            }
-
-            @Override
             public JSONObject cameraCapture(JSONObject arguments, long callCount) throws org.json.JSONException {
                 return new JSONObject()
                         .put("captured", true)
@@ -235,7 +227,7 @@ public final class McpHttpServerTest {
     }
 
     @Test
-    public void handlesLegacyInitializeAndPhoneEcho() throws Exception {
+    public void handlesLegacyInitialize() throws Exception {
         HttpResult initialize = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"," +
                         "\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{}," +
@@ -244,17 +236,6 @@ public final class McpHttpServerTest {
         assertEquals(200, initialize.status);
         assertEquals("2025-11-25",
                 new JSONObject(initialize.body).getJSONObject("result").getString("protocolVersion"));
-
-        HttpResult echo = post(
-                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\"," +
-                        "\"params\":{\"name\":\"phone_echo\",\"arguments\":{\"text\":\"hello phone\"}}}",
-                authorizedHeaders());
-        assertEquals(200, echo.status);
-        assertEquals("hello phone", echoed.get());
-        assertEquals("hello phone", new JSONObject(echo.body)
-                .getJSONObject("result")
-                .getJSONObject("structuredContent")
-                .getString("echo"));
     }
 
     @Test
@@ -484,7 +465,7 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(57, listed.getInt("count"));
+        assertEquals(56, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
@@ -581,7 +562,7 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(57, capabilityList.getInt("count"));
+        assertEquals(56, capabilityList.getInt("count"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
 

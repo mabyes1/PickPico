@@ -166,32 +166,6 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.phoneWake(callCount));
 
         register(
-                "phone.echo",
-                "Show an observable message through vibration and the foreground notification.",
-                "phone",
-                "physical_action",
-                true,
-                new JSONObject()
-                        .put("type", "object")
-                        .put("properties", new JSONObject()
-                                .put("text", new JSONObject()
-                                        .put("type", "string")
-                                        .put("minLength", 1)
-                                        .put("maxLength", 512)))
-                        .put("required", new JSONArray().put("text"))
-                        .put("additionalProperties", false),
-                (arguments, callCount) -> {
-                    String text = arguments.optString("text", "");
-                    if (text.isEmpty()) {
-                        throw new CommandInputException("phone.echo requires a non-empty text argument");
-                    }
-                    if (text.length() > 512) {
-                        throw new CommandInputException("phone.echo text is limited to 512 characters");
-                    }
-                    return actions.phoneEcho(text, callCount);
-                });
-
-        register(
                 "camera.capture",
                 "Capture one JPEG frame from the Android camera and persist it in the PickPico workspace.",
                 "sensor",
@@ -236,7 +210,7 @@ final class CommandRuntime {
 
         register(
                 "phone.speak",
-                "Speak text through Android TextToSpeech so the Agent can address people near the phone.",
+                "Speak text through Android TextToSpeech. PickPico inspects media volume first and can raise very low volume to an audible level while respecting silent/DND state.",
                 "interaction",
                 "physical_action",
                 true,

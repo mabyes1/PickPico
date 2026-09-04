@@ -990,25 +990,6 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
-    public JSONObject phoneEcho(String text, long callCount) throws JSONException {
-        vibrate();
-        String inboxId = AgentInboxStore.add(this, "phone.echo", "PickPico Agent", text);
-        String summary = "phone_echo #" + callCount + ": " + abbreviate(text, 80);
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putString(KEY_RECENT, summary + "\n" + Instant.now())
-                .putLong(KEY_CALL_COUNT, callCount)
-                .apply();
-        updateNotification(summary);
-        return new JSONObject()
-                .put("echo", text)
-                .put("inboxId", inboxId)
-                .put("executedOn", Build.MANUFACTURER + " " + Build.MODEL)
-                .put("timestamp", Instant.now().toString())
-                .put("action", "vibrated_and_updated_notification")
-                .put("toolCallCount", callCount);
-    }
-
-    @Override
     public JSONObject cameraCapture(JSONObject arguments, long callCount) throws JSONException {
         if (deviceCapabilities == null) {
             return capabilityRuntimeUnavailable("captured", callCount);
@@ -1407,7 +1388,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     private Notification buildNotification(String message) {
-        Intent openIntent = new Intent(this, MainActivity.class);
+        Intent openIntent = new Intent(this, DashboardActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
                 0,
