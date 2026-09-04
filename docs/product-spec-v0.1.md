@@ -1,736 +1,135 @@
-# PickPico Product Spec v0.1
+# PickPico 產品與能力說明
 
-> Status: Draft / Hackathon development spec  
-> Platform strategy: **Android-first Full Mobile Agent Node**  
-> Future iOS strategy: **Capability-limited Mobile Agent Companion**  
-> Scope: capability model, permissions, Hyper Mode, approval policy, Human Interaction UI, platform boundaries
+本文依 2026-09-04 的 Android 0.16.34 程式整理。檔名保留以維持既有連結，內容已改為目前功能說明，不再沿用早期 v0.1 的開發計畫。
 
-## 1. Product definition
+## PickPico 負責什麼
 
-PickPico turns a phone into an MCP-capable Agent node.
+PickPico 是 Android 上供外部 Agent 使用的 MCP 服務。外部 Agent 決定要做什麼，PickPico 提供手機能力、執行結果、核准請求與人工協助介面。
 
-The product is intentionally split into two capability layers:
+目前 APK 支援 Android 8.0 以上的 ARM64 裝置，包含 Node.js 執行環境。沒有內建通用本地語言模型，也沒有 iOS 版本。Node.js 能執行程式，不等於手機已內建會自主思考的 Agent。
 
-- **Core Mode**: ordinary app-level capabilities that should remain portable where possible.
-- **Hyper Mode**: Android special-access, cross-app, screen, notification, or device-control capabilities.
+## 使用前先分清楚三件事
 
-The two layers answer only one question:
-
-> **Can this phone perform the requested capability?**
-
-They do **not** decide whether the Agent is allowed to perform it automatically. That is handled by a separate Approval Policy.
-
-```text
-Capability layer = what the phone CAN do
-Approval policy  = what the Agent MAY do without asking
-Human interaction = what a person must approve or physically complete
-```
-
-## 2. Product architecture
-
-```mermaid
-flowchart TD
-    A[External Agent / MCP Client] --> B[Thin MCP Gateway]
-    B --> C[Capability Discovery + Runtime]
-
-    C --> D[Core Mode]
-    C --> E[Hyper Mode]
-
-    D --> F[Capability Registry]
-    E --> F
-
-    F --> G[Approval Policy]
-    G -->|Allowed| H[Execution Runtime]
-    G -->|Needs approval| I[Human Interaction Runtime]
-
-    I --> J[Shared Human Request UI]
-    J -->|Approved / response / image| H
-    J -->|Rejected / timeout| K[Return structured result to Agent]
-
-    H --> L[Android APIs / app sandbox / external app handoff]
-    L --> K
-
-    K --> A
-```
-
-### 2.1 Thin MCP gateway
-
-PickPico separates the **stable MCP protocol surface** from the **growing device capability set**.
-
-The public Thin MCP profile targets **10–15 top-level tools maximum**. The current `v3` profile exposes 10:
-
-```text
-server_info
-capability_search
-capability_status
-policy_status
-command_run
-command_status
-task_runtime_info
-task_create
-task_update
-task_status
-```
-
-These tools are gateways, not the complete action inventory. Device abilities such as:
-
-```text
-screen.capture
-camera.capture
-ui.inspect
-ui.action
-human.help
-notification.reply
-app.launch
-location.get
-workspace.read
-process.exec
-contacts.search        # planned Core P0
-calendar.create        # planned Core P0
-```
-
-live in the dynamic Capability Runtime and are discovered only when relevant.
-
-Architecture rule:
-
-> **MCP tool count should remain nearly constant while capability count is allowed to grow.**
-
-This avoids turning every new Android/iOS/device feature into a new top-level MCP schema and reduces client schema-cache churn, prompt/tool-selection noise, and platform-specific tool explosion.
-
-The current compatibility boundary is:
-
-- `/v1` / `/v2`: full compatibility tool registry for existing clients.
-- `/v3`: Thin MCP profile backed by the same Capability Runtime.
-
-Transport branding is migrated separately from protocol versioning. Android `0.16.1` first introduced an intermediate `https://pickpico-relay.mcpocket.workers.dev` bridge. Starting with Android `0.16.3`, PickPico has its own Cloudflare account and canonical reference Worker at `https://relay.pickpico.workers.dev`. Devices still configured for either historical `https://relay.mcpocket.workers.dev` or the intermediate bridge rotate only the persisted relay Node ID and relay secret, then reconnect with a fresh `/v3/nodes/<new-id>/mcp` capability URL. Historical Workers remain temporary upgrade bridges only; they are not canonical endpoints for new clients.
-
-`command_run` can return native MCP image/audio content, so media capabilities do not need dedicated top-level tools.
-
-Physical validation on 2026-09-03 confirmed the deployed `/v3` path end to end through the Cloudflare relay and a Samsung S23 / Android 16 node:
-
-- `tools/list` returned `toolProfile = thin-v1` with exactly **10** top-level tools.
-- Chinese natural-language discovery (`幫我截圖看看手機畫面`) ranked `screen.capture` as the only match and reported its current `setup_required` MediaProjection state instead of treating the capability as unsupported.
-- Thin-profile `initialize.instructions` explicitly directs the Agent to use `capability_search` before prematurely claiming a device action is impossible.
-- `command_run("phone.status")` successfully executed a capability that is not exposed as its own Thin MCP top-level tool.
-
-### 2.2 Capability discovery policy
-
-Thin MCP must not cause an Agent to incorrectly assume that hidden capabilities do not exist.
-
-Therefore the protocol contract is:
-
-> **Before telling the user that PickPico cannot perform a requested device/physical-world action, the Agent should search capabilities unless the capability state is already known.**
-
-`capability_search` accepts a natural-language need and returns a small ranked set containing:
-
-- capability ID
-- description/category/group
-- risk and side-effect metadata
-- `available` / `setup_required` / `disabled` state
-- setup reason when applicable
-- the capability's current `inputSchema`
-
-Its search vocabulary includes intent aliases for important device affordances. For example, `screenshot`, `display`, `see`, or `visual` can lead to `screen.capture`; UI interaction terms can lead to `ui.inspect`, `ui.action`, `ui.type`, or `ui.scroll`.
-
-The Thin MCP server instructions and `command_run` description intentionally seed a **small representative set** of capability names. This is affordance priming, not an exhaustive API list. Exact discovery remains runtime-driven.
-
-Two execution paths are valid:
-
-```text
-Known/common capability
-  -> command_run (fast path)
-
-Unknown/uncertain device operation
-  -> capability_search
-  -> inspect availability + input schema
-  -> command_run (discovery path)
-```
-
-Required Agent behavior test cases include:
-
-```text
-"Take a screenshot"
-  -> discover/use screen.capture, not "I cannot access your phone"
-
-"Find a contact"
-  -> discover contacts.search when implemented
-
-"Scroll this page"
-  -> discover/use ui.scroll
-```
-
-### Architecture rule
-
-`Hyper Mode` and `Approval Mode` must remain independent.
-
-Examples:
-
-- Hyper Mode ON + Ask Me: UI automation exists, but side-effect actions still ask first.
-- Hyper Mode ON + YOLO: PickPico adds no extra approval prompt, but Android / biometric / Wallet / OS security boundaries still apply.
-- Hyper Mode OFF + YOLO: Agent still cannot use Hyper-only capabilities because the capability does not exist in the exposed registry.
-
-## 3. Capability lifecycle
-
-Every capability should eventually expose runtime availability, not only static schema discovery.
-
-Proposed state model:
-
-```json
-{
-  "id": "screen.capture",
-  "group": "hyper",
-  "platform": "android",
-  "supported": true,
-  "enabled": false,
-  "available": false,
-  "requiresSetup": true,
-  "setupType": "media_projection",
-  "userInteractionRequired": true,
-  "risk": "screen_read"
-}
-```
-
-Recommended runtime states:
-
-| State | Meaning |
+| 問題 | 由什麼決定 |
 | --- | --- |
-| `unsupported` | This platform/build cannot provide the capability |
-| `disabled` | Feature exists, but Core/Hyper policy has disabled it |
-| `setup_required` | User must grant Android permission or Special Access |
-| `available` | Capability can currently run |
-| `temporarily_unavailable` | Runtime condition blocks it, such as no foreground activity |
+| 程式有沒有這項能力？ | 已登記的 command 與能力探索。 |
+| 這支手機此刻能不能用？ | Hyper Mode、Android 權限、服務狀態、裝置與目標 App。 |
+| 執行前會不會再問我？ | PickPico 核准模式、指令分類，以及 Android 或目標 App 自己的要求。 |
 
-### Current capability discovery surface
+`capability_search` 或 `capability_status` 是檢查入口；`available` 不保證下一次呼叫一定成功。例如相機探索目前主要檢查相機權限，實際拍照時還會檢查相機前景服務是否啟用。
 
-Implemented in the current runtime:
+## 已登記的能力
 
-- `capability.list`
-- `capability.status`
-- `capability_search` (Thin MCP top-level discovery gateway)
+下表表示程式已有實作，不表示每一項都在所有手機上驗證過。精確參數請查當下探索回傳的 `inputSchema`。
 
-`command_list` remains available through the full compatibility profile. New Thin MCP clients should prefer `capability_search` and execute results through `command_run`. `capability.*` explains why a command is or is not currently usable.
-
-## 4. Core Mode
-
-Core Mode contains capabilities that do not depend on Android Accessibility or another highly privileged cross-app access mechanism.
-
-### 4.1 Existing Core capabilities
-
-| Capability | Current command | Status | Notes |
-| --- | --- | --- | --- |
-| Node info | `node.info` | ✅ implemented | Device / runtime metadata |
-| Phone status | `phone.status` | ✅ implemented | Battery, network, storage, permissions |
-| Camera | `camera.capture` | ✅ implemented | Runtime CAMERA permission |
-| Microphone | `microphone.record` | ✅ implemented | Runtime RECORD_AUDIO permission |
-| Location | `location.get` | ✅ implemented | Coarse/fine location permission |
-| Notify human | `phone.notify` | ✅ implemented | Own app notification |
-| TTS | `phone.speak` | ✅ implemented | Android TTS |
-| Ring | `phone.ring` | ✅ implemented | Observable device action |
-| Wake screen | `phone.wake` | ✅ implemented | Does not unlock |
-| HUMAN HELP | `human.help` | ✅ implemented | Text / actions / images / camera |
-| App launch | `app.launch` | ✅ implemented | Launchable package only |
-| Deep link / URL | `url.open` | ✅ implemented | Web, geo, wallet/deep-link handoff |
-| Clipboard | `clipboard.get/set` | ✅ implemented | Subject to Android clipboard restrictions |
-| Workspace files | `workspace.*` | ✅ implemented | App-private storage only |
-| Shell runtime | `process.exec/output/stop` | ✅ implemented | App UID sandbox, not root |
-| Embedded Node.js | `node.start/status/stop` | ✅ implemented | App-private runtime |
-| Agent tasks | `task_*` | ✅ implemented | Long-running Agent lifecycle |
-| Self-update | `app.update_*` | ✅ implemented + continuity validated | Android package installer remains final boundary; when the node was running before a 0.15.3 → 0.16.0 update, `MY_PACKAGE_REPLACED` restored the Node/Relay automatically without pressing START NODE |
-
-### 4.2 Core capabilities still to develop
-
-#### P0: required for a convincing Mobile Agent product
-
-| Planned capability | Proposed MCP surface | Permission / boundary | Android | Future iOS |
-| --- | --- | --- | ---: | ---: |
-| Capability discovery | `capability.list/status` | none | ✅ | ✅ |
-| Contacts | `contacts.search/get` | Contacts permission | ✅ | ✅ |
-| Calendar read | `calendar.list/get` | Calendar permission | ✅ | ✅ |
-| Calendar write | `calendar.create/update/delete` | Calendar permission + Approval Policy | ✅ | ✅ |
-| File picker | `file.pick` | User-mediated system picker | ✅ | ✅ |
-| Media picker | `media.pick` | User-mediated photo/video picker | ✅ | ✅ |
-| Share sheet | `share.send` | User/app handoff | ✅ | ✅ |
-
-#### P1: useful device capabilities
-
-| Planned capability | Proposed MCP surface | Permission / boundary | Android | Future iOS |
-| --- | --- | --- | ---: | ---: |
-| Flashlight | `flashlight.set` | Camera/torch availability | ✅ | ✅ |
-| Sensors | `sensor.snapshot` | Device-dependent | ✅ | ✅ partial |
-| Bluetooth discovery | `bluetooth.scan` | Nearby devices / Bluetooth permission | ✅ | ✅ partial |
-| Bluetooth interaction | capability-specific | Device protocol dependent | ✅ | ✅ partial |
-| Volume | `volume.get/set` | Android audio policy | ✅ | ⚠️ limited |
-
-### Core design rule
-
-Core does not mean “risk-free”.
-
-For example `calendar.delete`, `clipboard.set`, `process.exec`, `app.update_latest`, and `share.send` may still require Approval Policy decisions even though they are not Hyper capabilities.
-
-## 5. Hyper Mode ⚡
-
-Hyper Mode unlocks Android special-access or deeper cross-app/device capabilities.
-
-Hyper Mode is a **product switch**, not a single Android permission.
-
-When enabled, PickPico should show the setup state of each Hyper capability individually.
-
-```text
-⚡ Hyper Mode                                      ON
-
-Accessibility / UI Control                        Ready
-Notification Access                               Ready
-Screen Capture                                    Ask when used
-Usage Access                                      Optional / Not configured
-Device Admin                                      Ready
-```
-
-### 5.1 Existing capabilities that belong under Hyper governance
-
-These capabilities existed before the unified Hyper Mode work and are now governed by the same capability/Hyper model.
-
-| Capability | Current command | Android access | Current state |
-| --- | --- | --- | --- |
-| Notification observation | `notification.list/get` | Notification Listener Special Access | ✅ implemented + Hyper governed |
-| Notification dismiss | `notification.dismiss` | Notification Listener Special Access | ✅ implemented + Hyper governed |
-| Device lock | `phone.lock` | Device Admin opt-in | ✅ implemented + Hyper governed |
-
-### 5.2 Hyper capabilities still to develop
-
-#### P0: highest-value Hackathon targets
-
-| Planned capability | Proposed MCP surface | Android mechanism | Notes |
-| --- | --- | --- | --- |
-| Hyper Mode manager | capability layer + local UI | App settings + capability registry | ✅ implemented; one product switch, many independent access grants |
-| UI tree inspection | `ui.inspect` | AccessibilityService | ✅ implemented and capability availability validated on Samsung S23 / Android 16 |
-| UI click/action | `ui.action` | AccessibilityNodeInfo actions | ✅ implemented and physically validated cross-app on Samsung S23 / Android 16 |
-| UI text entry | `ui.type` | Accessibility actions | ✅ implemented in source; subject to app/widget support |
-| UI scroll | `ui.scroll` | Accessibility actions | ✅ physically validated cross-app on Threads / Samsung S23 / Android 16 |
-| Screen capture | `screen.capture` | MediaProjection | ✅ physically validated on Samsung S23 / Android 16; user-authorized session produced 1080×2340 JPEG and native MCP image content through schema-stable `command_run` |
-| Notification actions | `notification.actions` | Notification Listener | ✅ implemented in source; exposes buttons/RemoteInput metadata |
-| Invoke notification action | `notification.invoke_action` | Notification Listener + PendingIntent | ✅ implemented in source; Approval Policy applies |
-| Notification reply | `notification.reply` | RemoteInput where available | ✅ implemented in source; only when source supports reply |
-
-#### P1: advanced Hyper capabilities
-
-| Planned capability | Proposed MCP surface | Android mechanism | Notes |
-| --- | --- | --- | --- |
-| Notification watch/event stream | `notification.watch` | Notification Listener | Event-driven Agent workflow |
-| Usage state | `usage.current/recent/stats` | UsageStats Special Access | Useful context, privacy-sensitive |
-| Coordinate gesture | `ui.gesture` | Accessibility gesture dispatch | Fallback for UI without useful accessibility tree |
-| Screen + UI fused observation | internal / future | MediaProjection + Accessibility | Agent gets visual + semantic screen model |
-
-### 5.3 Hyper Mode non-goals
-
-Hyper Mode does **not** provide:
-
-- root access
-- access to another app's private database/files
-- biometric bypass
-- lock-screen bypass
-- Wallet private keys
-- silent transaction signing
-- permission bypass
-- Android security-setting bypass
-
-Hyper Mode removes a PickPico product restriction only when the user has explicitly granted the underlying Android access.
-
-## 6. Hyper Mode enable flow
-
-```mermaid
-flowchart TD
-    A[User turns Hyper Mode ON] --> B[Show Hyper capability setup]
-    B --> C{Accessibility granted?}
-    C -->|No| D[Open PickPico App info]
-    D --> R{Restricted settings gate shown?}
-    R -->|Yes| S[Human taps Allow restricted settings]
-    R -->|No| T[Continue]
-    S --> T
-    T --> U[Open Android Accessibility Settings]
-    U --> V[Human enables PickPico Hyper UI Control]
-    V --> E
-    C -->|Yes| E[UI tools available]
-
-    B --> F{Notification access granted?}
-    F -->|No| G[Open Notification Listener Settings]
-    F -->|Yes| H[Notification Hyper tools available]
-    G --> H
-
-    B --> I[Screen capture: request only when needed]
-    B --> J[Usage access: optional]
-    B --> K[Device Admin: optional if phone.lock enabled]
-
-    E --> L[Capability Registry refreshed]
-    H --> L
-    I --> L
-    J --> L
-    K --> L
-```
-
-Android Special Access is intentionally a **human-owned security boundary**. PickPico can deep-link
-the owner to the relevant system settings page and explain the next action, but it cannot silently
-grant Accessibility, Notification Listener, Device Admin, MediaProjection, or similar privileged
-access to itself.
-
-For sideloaded Android builds, Accessibility can additionally be protected by Android's
-**Restricted settings** gate. The validated setup flow is:
-
-1. PickPico opens its Android App info page.
-2. If the device presents the option, the owner chooses `⋮ → Allow restricted settings` and confirms locally.
-3. The owner returns to PickPico and opens Accessibility settings.
-4. The owner enables **PickPico Hyper UI Control**.
-5. `capability.status` for `ui.inspect` changes from `setup_required` to `available`.
-
-The product should present this as a guided setup rather than as a failed Agent action. Store-installed
-builds or future Android versions may skip or rename the Restricted settings step, so live capability
-status remains authoritative.
-
-### UX rule
-
-Turning Hyper Mode on must **not** blindly request every special permission at once.
-
-The switch enables the capability family. Each capability shows its own setup status and obtains user access only when needed or explicitly configured.
-
-## 7. Approval Policy
-
-Approval Policy is independent from Core/Hyper.
-
-Proposed user modes:
-
-| Mode | User-facing meaning | Behavior |
+| 能力 | 主要指令 | 實際條件與限制 |
 | --- | --- | --- |
-| 🛡️ Ask Me | 詢問我 | Side-effect actions require approval according to policy |
-| 🤖 Auto-approve | 代我核准 | Low/medium-risk actions can run automatically; sensitive actions still ask according to policy |
-| ☠️ YOLO Mode | YOLO MODE | PickPico adds no optional approval gate; OS/app/human-only boundaries remain |
+| 裝置資訊 | `node.info`、`phone.status` | 查看手機與服務狀態。 |
+| 相機 | `camera.capture` | 前／後鏡頭單張 JPEG；需要相機權限及相機前景服務，結果保存在 App 工作空間。 |
+| 錄音、位置 | `microphone.record`、`location.get` | 需要對應權限與可用的系統服務；定位結果受訊號與裝置狀態影響。 |
+| 語音、響鈴與音量 | `phone.speak`、`phone.ring`、`audio.status`、`audio.set` | 語音播報使用 Android TTS；音量與勿擾行為受系統狀態影響。 |
+| 通知與人工協助 | `phone.notify`、`human.help`、`human.help.status` | 通知需能顯示；求助要有人回覆，或等到閒置期限到期。 |
+| 喚醒與回桌面 | `phone.wake`、`phone.home` | `phone.home` 屬於 Hyper 能力；不等於解鎖安全鎖，回傳結果需確認是否仍要人操作。 |
+| App 與連結 | `app.list`、`app.launch`、`url.open` | App 必須已安裝；連結需有可處理的 App。背景開啟不符合條件時改用通知／收件匣。 |
+| 剪貼簿 | `clipboard.get`、`clipboard.set` | 受 Android 對背景剪貼簿存取的限制。 |
+| 聯絡人 | `contacts.search`、`contacts.get` | 已實作查詢，需讀取聯絡人權限。 |
+| 行事曆 | `calendar.list/get/create/update/delete` | 已實作讀寫，需對應權限、可用行事曆；寫入受核准模式控制。 |
+| 檔案與照片選取 | `file.pick`、`media.pick` | 開啟 Android 選取器，由人選擇，再匯入 App 工作空間。 |
+| 分享 | `share.send` | 開啟 Android 分享面板；人選擇目的地與收件人，回傳不代表已送達。 |
+| 工作空間 | `workspace.info/list/read/write` | 位於 App 私有空間；`workspace.read/write` 是 UTF-8 文字操作，不是通用二進位附件介面。 |
+| 執行程序 | `process.run/exec/output/stop` | 在 App 身分與沙盒限制內執行；不是 ADB shell，也不具備 Root。 |
+| Node.js | `node.start/status/stop` | 啟動、查詢、停止手機上的 Node.js 工作；不保證被系統終止後自動恢復。 |
+| 更新 | `app.update`、`app.update_check`、`app.update_latest`、`app.update_status` | 下載驗證後交 Android 安裝；安裝仍可能需要人確認。 |
 
-### Approval flow
+## Hyper Mode 的能力
 
-```mermaid
-flowchart TD
-    A[Agent requests command] --> B[Capability available?]
-    B -->|No| C[Return unsupported/setup-required result]
-    B -->|Yes| D[Classify command risk + context]
-    D --> E{Approval Mode}
+Hyper Mode 預設關閉。它是 PickPico 的功能開關，開啟後還要取得每項能力需要的 Android 權限。
 
-    E -->|Ask Me| F[Create approval HumanRequest]
-    E -->|Auto-approve| G{Policy allows automatic execution?}
-    E -->|YOLO| H[Execute]
-
-    G -->|Yes| H
-    G -->|No| F
-
-    F --> I[Shared Human Interaction UI]
-    I -->|Approve| H
-    I -->|Reject| J[Return rejected]
-    I -->|Timeout| K[Return timed_out]
-
-    H --> L{OS / app requires human-only step?}
-    L -->|No| M[Return result]
-    L -->|Yes| N[Agent may invoke human.help]
-    N --> I
-```
-
-### Risk metadata
-
-Commands should eventually declare risk metadata such as:
-
-```text
-read_only
-sensor_read
-personal_data_read
-filesystem_write
-external_communication
-ui_action
-notification_write
-software_update
-security_action
-financial_action
-arbitrary_process
-```
-
-The mode selects a policy. It should not require hard-coding approval behavior individually into every UI screen.
-
-## 8. Shared Human Interaction Runtime
-
-Approval and HUMAN HELP are different semantics but should use the same underlying mobile UI and notification system.
-
-```mermaid
-flowchart LR
-    A[Approval Gate] --> C[HumanRequest Runtime]
-    B[human.help] --> C
-    C --> D[Notification]
-    C --> E[Request Card UI]
-    C --> F[Agent Inbox]
-    E --> G[Actions]
-    E --> H[Text reply]
-    E --> I[Images / Camera]
-    G --> J[HumanResponse]
-    H --> J
-    I --> J
-```
-
-### Proposed internal model
-
-Current implementation uses `HumanHelpStore`. Future refactor should generalize the data model without forcing a visual rewrite.
-
-```text
-HumanRequest
-  id
-  type: help | approval
-  title
-  instruction
-  actions[]
-  allowTextReply
-  allowImages
-  maxImages
-  sourceCommand
-  sourceExecutionId
-  taskId
-  risk
-  createdAt
-  idleTimeout
-  status
-
-HumanResponse
-  selectedAction
-  text
-  attachments[]
-  respondedAt
-```
-
-### Semantic distinction
-
-**Approval** means:
-
-> The Agent knows how to perform the action, but PickPico wants permission before executing it.
-
-**HUMAN HELP** means:
-
-> The Agent needs the human to provide information or physically perform a step the Agent cannot or should not perform itself.
-
-Example:
-
-```text
-Agent prepares payment
-  ↓
-Approval: allow opening Wallet and preparing handoff?
-  ↓
-Agent opens Wallet
-  ↓
-Wallet requires biometric signature
-  ↓
-HUMAN HELP: please complete Face ID / fingerprint
-  ↓
-Agent observes result and continues
-```
-
-## 9. Command exposure rules
-
-Target behavior:
-
-1. New public clients should use the Thin MCP profile; the top-level surface has a soft target of 10–15 tools and must not grow one-for-one with capabilities.
-2. `capability_search` should return only a small relevant subset by default, with current state and input schema.
-3. The full compatibility profile may keep direct tools and `command_list` for existing clients, but new capability work should not add new top-level tools unless there is a strong protocol-level reason.
-4. Hyper-only commands should not be executable when the Hyper module is absent.
-5. When the Hyper module exists but the user has Hyper Mode OFF, discovery may report the capability as disabled rather than pretending it does not exist.
-6. When access is missing but Hyper Mode is ON, discovery/status should report `setup_required` with setup guidance.
-7. Approval Policy must not alter static capability support. It only changes execution authorization.
-8. The Agent should not conclude that a requested device action is impossible solely because there is no matching top-level MCP tool.
-
-This prevents both failure modes: repeatedly calling impossible commands **and** prematurely refusing capabilities hidden behind the Thin MCP gateway.
-
-## 10. Android build modularity
-
-Hyper capabilities should be removable as a build-time module, not merely hidden by a runtime boolean.
-
-Target conceptual layout:
-
-```text
-PickPico
-├─ core-agent
-├─ human-interaction
-├─ core-capabilities
-│  ├─ camera
-│  ├─ microphone
-│  ├─ location
-│  ├─ contacts
-│  ├─ calendar
-│  └─ file-media-picker
-└─ hyper-android
-   ├─ accessibility
-   ├─ ui-automation
-   ├─ screen-capture
-   ├─ notification-control
-   ├─ usage-access
-   └─ device-admin
-```
-
-Future build targets may conceptually become:
-
-```text
-releaseHyper   -> includes Hyper module and corresponding manifest services/access declarations
-releaseStore   -> Hyper module, services, UI, tool registration and declarations are not compiled in
-```
-
-The exact Gradle module/flavor layout can be decided after the Hackathon. The architectural boundary should be preserved now so Hyper code is not spread through unrelated Core classes.
-
-## 11. Platform strategy
-
-### Android
-
-Product role:
-
-> **Full Mobile Agent Node**
-
-Android is the primary platform for the Hackathon and initial product development because it allows the deeper device capabilities required by PickPico's core concept.
-
-### iOS
-
-Product role, if implemented later:
-
-> **Mobile Agent Companion**
-
-iOS should use the same capability model and UI vocabulary, but unsupported Hyper capabilities remain visible as disabled/unsupported where useful for clarity.
-
-Example future UI:
-
-```text
-⚡ Hyper Mode
-
-Cross-app UI control          Not available on iOS
-Notification observation     Not available on iOS
-Persistent Agent runtime     Not available on iOS
-
-Camera                        Available
-Microphone                    Available
-Location                      Available
-Human Help                    Available
-Contacts                      Available
-Calendar                      Available
-Files / Photos                Available
-Deep links                    Available
-```
-
-### Platform capability matrix
-
-| Capability family | Android | Future iOS | Product decision |
-| --- | ---: | ---: | --- |
-| HUMAN HELP | ✅ | ✅ | shared |
-| Camera / microphone | ✅ | ✅ | shared |
-| Location | ✅ | ✅ | shared |
-| Contacts / calendar | ✅ planned | ✅ planned | shared |
-| File / media picker | ✅ planned | ✅ planned | shared |
-| TTS / own notifications | ✅ | ✅ | shared |
-| Deep-link handoff | ✅ | ✅ limited by platform | shared abstraction |
-| Persistent Agent node | ✅ | ❌ strict parity | Android Full Node advantage |
-| Other-app notification observation | ✅ | ❌ public parity | Hyper Android |
-| Cross-app UI accessibility automation | ✅ implemented and Accessibility enablement validated on Android 16 | ❌ public parity | Hyper Android |
-| App-sandbox shell / embedded Node | ✅ | ❌ strict parity | Android-specific |
-| Device lock/wake | ✅ partial | ❌ strict parity | Android-specific |
-| APK-style self-update | ✅ | ❌ | Android-specific |
-
-### Hackathon decision
-
-Do **not** implement iOS during the current Hackathon unless Android Core + Hyper Demo + UI + presentation are already complete.
-
-Current priority is to demonstrate the strongest form of the product rather than spend Hackathon time implementing a deliberately reduced platform variant.
-
-## 12. Permission / access inventory
-
-### Normal runtime or user-mediated access
-
-| Access | Used by | Current / planned |
+| 能力 | 指令 | 需要什麼 |
 | --- | --- | --- |
-| CAMERA | `camera.capture`, future flashlight | ✅ current |
-| RECORD_AUDIO | `microphone.record` | ✅ current |
-| Location | `location.get` | ✅ current |
-| Notification posting | `phone.notify`, HUMAN interaction | ✅ current |
-| Contacts | `contacts.*` | ⏳ planned |
-| Calendar | `calendar.*` | ⏳ planned |
-| System file picker | `file.pick` | ⏳ planned |
-| System media picker | `media.pick` | ⏳ planned |
-| Nearby/Bluetooth | `bluetooth.*` | ⏳ P1 |
+| 讀取介面元素 | `ui.inspect` | 啟用 PickPico 無障礙服務；只能取得目標 App 暴露的介面資訊。 |
+| 點擊、輸入、捲動 | `ui.action`、`ui.type`、`ui.scroll` | 無障礙服務與可操作的目標元素；不是任意畫面都能可靠操作。 |
+| 擷取螢幕 | `screen.capture` | 在 App 開啟 Screen Capture，並取得 Android MediaProjection 工作階段。 |
+| 其他 App 的通知 | `notification.list/get/dismiss/actions/invoke_action/reply` | 通知存取權；回覆或按鈕必須由原通知提供。 |
+| 鎖定手機 | `phone.lock` | 明確啟用裝置管理員功能。 |
 
-### Android Special Access / privileged user opt-in
+安全鎖、指紋、PIN 與目標 App 的安全限制仍存在。Hyper Mode 不會自動授予權限或提供其他 App 私有資料存取。
 
-| Access | Used by | Current / planned |
-| --- | --- | --- |
-| Notification Listener | notification read/dismiss/actions/invoke/reply | ✅ implemented; device validation for new action/reply flow pending |
-| Device Admin | `phone.lock` | ✅ current |
-| Accessibility Service | `ui.inspect/action/type/scroll` | ✅ implemented; Restricted settings + Accessibility human setup validated on Android 16 |
-| MediaProjection consent | `screen.capture` | ✅ human-owned consent + physical screen capture + native MCP image delivery validated on Android 16 |
-| Usage Access | `usage.*` | ⏳ P1 Hyper |
+側載 App 若被 Android 擋住無障礙設定，可能需要使用者先在 App 資訊頁允許受限制的設定，再啟用服務。是否出現該步驟，以手機實際畫面為準。
 
-## 13. Development priority from current state
+## 核准模式的精確行為
 
-### Phase A: capability framework
+預設為 **Auto-approve**。模式在手機 App 設定，沒有供遠端 Agent 改寫模式的公開指令。
 
-1. ✅ Add capability registry/status model.
-2. ✅ Add Hyper Mode setting and UI shell.
-3. ✅ Group existing Notification Listener and Device Admin capabilities under Hyper execution policy.
-4. ✅ Add Approval Mode setting: Ask Me / Auto-approve / YOLO.
-5. ✅ Reuse Human Help UI/runtime as generic Human Interaction UI for approvals.
+| 模式 | 程式現在如何判斷 |
+| --- | --- |
+| Ask Me | 對登記為 `sideEffect: true` 的指令要求核准；`human.help` 本身除外。不是所有讀取都會詢問。 |
+| Auto-approve | 在有副作用的指令中，對 `security_action`、`software_update`、`arbitrary_process`、`filesystem_write`、`notification_write` 類別要求核准。 |
+| YOLO | 不加 PickPico 的指令核准提示；Android、目標 App 與人工選取流程仍照常。 |
 
-### Phase B: Hyper MVP
+分類在程式中預先登記，並不是每次執行都由安全模型判斷。尤其 **Auto-approve 不會因為 UI 上出現付款、叫車或傳訊就自動辨識並攔下**。若需求是「送出前停下讓我確認」，Agent 的任務流程必須真的停下並求助，不能只依賴核准模式的名稱。
 
-1. ✅ Accessibility Service setup implemented and enabled on a physical Samsung S23 / Android 16.
-2. ✅ `ui.inspect` capability availability validated after the human-owned Restricted settings / Accessibility setup.
-3. ✅ `ui.action` physically validated cross-app on 三竹股市; `ui.scroll` physically validated on Threads; `ui.type` remains implemented with physical-device validation pending.
-4. ✅ `screen.capture` implemented with a dedicated MediaProjection foreground session and physically validated end-to-end, including native MCP image delivery through schema-stable `command_run`.
-5. ✅ `notification.actions` / `notification.invoke_action` / `notification.reply` implemented; physical-device validation pending.
+## HUMAN HELP 怎麼等待
 
-### Phase C: Core personal-context capabilities
+Agent 可以提供問題、選項，並選擇允許文字回覆與圖片。圖片最多 3 張；使用者可以選圖或拍照。
 
-1. `contacts.search/get`.
-2. `calendar.list/create/update`.
-3. `file.pick` / `media.pick`.
-4. `share.send`.
+`idleTimeoutSeconds` 可選 120、180、360 秒，預設 180 秒。這是可續時的閒置期限，使用者打字、選圖或相機活動會更新等待時間，因此總等待可能超過一次期限。
 
-### Phase D: UI / product polish
+求助結果與圖片放在 App 私有儲存空間。求助呼叫會占用執行資源等待；這版不是完全非阻塞的人工等待架構。服務中斷、客戶端逾時或 Relay 斷線，都可能使原本的呼叫無法正常拿到回覆。
 
-1. Main screen becomes capability-oriented instead of debug-panel-oriented.
-2. Show Core / Hyper state clearly.
-3. Show Approval Mode clearly.
-4. Human Inbox presents help and approval requests in one timeline.
-5. Permission setup provides actionable guidance and status.
-6. Agent task state and recent actions become visually understandable during a Demo.
+核准請求和 HUMAN HELP 共用相關手機互動流程，但意思不同：前者詢問是否允許一項指令，後者要求人補充資訊或完成實際動作。
 
-### Phase E: Optional Sponsor extension
+## 照片、截圖與「使用者看得到」
 
-Only after the core product is stable:
+`camera.capture`、`screen.capture` 可以回傳原生 MCP 圖片內容，並保留工作空間檔案路徑。但要分清楚：
 
-- PickPico Financial Agent
-- transaction preparation
-- HUMAN approval/handoff
-- Wallet deep link
-- user signature
-- transaction/notification observation
+1. 手機是否拍到或擷取到影像。
+2. Agent 是否收到圖片內容。
+3. MCP 客戶端是否把圖片顯示給使用者。
 
-## 14. Definition of the next product milestone
+三者不是同一件事。2026-09-04 的實測中，前鏡頭拍照成功、Agent 能看到照片，但使用者在聊天畫面看不到圖片。因此不能把這條路徑描述成已驗證的「傳照片給使用者」。
 
-The next meaningful milestone is not “more commands”.
+`share.send` 可以交給 Android 分享面板處理；它不是直接開啟全螢幕看圖的指令，也不會自動替使用者選擇收件人。目前沒有通用的 `file.open` 或 `image.open` 能力；`url.open` 會拒絕 `file:`、`content:`、`data:` 等協定。
 
-It is reached when this complete flow works:
+螢幕擷取需有效的系統分享工作階段。鎖屏或系統停止分享後，可能必須重新開啟並由人確認。
 
-```mermaid
-flowchart TD
-    A[Agent receives a real task] --> B[Discover PickPico capabilities]
-    B --> C[Use Core or Hyper capability]
-    C --> D[Observe Android / another app]
-    D --> E[Take an action]
-    E --> F{Approval required?}
-    F -->|Yes| G[Shared approval UI]
-    F -->|No| H[Continue]
-    G --> H
-    H --> I{Human-only step encountered?}
-    I -->|Yes| J[human.help]
-    J --> K[Human responds / acts]
-    K --> L[Agent resumes]
-    I -->|No| L
-    L --> M[Task completed]
-```
+目前截圖結果附 `freshFrame` 與 `frameAgeMs`。沒有新 ImageReader 影格時，快取超過 5 秒就拒絕回傳；較新的快取會明確標示。影格經過的時間由 App 取得影格時計算，不能當成每個螢幕像素都已即時更新的保證。
 
-This is the target product story for the Hackathon:
+## 長任務、背景執行與常亮
 
-> **The Agent can use the phone as a real execution node, understand what it is allowed to do, ask for approval when policy requires it, and hand control to a human when reality requires a human.**
+`task_create`、`task_update`、`task_status` 提供任務紀錄與狀態管理。目前最多保存 50 筆在記憶體中，服務重建後不保證保留。它們不是自主 Agent、持久排程器，也不會只因為建立任務就自動執行或在重啟後接續。
 
+例如「一分鐘後倒數拍照」需要外部 Agent 或明確的執行流程串接等待、播報與拍照，不能把任務紀錄當作鬧鐘排程 API。
+
+Node.js 與背景程序由 Android App 承載，仍受系統生命週期、記憶體、電量與網路影響。
+
+常亮目前使用帶 `FLAG_KEEP_SCREEN_ON` 的小型 overlay，必要時回退到螢幕 WakeLock；相關視窗操作已移到主執行緒。指令期間與結束後有不同的保留時間，`phone.wake` 不延長 Agent 常亮租期。這是維持工作期間可見的措施，不是永不被系統終止的保活保證。
+
+## 更新的邊界
+
+APK 安裝前會檢查 SHA-256、套件名稱、簽章與版本，再交 Android 安裝器。下載網址目前接受 HTTP 與 HTTPS，並未強制 HTTPS；雜湊和簽章檢查也不代表 HTTP 本身經過加密。
+
+App 更新後，仍可能要重新啟動服務或重新確認螢幕分享。已安裝的測試 APK 版本，也不一定等於 Relay 更新端點目前發布的版本。
+
+## 這次實測證明了什麼
+
+2026-09-04、Samsung S23（SM-S9110）、Android 16、PickPico 0.16.34：
+
+- 透過 Relay 查詢手機資訊、操作 PickPico 分頁，切頁後取得不同截圖。
+- 後鏡頭連拍 3 次成功，前鏡頭單張成功。
+- 約 100 秒等待測試結束後，手機回報亮著且未鎖定；不是所有省電設定或機型的長時間常亮驗證。
+- 曾遇到有相機權限但相機前景服務未啟用；進入既有工程頁後才恢復拍照。
+- 曾遇到螢幕分享停止，需人重新確認；聊天端圖片顯示未成功。
+
+相機超時後的資源清理與過期截圖判斷已通過程式測試，但尚未在實機刻意重現延遲開相機與快取過期的故障。其他能力的程式存在，不應自動算進這份實測清單。
+
+## 原始碼與相關文件
+
+- [能力與參數、核准判斷](../app/src/main/java/com/mcpocket/poc/CommandRuntime.java)
+- [能力狀態判斷](../app/src/main/java/com/mcpocket/poc/AndroidCapabilityRegistry.java)
+- [模式預設值](../app/src/main/java/com/mcpocket/poc/McpocketPolicySettings.java)
+- [任務紀錄](../app/src/main/java/com/mcpocket/poc/AgentTaskRuntime.java)
+- [連線指南](remote-access-setup.md)
+- [遠端傳輸與安全設計](remote-transport.md)
+
+[回到 README](../README.md)

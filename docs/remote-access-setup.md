@@ -1,149 +1,107 @@
-# PickPico Remote Access Setup Notes
+# PickPico 連線指南
 
-這份文件用來說明 PickPico 的 Remote Access 到底需要什麼，以及未來應如何向使用者解釋。
+本文依 Android 0.16.34 的程式與介面整理（2026-09-04）。說明目前可操作的設定流程；介面改版後，按鈕位置可能調整。
 
-它不是完成版 onboarding UI spec，也不是要求目前版本立刻實作 Remote setup wizard。目的是先把產品與架構邊界講清楚，讓後續的人類或 AI 能在不猜測的情況下繼續設計。
+## 選擇連線方式
 
-## 1. 預設產品狀態
+| 方式 | 適用情況 | 需要準備 |
+| --- | --- | --- |
+| 區域網路直連 | Agent 所在的電腦可以直接連到手機 IP | 手機與電腦間可互通的網路、Local MCP 網址與 Bearer token |
+| 遠端連線 | Agent 在雲端，或與手機不在同一個網路 | 手機可上網、可用的 PickPico Relay、Remote MCP 網址 |
 
-PickPico 安裝後，手機本身即可提供 Local MCP：
+手機端服務必須保持運行。安裝 APK 本身不代表 Agent 已能連線；也不是每個 MCP 客戶端都支援相同的連線設定格式。
 
-```text
-Local Agent / Desktop Agent
-        |
-        | HTTP + Bearer
-        v
-Android phone :8765/mcp
+## 設定遠端連線
+
+1. 打開 PickPico，從首頁的 **REMOTE ACCESS** 或 **SETTINGS → Remote Access** 進入設定。
+2. 在 Relay 欄位填入 Relay 的基底網址。專案目前使用：
+
+   ```text
+   https://relay.pickpico.workers.dev
+   ```
+
+   這裡不要填手機的 `/v3/nodes/.../mcp` 完整網址，也不要填區域網路 IP。
+
+3. 點 **SAVE RELAY**。若服務已在運行，選 **Restart** 套用；若尚未啟動，回首頁按 **START**。
+4. 等待 **REMOTE ACCESS** 顯示 **CONNECTED**。
+5. 點首頁的 **COPY CONNECTION**，將連線資訊貼到支援遠端 MCP 的客戶端。
+
+遠端連線資訊的形式如下。以下是佔位範例，不是可直接使用的裝置網址：
+
+```json
+{
+  "url": "https://relay.pickpico.workers.dev/v3/nodes/<你的裝置識別碼>/mcp",
+  "authentication": "none"
+}
 ```
 
-因此不需要任何 Relay，PickPico 就可以先處於：
+`authentication: none` 表示客戶端不必另外提供登入或 Bearer header。**完整網址本身就是存取憑證**，持有它的人可以向這支手機提出指令，仍受手機上的權限與核准模式控制。
 
-```text
-READY · LOCAL
+不同客戶端可能要求只貼網址，或把欄位放進自己的設定結構；App 複製的 JSON 是連線資料，不是所有客戶端通用的完整設定檔。
 
-Remote access
-Not configured
+## 確認真的連上
+
+先請 Agent 呼叫 `server_info`，再執行 `command_run`：
+
+```json
+{
+  "commandId": "phone.status",
+  "arguments": {}
+}
 ```
 
-`Remote access: Not configured` 不是錯誤。它只是表示目前只有區域網路內的 Agent 能抵達這支手機。
+應收到手機的裝置、電池、網路與服務資訊。這才證明 Agent 到手機的請求有走完；Relay 的 `/health` 正常，只代表 Relay 本身有回應。
 
-## 2. 為什麼 Remote 需要額外基礎設施
+接著依需求開啟相機、畫面操作等能力。遠端連線成功，不會自動授予 Android 權限。
 
-ChatGPT Web、Claude.ai 等雲端 Agent 無法直接連進使用者家中的 LAN，也不能直接存取 `192.168.x.x:8765`。
+## 設定區域網路直連
 
-PickPico 的 Remote Transport 因此採用反向連線：
+1. 確認電腦能連到手機目前的區域網路 IP。訪客 Wi-Fi 或裝置隔離可能阻擋互連。
+2. 在 PickPico 首頁啟動服務。
+3. 到 **SETTINGS → Developer / Diagnostics** 查看 **Local MCP** 與 **Local bearer**。
+4. 在客戶端設定手機顯示的網址，以及 `Authorization: Bearer <token>`。
 
-```text
-Cloud Agent
-    |
-    | HTTPS
-    v
-Compatible PickPico Relay
-    ^
-    | WSS initiated by phone
-    |
-PickPico Android
-    |
-    | HTTP loopback
-    v
-127.0.0.1:8765/mcp
+```json
+{
+  "url": "http://<手機區域網路IP>:8765/mcp",
+  "headers": {
+    "Authorization": "Bearer <手機顯示的token>"
+  }
+}
 ```
 
-手機主動向 Relay 建立 WSS，因此不需要 public IP、port forwarding 或額外 VPN。
+Local MCP 使用 HTTP，沒有 TLS 加密，請用在可信任的網路。手機 IP 可能因換網路而改變。
 
-## 3. 什麼叫「Compatible PickPico Relay」
+首頁 **COPY CONNECTION** 在已有 Remote MCP 網址時會優先複製遠端資訊，即使 Relay 當下斷線也不代表它會改選 Local。要指定直連，請查看診斷頁的 Local 欄位。
 
-Remote Access 並不是要求使用者一定要使用 Cloudflare。
+## 停用遠端連線
 
-真正的產品需求是：
+把 Relay 欄位清空、儲存，再重新啟動服務。Local MCP 仍可使用。
 
-> Relay backend 必須實作 PickPico Remote Transport protocol，能接受遠端 MCP request，找到對應的手機連線，並透過手機主動建立的連線把 request 轉交給 Android 上的 MCP runtime。
+停止首頁的 Node 服務則會停止 Local 與 Relay 連線。停用遠端不等於更換裝置識別碼；重新啟用後不應假設舊網址已失效。
 
-目前 repo 內的 `relay/` 是官方 reference implementation，技術上使用：
+## 常見情況
 
-```text
-Cloudflare Worker + Durable Object
-```
+| 畫面或結果 | 代表什麼、如何處理 |
+| --- | --- |
+| `NOT CONFIGURED` | 未設定 Relay；需要遠端連線時填入基底網址並重啟服務。 |
+| `CONNECTING`、`VERIFYING` | 正在建立連線或等待心跳確認，尚不能當作可用。 |
+| `CONNECTED` | 手機與 Relay 的心跳已確認；再用 `phone.status` 檢查 Agent 端完整路徑。 |
+| `node_offline` | Relay 找不到健康的手機連線。確認 Node 已啟動、網路可用、網址是目前這支手機的。 |
+| `node_delivery_timeout` | Relay 未及時收到手機收件確認。先查連線，別把它當成指令已完成。 |
+| 指令逾時 | 可能在等待人、排隊或失去連線。先查執行狀態與實際結果，避免重複執行有副作用的動作。 |
+| 能連線，但相機要求重啟 | 相機權限和相機前景服務是兩個條件。從手機 App 停止再啟動 Node；若仍異常，可進工程頁查看狀態。 |
+| 螢幕擷取要求設定 | 在 **CAPABILITIES** 開啟 Hyper Mode，再開啟 **Screen Capture**，完成 Android 的螢幕分享確認。更新 App 不會自動跳出這個視窗。 |
+| 鎖屏後無法繼續擷取 | 先解鎖並查看 Screen Capture 是否仍啟用；若工作階段已停止，需要重新確認螢幕分享。 |
+| App 沒打開，只出現通知 | 系統或 PickPico 的前景啟動條件未滿足。解鎖後點通知完成接續操作。 |
+| Agent 看得到照片，我卻看不到 | 拍照回傳與客戶端顯示圖片是不同環節。客戶端收到圖片內容，不保證會顯示成使用者可見附件。 |
 
-目前專案自己操作的 demo relay 是：
+Wi-Fi 與行動網路切換後，PickPico 會嘗試重新連線；不要把重新連上解讀成切換期間的指令一定成功或會自動重送。
 
-```text
-https://relay.pickpico.workers.dev
-```
+## 使用自己的 Relay
 
-這個 relay 適合 hackathon、內測與專案 demo，但不應被視為所有開源使用者永久免費共用的公共基礎設施。
+目前配套是儲存庫內的 Cloudflare Worker + Durable Object。不是任意網址或一般 HTTP 代理都能使用。
 
-## 4. 一般使用者要怎麼取得 Remote Access
+部署設定含專案帳號與 KV 綁定，需要先換成自己帳號的資源，不能直接把現有設定當通用的一鍵安裝指令。維護細節見 [遠端傳輸與安全設計](remote-transport.md)。
 
-未來至少應支援一條清楚的自架路徑。
-
-目前 reference implementation 的概念流程是：
-
-```text
-1. 取得 PickPico repo
-2. 進入 relay/
-3. 在自己的 Cloudflare account 部署 Worker / Durable Object
-4. 取得自己的 relay base URL
-5. 將 relay URL 設定進 PickPico
-6. PickPico 產生或使用自己的 Node ID / relay secret
-7. 手機連上 relay
-8. 產生可供外部 Agent 使用的 Remote MCP URL
-```
-
-目前 repo 的基本部署方式：
-
-```bash
-cd relay
-npm install
-npx wrangler login
-npx wrangler deploy
-```
-
-實際畫面、QR code、copy/paste 流程、是否能一鍵部署等，都留給後續 UI / onboarding 設計決定。
-
-## 5. 未來說明頁必須讓使用者理解的事
-
-Remote setup 頁面不需要把使用者訓練成網路工程師，但至少要清楚說明：
-
-- `Local` 不需要任何雲端服務，裝好即可使用。
-- `Remote` 需要一個相容的 Relay backend。
-- PickPico 提供 reference relay implementation，但預設不保證提供永久公共 hosted relay。
-- Remote Relay 可以自架，不必依賴 PickPico 專案作者的 Cloudflare 帳號。
-- Cloudflare 只是目前的 reference implementation，不是 protocol 本身。
-- Remote URL 應視同 credential，不應公開張貼。
-- Local bearer token、Relay secret、Remote capability URL 是不同用途的 credential，不應混為同一個東西。
-
-## 6. UI 層級建議，目前只做記錄、不要求立即實作
-
-首頁只需要讓使用者知道：
-
-```text
-READY · LOCAL
-
-Remote access
-Not configured
-```
-
-之後若要做 Remote setup，可以由 `Remote access` 區塊進入一個獨立說明 / 設定頁。
-
-該頁的第一層應先解釋產品概念，再讓進階使用者選擇或輸入 Relay。不要一打開就直接丟出 Worker、Durable Object、WSS、Node ID 等底層術語。
-
-完整 transport 細節仍應放在：
-
-```text
-Settings → Developer / Diagnostics
-```
-
-## 7. 目前尚未決定的項目
-
-以下都還沒有定案，不應由後續實作者自行假設：
-
-- 是否提供官方 hosted relay 方案。
-- 是否提供一鍵 Cloudflare deploy。
-- 是否支援其他 relay provider / self-host template。
-- Remote setup 是否採 wizard、QR code 或 deep link。
-- 如何替非技術使用者解釋 self-host。
-- 是否自動偵測 Local / Relay 並替 Agent 選擇 transport。
-- Remote setup 完成後首頁的最終視覺樣式。
-
-這些等後續 UI / product 討論再逐項決定。
+[回到 README](../README.md)
