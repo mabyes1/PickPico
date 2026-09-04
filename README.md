@@ -40,7 +40,7 @@ flowchart LR
     HUMAN -->|Reply| AGENT
 ```
 
-手機主動建立對外連線，因此不需要 public IP、port forwarding 或 VPN；在可信任的相同區域網路中，也可以直接連線：
+手機主動建立對外連線，不需要 public IP、port forwarding 或 VPN；在可信任的相同區域網路中，也可以直接連線：
 
 ```text
 Remote: Agent ─HTTPS→ Cloudflare Relay ←WSS─ PickPico
@@ -49,7 +49,7 @@ Local:  Agent ─HTTP + Bearer→ Android :8765/mcp
 
 ## 動態能力架構
 
-PickPico 不會把每項手機能力都做成一個頂層 MCP 工具。公開的 `/v3` 端點只提供 10 個穩定入口：
+PickPico 採動態thin mcp 架構 端點只提供 10 個穩定入口十個工具 動態生成後續可選工具 不會把每項手機能力都做成一個頂層 MCP 工具。公開的 `/v3` ：
 
 ```text
 server_info
@@ -67,14 +67,14 @@ task_status
 Agent 在需要時透過 `capability_search` 找到相關能力、目前狀態與輸入格式，再交給 `command_run` 執行。例如：
 
 ```text
-capability_search("看看目前手機畫面")
+capability_search("plz check my phone screen")
   → screen.capture / ui.inspect
 
 command_run("screen.capture")
   → native MCP image
 ```
 
-新增手機能力不需要持續擴張頂層工具數量，也能避免 Agent 因工具清單過長而選錯工具。舊版 `/v1`、`/v2` 端點保留完整工具介面以維持相容性。
+新增手機能力不需要持續擴張頂層工具數量，也能避免 Agent 因工具清單過長而選錯工具。
 
 ## 已實作能力
 
