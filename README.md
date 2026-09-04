@@ -1,292 +1,163 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="app/src/main/res/icon1.png">
+    <source media="(prefers-color-scheme: light)" srcset="app/src/main/res/icon2.png">
+    <img src="app/src/main/res/icon2.png" alt="PickPico" width="320">
+  </picture>
+</p>
+
 # PickPico
 
 > **Give your agent a phone.**
 
-Turn any Android phone into an AI Agent's **eyes, hands, runtime, and human connection**.
+**讓 AI 看見現場、操作手機、執行程式，遇到難題直接找你。**
 
-PickPico 把 Android 手機變成可被 AI Agent 使用的 **Mobile Agent Node**。Agent 能透過手機看見現場、理解畫面、操作 App、執行程式；遇到需要人類的步驟時，**HUMAN HELP** 會把任務交給手機旁的人，拿到回覆後繼續工作。
+PickPico 把 Android 手機變成 AI Agent 能使用的行動工具。接上支援 MCP 的 Agent，就能透過手機拍照、操作 App、執行小程式；遇到需要人類的步驟，直接向手機旁的人求助，收到回覆後繼續工作。
 
-PickPico 想解一個很直接的問題：
-
-> **AI Agent 已經活在雲端裡了，怎麼讓它跨進真實世界？**
+**你的手機，成為 Agent 走進真實世界的入口。**
 
 FUTUREMODE × SITCON Hackathon 2026 · AI Agents & Automation
 
-##簡介
+## 一支手機，讓 Agent 多做四件事
 
-AI Agent 已經很會用瀏覽器、程式碼和 Cloud API，卻很難碰到身邊的世界。
+| | 能做什麼 | 你可以怎麼用 |
+| --- | --- | --- |
+| 👀 **看現場** | 相機、錄音、位置、螢幕擷取 | 「拍一下設備面板，看看現在是什麼狀態。」 |
+| 👆 **動手機** | 開啟 App、點擊、輸入、捲動、語音播報 | 「幫我操作到設定頁，確認目前的選項。」 |
+| ⚙️ **跑程式** | 讀寫檔案、執行指令、啟動 Node.js 程式 | 「把這個小工具放到手機上執行。」 |
+| 🙋 **找人幫忙** | 發出求助、接收文字與照片、等待回覆 | 「這一步需要你確認，我把問題送到手機上。」 |
 
-Android 手機本身就是一台完整的 edge computer。它能看、能聽、知道自己在哪裡，也有螢幕、網路、電池和各種 App；更重要的是，手機通常就在人的身邊。
+手機本來就有相機、麥克風、螢幕、網路與電池，而且通常就在人的身邊。PickPico 把這些能力接進 Agent 的工作流程。
 
-PickPico 透過 MCP 把這支手機接進 Agent 的工作流程，讓 Agent 可以直接使用它的感知、操作、運算與人類協助能力。
+## Agent 卡住時，你的手機會來找你
 
-## 為什麼是 PickPico
+真實世界裡，總有 Agent 無法獨自完成的一步：移動物品、確認現場、補拍一張照片，或做出需要本人決定的選擇。
 
-多數 Agent 工具替 AI 增加更多可以呼叫的能力。PickPico 把 Agent 的執行邊界延伸到一支真實世界裡的 Android 手機，並搭配手機架與實體按紐達成不需要PC也能運行的小型開發環境，同時手機有任何問題，需要請AGENT協助時，不須ROOT/ADB開發者模式，不須擔心無法使用銀行轉帳等問題。
+**HUMAN HELP 讓 Agent 直接開口求助。**
 
-> **Most Agent tools extend what an AI can call. PickPico extends where an AI can exist.**
+例如，Agent 正在協助檢查設備：
 
-這支手機會成為一個 **Mobile Agent Node**：Agent 可以透過它感知環境、操作 App、執行程式，必要時把任務交給附近的人。
+1. Agent 透過手機拍攝設備面板。
+2. 畫面看不清楚，Agent 發出求助：「請靠近面板拍一張照片。」
+3. 手機旁的人開啟請求，拍照並回覆。
+4. Agent 收到照片，接著完成判讀與後續工作。
+
+你可以回覆文字、點選選項、選擇照片，或直接拍攝現場。操作期間會延長等待時間，讓你有時間把事情做好。
+
+**人類的協助，直接接回原本的任務。**
+
+## 坐在沙發上，也能叫 Agent 寫程式
+
+搭配 Pico 手機架與 BLE 實體按鈕，手機可以成為隨手可用的 Agent 終端。
+
+**按住說話、放開確認，把需求交給 Agent。**
+
+Agent 可以在手機的工作空間裡寫入檔案、執行指令，或啟動 Node.js 小工具。需要你補充資訊時，再透過 HUMAN HELP 找你。
+
+從提出需求、執行程式到回覆問題，都能圍繞這支手機完成。
+
+*手機架與實體按鈕為選配。*
+
+## 讓閒置手機接手小任務
+
+PickPico 內建 Node.js 執行環境，也支援背景程序與檔案管理。
+
+Agent 可以把小型自動化、機器人或工具程式放到手機上執行。手機既是操作入口，也能是實際執行工作的裝置。
 
 ```text
-AI Agent
-   │
-   │ MCP
-   ▼
-PickPico
-   ├─ Sense   → camera / mic / location / screen / notifications
-   ├─ Act     → apps / UI / notification / speech / share sheet
-   ├─ Run     → workspace / shell / background process / Node.js
-   └─ Ask     → HUMAN HELP → nearby human
+交代需求 → Agent 寫入程式 → 手機執行 → 取得結果
 ```
 
-## PickPico 能做什麼
+程式在 PickPico 的 App 私有空間內執行，使用 Android 允許的資源與權限。
 
-| 類別 | 已實作能力 |
+## 日常手機，也能交給 Agent 幫忙
+
+**不需要 Root，也不用開啟 ADB／USB 偵錯。**
+
+不必為了讓 AI 操作手機，額外開啟可能觸發銀行 App 安全檢查的設定。
+
+PickPico 使用 Android 提供的權限與服務。你可以在 App 裡選擇開放哪些能力，需要進一步操作畫面時，再啟用 **Hyper Mode** 並完成系統授權。
+
+- 相機、麥克風、位置等能力，由 Android 權限管理。
+- 畫面操作、通知存取與螢幕擷取，需要另外授權。
+- PIN、圖形、指紋等解鎖驗證，仍由 Android 處理。
+- 檔案與程式在 PickPico 的 App 私有空間內運作。
+
+## 開始使用
+
+準備一支 **Android 8.0 以上、ARM64 架構的手機**，以及支援遠端 MCP 連線的 Agent。
+
+1. 安裝並開啟 PickPico。
+2. 啟動服務，依需求開放手機能力。
+3. 複製 App 顯示的 MCP 連線資訊，加入你的 Agent。
+4. 確認連線後，試著交代第一個任務：
+
+> 「看看這支手機現在有哪些能力，再幫我用前鏡頭拍一張照片。」
+
+需要操作 App 畫面時，請先在 PickPico 開啟 Hyper Mode，並依提示完成授權。
+
+連線設定請見 [遠端連線指南](docs/remote-access-setup.md)。
+
+## 在同一個網路，或隔著網路使用
+
+PickPico 支援區域網路直連，也能透過 Relay 讓遠端 Agent 使用手機。
+
+```text
+區域網路：Agent ─────────────→ PickPico
+
+遠端連線：Agent → Cloudflare Relay ← PickPico
+```
+
+手機會主動連上 Relay，不需要設定公開 IP、路由器連接埠轉發或 VPN。
+
+**連線資訊含有存取憑證，請只交給你信任的 Agent，不要公開貼出。**
+
+傳輸方式與自架說明請見 [遠端架構文件](docs/remote-transport.md)。
+
+## 能力很多，Agent 需要時再找
+
+PickPico 透過 MCP 提供穩定的探索與執行入口。Agent 先搜尋任務需要的能力，再確認狀態並呼叫。
+
+```text
+「看看手機畫面」
+       ↓
+搜尋螢幕相關能力
+       ↓
+確認是否已授權
+       ↓
+擷取畫面或讀取介面元素
+       ↓
+依結果繼續工作
+```
+
+除了相機、畫面操作與程式執行，也支援：
+
+- 聯絡人查詢、行事曆讀寫。
+- 通知讀取、通知按鈕與回覆。
+- 系統檔案與照片選取器。
+- 語音播報、音量控制與手機喚醒。
+- Android 分享面板。
+- 跨步驟任務的建立與進度追蹤。
+- 檢查更新、下載與驗證 APK，再交由 Android 安裝。
+
+圖片等內容的顯示方式，取決於所使用的 MCP 客戶端。
+
+## 開發與展示
+
+PickPico 由 Android App、Cloudflare Relay，以及選配的 BLE 按鈕韌體組成。
+
+| 目錄 | 內容 |
 | --- | --- |
-| **Sense** | 相機拍照、麥克風錄音、GPS、螢幕擷取、通知讀取、Accessibility UI tree |
-| **Act** | App 啟動、網址 / deep link、點擊、輸入、捲動、剪貼簿、通知、TTS、響鈴、喚醒 |
-| **Personal data** | 聯絡人查詢、行事曆讀寫、通知 action / reply |
-| **Files & media** | 系統 File Picker、Photo Picker、PickPico 私有 workspace、Android Share Sheet |
-| **Run** | App sandbox 內 shell、背景程序、內嵌 Node.js runtime |
-| **Human** | HUMAN HELP：文字、選項、相簿選圖、現場拍照、可續時等待 |
-| **Long tasks** | 建立、更新與追蹤跨多個 command / human handoff 的 Agent task |
-| **Remote** | 跨 Wi-Fi / 行動網路使用 |
-| **self Update** | 遠端檢查新版、下載 APK、驗證後交給 Android installer |
-
-### Core Mode / Hyper Mode
-
-PickPico 把高權限能力集中在 **Hyper Mode**。手機持有者必須在 Android 系統設定中明確開啟對應權限。
-
-目前 Hyper 能力包含：
-
-- Accessibility UI inspect / click / type / scroll
-- active notifications read / action / reply
-- MediaProjection screen capture
-- Device Admin phone lock
-- urgent full-screen Agent handoff
-- 在 Hyper Mode 開啟時請 Android 嘗試 dismiss keyguard
-
-Keyguard dismissal 仍由 Android 決定，PIN、圖形、指紋等安全驗證維持系統原本的規則。
-
-## 核心 Demo
-
-### 1. Agent 卡住時，不要死轉圈，直接叫人
-
-PickPico 的 **HUMAN HELP** 是 Agent 面對真實世界阻礙時的標準出口。
-
-例如 Agent 遠端維護設備時需要知道「面板綠燈到底有沒有亮」，與其反覆猜測，它可以直接把任務交給手機旁的人：
-
-```json
-{
-  "commandId": "human.help",
-  "arguments": {
-    "title": "請協助確認設備狀態",
-    "instruction": "請看面板上的綠燈是否亮起；如果不確定，可以直接拍照。",
-    "actions": ["綠燈有亮", "沒有亮", "無法確認"],
-    "allowTextReply": true,
-    "allowImages": true,
-    "maxImages": 3,
-    "idleTimeoutSeconds": 180
-  }
-}
-```
-
-使用者開啟任務、輸入文字、選照片或拍照時都會更新 idle timer，避免人類正在幫忙時 request 卻先死掉。
-
-### 2. Pocket Worker：讓閒置手機本身成為 Agent 的運算節點
-
-Agent 可以在 PickPico 私有 workspace 寫檔、執行 shell，或啟動一個長駐 Node.js entry point。
-
-承載小型 automation、bot 或 utility，直接成為實際執行節點。
-
-```text
-Agent → workspace.write → node.start → Android phone keeps the workload alive
-```
-
-### 3. 沙發 Vibe Coding
-
-PickPico 也有 BLE button bridge，可搭配 Pico 手機架 / 實體按鈕，把手機變成 Agent 的隨身終端：按住說話、放開確認，再把語音需求送進 Agent。
-
-坐在沙發上也能叫 Agent 寫程式。手機本身就是入口。 📱🛋️
-
-### 4. 手機端小模型 + PickPico
-
-PickPico 的 MCP capability layer 與上層模型解耦。架構上可以讓 4B 級左右的手機端模型使用同一組 capabilities，變成真正能操作這支手機的 local assistant。
-
-> 這是目前的延伸方向；PickPico APK 尚未內建特定本地模型。
-
-## 系統架構
-
-```mermaid
-flowchart LR
-    AGENT[AI Agent / MCP Client]
-    RELAY[Cloudflare Relay]
-    PHONE[Android PickPico]
-    GATEWAY[Thin MCP Gateway]
-    RUNTIME[Capability Runtime]
-    DEVICE[Android Device + Apps]
-    NODE[Workspace + Node.js]
-    HUMAN[HUMAN HELP]
-
-    AGENT -->|HTTPS| RELAY
-    PHONE -->|Outbound WSS| RELAY
-    RELAY --> GATEWAY
-    GATEWAY --> RUNTIME
-    RUNTIME --> DEVICE
-    RUNTIME --> NODE
-    RUNTIME --> HUMAN
-    HUMAN -->|Reply / Image| AGENT
-```
-
-手機主動建立 outbound connection，所以不需要 public IP、port forwarding 或 VPN。
-
-```text
-Remote: Agent ─HTTPS→ Cloudflare Relay ←WSS─ PickPico
-Local:  Agent ─HTTP + Bearer→ Android :8765/mcp
-```
-
-目前 reference Relay：
-
-```text
-https://relay.pickpico.workers.dev
-```
-
-## 為什麼 MCP 工具只有少數幾個
-
-PickPico 將公開的 `/v3` thin profile 收斂成 10 個穩定入口，手機能力則由 Agent 在需要時動態探索：
-
-```text
-server_info
-capability_search
-capability_status
-policy_status
-command_run
-command_status
-task_runtime_info
-task_create
-task_update
-task_status
-```
-
-Agent 需要能力時才搜尋：
-
-```text
-capability_search("看看現在手機畫面")
-  → screen.capture / ui.inspect
-
-command_run("screen.capture")
-  → native MCP image
-```
-
-這樣新增手機能力時不必一直膨脹 tool list，也降低模型在一大排相似工具裡選錯的機率。
-
-舊版 `/v1`、`/v2` 仍保留較完整的 tool surface 以維持相容性。
-
-## 安全邊界
-
-PickPico 的能力受 Android 原生權限與明確的 owner policy 約束。
-
-| 能力 | 邊界 |
-| --- | --- |
-| 相機、麥克風、位置、聯絡人、行事曆 | 依 Android runtime permission 管理 |
-| 通知存取 | 必須由使用者在 Android 設定中開啟 Notification Listener |
-| Hyper UI | 必須由使用者親自在系統設定中啟用 Accessibility Service |
-| Screen capture | 必須取得 Android MediaProjection 授權 |
-| Phone lock | 必須先啟用 Device Admin |
-| Hyper unlock | 只要求 Android dismiss keyguard，不繞過 secure authentication |
-| Shell / Node.js | 僅在 PickPico App sandbox 內執行，沒有 root 或 ADB 權限 |
-| HUMAN HELP | 回覆與圖片保存在 App 私有儲存空間 |
-| Local MCP | 使用 Bearer token |
-| Remote MCP | 高熵 capability URL、Relay secret 與 local Bearer 分開管理 |
-| Self update | 驗證 SHA-256、package name、簽章與版本後才交給 Android installer |
-
-**遠端 capability URL 本身等同憑證，不應公開分享。**
-
-## 連線方式
-
-### Local
-
-1. 手機與 MCP Client 位於相同的可信任網路。
-2. 開啟 PickPico，啟動 Node。
-3. 複製 App 顯示的 MCP Connection JSON 到 Client。
-
-### Remote Relay
-
-1. Relay URL 使用 `https://relay.pickpico.workers.dev`。
-2. 啟動 Node，等待 Relay 顯示 connected。
-3. 複製 Remote MCP Connection JSON 到 Client。
-4. 手機之後可在 Wi-Fi / 行動網路間切換並自動重連。
-
-更完整的傳輸、安全設計與自架說明：[`docs/remote-transport.md`](docs/remote-transport.md)
-
-## Build
-
-
-
-需求：
-
-- Java 17
-- Gradle 8.7
-- Android SDK 35
-- Android NDK `27.3.13750724`
-- CMake `3.22.1`
-- Android 8.0+ / `arm64-v8a`
-
-第一次 build 會下載 `nodejs-mobile 18.20.4`，並在解壓前驗證固定 SHA-256。
-
-```powershell
-gradle :app:testDebugUnitTest :app:assembleDebug
-```
-
-APK：
-
-```text
-app\build\outputs\apk\debug\app-debug.apk
-```
-
-## Hackathon readiness
-
-```powershell
-# Build + unit tests + APK + Relay health
-pwsh scripts/hackathon-readiness.ps1
-
-# 加上真實 Android MCP Node
-pwsh scripts/hackathon-readiness.ps1 -Device
-
-# 再加 HUMAN HELP 完整 round trip
-pwsh scripts/hackathon-readiness.ps1 -Device -HumanHelp
-```
-
-完整展示流程：[`docs/demo-runbook.md`](docs/demo-runbook.md)
-
-## 專案結構
-
-```text
-MCPocket/
-├─ app/                         Android PickPico
-├─ relay/                       Cloudflare Worker + Durable Object
-├─ firmware/
-│  └─ pickpico-button-pad/      BLE physical button pad
-├─ docs/
-│  ├─ product-spec-v0.1.md      Product / capability spec
-│  ├─ remote-transport.md       Remote transport & security
-│  ├─ remote-access-setup.md    Remote setup
-│  └─ demo-runbook.md           Hackathon demo flow
-└─ scripts/                     Build / validation / publishing
-```
-
-## Tech
-
-- Model Context Protocol
-- Android SDK / AndroidX
-- OkHttp
-- nodejs-mobile
-- Cloudflare Workers / Durable Objects / Workers KV
-- BLE
-- JUnit
-
-本專案使用 AI coding agents 協助開發與測試；產品設計、整合與驗證由團隊負責。第三方元件各自適用其原始授權條款。
-
-## License
-
+| `app/` | Android App 與手機能力 |
+| `relay/` | 遠端連線服務 |
+| `firmware/` | BLE 實體按鈕韌體 |
+| `docs/` | 設計、設定與展示文件 |
+| `scripts/` | 建置、驗證與發布工具 |
+
+- [完整展示流程](docs/demo-runbook.md)
+- [遠端傳輸與安全設計](docs/remote-transport.md)
+- [產品與能力規格](docs/product-spec-v0.1.md)
+
+主要技術：MCP、Android、Node.js、Cloudflare Workers、Durable Objects、BLE。
+
+本專案使用 AI coding agents 協助開發與測試；產品設計、整合與驗證由團隊負責。
