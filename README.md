@@ -320,6 +320,7 @@ PickPico Logo、產品文案與本專案自製介面素材由團隊製作。若�
 | 姓名 | 分工 |
 | --- | --- |
 | Ken Huang (`@mabyes1`) | Product design、Android / MCP / Relay integration、Agent workflow、testing |
+| Kate Li（凱特李）<br>`kateli02022024@gmail.com` | Frontend UI/UX design、PICO 實體手機架設計 |
 
 本專案使用 AI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
 
@@ -335,4 +336,9 @@ PickPico Logo、產品文案與本專案自製介面素材由團隊製作。若�
 
 ## License
 
-PickPico 採用 **MIT License**。完整條款見 [LICENSE](LICENSE)。
+PickPico 採用 **AGPL-3.0 + Commercial Dual License**。
+
+- 開源使用、修改與散布：依 **GNU Affero General Public License v3.0 (AGPL-3.0)**，完整條款見 [LICENSE](LICENSE)。
+- 若要在不受 AGPL-3.0 copyleft 義務約束的專有／閉源產品或服務中使用、修改或整合 PickPico，請另行取得商業授權，詳見 [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md)。
+
+第三方元件仍依各自原始授權條款使用。
