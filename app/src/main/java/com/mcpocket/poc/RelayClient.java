@@ -52,7 +52,9 @@ final class RelayClient {
     private final String relayBaseUrl;
     private final Listener listener;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService requestExecutor = Executors.newFixedThreadPool(2);
+    // HUMAN HELP and picker calls wait for people. Keep spare workers available for
+    // status and independent commands while an interactive request is pending.
+    private final ExecutorService requestExecutor = Executors.newFixedThreadPool(4);
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)

@@ -23,7 +23,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Failed to request PickPico dev MCP command"
 }
 
-$deadline = [DateTime]::UtcNow.AddSeconds(125)
+# DevBridgeService permits up to four minutes for interactive commands. Keep the
+# host-side deadline slightly longer so HUMAN HELP can return its final result.
+$deadline = [DateTime]::UtcNow.AddSeconds(250)
 do {
     Start-Sleep -Milliseconds 200
     $result = & $adb shell run-as com.mcpocket.poc cat files/dev-last-command.json 2>$null

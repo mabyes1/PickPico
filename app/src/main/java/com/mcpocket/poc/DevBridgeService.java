@@ -32,6 +32,9 @@ import java.util.Base64;
 
 /** ADB-shell-only foreground service for debug smoke tests. */
 public final class DevBridgeService extends Service {
+    private static final int CONNECT_TIMEOUT_MS = 3_000;
+    // Debug commands can wait for HUMAN HELP or another Android-mediated user action.
+    private static final int COMMAND_READ_TIMEOUT_MS = 240_000;
     private static final int NOTIFICATION_ID = 8766;
     private static final String CHANNEL_ID = "mcpocket_dev_bridge";
     private static final String DEV_RESULT_FILE = "dev-last-command.json";
@@ -130,8 +133,8 @@ public final class DevBridgeService extends Service {
                 HttpURLConnection connection = (HttpURLConnection) new URL(
                         "http://127.0.0.1:8765/mcp").openConnection();
                 connection.setRequestMethod("POST");
-                connection.setConnectTimeout(3000);
-                connection.setReadTimeout(5000);
+                connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                connection.setReadTimeout(COMMAND_READ_TIMEOUT_MS);
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json");
                 connection.setRequestProperty("Authorization", "Bearer " + token);

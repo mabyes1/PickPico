@@ -17,6 +17,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class McpHttpServerTest {
@@ -25,6 +26,7 @@ public final class McpHttpServerTest {
     private McpHttpServer server;
     private int port;
     private AtomicInteger capabilityStateProbeCount;
+    private final AtomicBoolean failPhoneStatus = new AtomicBoolean();
 
     @Before
     public void setUp() throws Exception {
@@ -46,6 +48,9 @@ public final class McpHttpServerTest {
 
             @Override
             public JSONObject phoneStatus(long callCount) throws org.json.JSONException {
+                if (failPhoneStatus.get()) {
+                    throw new SecurityException("simulated denied permission");
+                }
                 return new JSONObject()
                         .put("battery", new JSONObject().put("percent", 80))
                         .put("toolCallCount", callCount);
@@ -281,6 +286,26 @@ public final class McpHttpServerTest {
                 .getJSONObject("structuredContent")
                 .getJSONObject("battery")
                 .getInt("percent"));
+    }
+
+    @Test
+    public void unexpectedToolFailureReturnsStructuredErrorInsteadOfDroppingConnection() throws Exception {
+        failPhoneStatus.set(true);
+        HttpResult failed = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":601,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"phone_status\",\"arguments\":{}}}",
+                authorizedHeaders());
+
+        assertEquals(200, failed.status);
+        JSONObject result = new JSONObject(failed.body).getJSONObject("result");
+        assertTrue(result.getBoolean("isError"));
+        assertTrue(result.getJSONArray("content").toString().contains("SecurityException"));
+
+        failPhoneStatus.set(false);
+        HttpResult recovered = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":602,\"method\":\"ping\"}",
+                authorizedHeaders());
+        assertEquals(200, recovered.status);
     }
 
     @Test
@@ -800,6 +825,28 @@ public final class McpHttpServerTest {
         HttpResult response = post("{not-json", authorizedHeaders());
         assertEquals(400, response.status);
         assertEquals(-32700, new JSONObject(response.body).getJSONObject("error").getInt("code"));
+    }
+
+    @Test
+    public void acceptsWorkspaceWritesLargerThanLegacy64KiBLimit() throws Exception {
+        String content = "x".repeat(70 * 1024);
+        String body = new JSONObject()
+                .put("jsonrpc", "2.0")
+                .put("id", 801)
+                .put("method", "tools/call")
+                .put("params", new JSONObject()
+                        .put("name", "workspace_write_file")
+                        .put("arguments", new JSONObject()
+                                .put("path", "large.txt")
+                                .put("content", content)))
+                .toString();
+
+        HttpResult response = post(body, authorizedHeaders());
+        assertEquals(200, response.status);
+        assertEquals(content.length(), new JSONObject(response.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getInt("bytesWritten"));
     }
 
     private Map<String, String> authorizedHeaders() {

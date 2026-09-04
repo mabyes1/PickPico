@@ -9,7 +9,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
@@ -61,7 +60,6 @@ public final class ScreenCaptureService extends Service {
     private int densityDpi;
     private boolean stopping;
     private Bitmap frameBitmap;
-    private Bitmap paddedFrameBitmap;
     private long lastFrameCapturedElapsedMs;
 
     @Override
@@ -327,20 +325,11 @@ public final class ScreenCaptureService extends Service {
         ByteBuffer buffer = plane.getBuffer();
         int pixelStride = plane.getPixelStride();
         int rowStride = plane.getRowStride();
-        int rowPadding = Math.max(0, rowStride - pixelStride * width);
-        int paddedWidth = width + rowPadding / Math.max(1, pixelStride);
-        buffer.rewind();
-
         frameBitmap = ensureBitmap(frameBitmap, width, height);
-        if (paddedWidth == width) {
-            frameBitmap.copyPixelsFromBuffer(buffer);
-            return frameBitmap;
-        }
-
-        paddedFrameBitmap = ensureBitmap(paddedFrameBitmap, paddedWidth, height);
-        paddedFrameBitmap.copyPixelsFromBuffer(buffer);
-        Canvas canvas = new Canvas(frameBitmap);
-        canvas.drawBitmap(paddedFrameBitmap, 0f, 0f, null);
+        // Some GPU drivers omit final-row padding from the plane buffer. Compact
+        // only real pixels instead of asking Bitmap to consume paddedWidth*height.
+        frameBitmap.copyPixelsFromBuffer(RgbaPlaneBuffer.compact(
+                buffer, width, height, pixelStride, rowStride));
         return frameBitmap;
     }
 
@@ -362,10 +351,6 @@ public final class ScreenCaptureService extends Service {
             frameBitmap.recycle();
         }
         frameBitmap = null;
-        if (paddedFrameBitmap != null && !paddedFrameBitmap.isRecycled()) {
-            paddedFrameBitmap.recycle();
-        }
-        paddedFrameBitmap = null;
     }
 
     private void startAsForeground() {

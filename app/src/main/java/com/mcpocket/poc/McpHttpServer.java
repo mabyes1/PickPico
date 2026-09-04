@@ -21,7 +21,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 final class McpHttpServer {
-    private static final int MAX_BODY_BYTES = 64 * 1024;
+    // workspace.write accepts up to 1 MiB of text; leave room for JSON framing
+    // and UTF-8 expansion while still bounding memory use per connection.
+    private static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
     private static final int MAX_LINE_BYTES = 8 * 1024;
     private static final int SOCKET_TIMEOUT_MS = 10_000;
 
