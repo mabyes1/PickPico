@@ -112,6 +112,13 @@ public final class McpNodeService extends Service implements McpToolActions {
     private boolean mediaForegroundRequested;
     private PowerManager.WakeLock agentScreenWakeLock;
     private int activeAgentCommandCount;
+    private boolean agentScreenDestroyed;
+    private final Runnable agentScreenRetryRunnable = () -> {
+        if (!agentScreenDestroyed) {
+            refreshAgentScreenAwakeState(activeAgentCommandCount > 0
+                    ? AGENT_SCREEN_ACTIVE_LEASE_MS : AGENT_SCREEN_IDLE_LEASE_MS);
+        }
+    };
     private WindowManager agentScreenWindowManager;
     private View agentScreenKeepAwakeView;
     private final Runnable agentScreenIdleReleaseRunnable = () -> {
@@ -205,6 +212,8 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public void onDestroy() {
         nodeActive = false;
+        agentScreenDestroyed = true;
+        mainHandler.removeCallbacks(agentScreenRetryRunnable);
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
         activeAgentCommandCount = 0;
@@ -230,10 +239,23 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
-    public synchronized void onAgentCommandStarted(String commandId) {
+    public void onAgentCommandStarted(String commandId) {
         if ("phone.wake".equals(commandId)) {
             return;
         }
+        postAgentScreenAction(this::startAgentScreenCommand);
+    }
+
+    // WindowManager views and their lifecycle belong to the main Looper, even
+    // when the command itself runs on an HTTP worker. Never block that worker
+    // waiting for the main thread, and ignore callbacks after service teardown.
+    private void postAgentScreenAction(Runnable action) {
+        mainHandler.post(() -> {
+            if (!agentScreenDestroyed) action.run();
+        });
+    }
+
+    private void startAgentScreenCommand() {
         activeAgentCommandCount++;
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
         refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
@@ -241,20 +263,19 @@ public final class McpNodeService extends Service implements McpToolActions {
         // screen from inside their handler. If the start hook ran while the
         // display was still asleep, retry once after that wake has had time to
         // land so a long-running command remains visibly awake.
-        mainHandler.postDelayed(() -> {
-            synchronized (McpNodeService.this) {
-                if (activeAgentCommandCount > 0) {
-                    refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
-                }
-            }
-        }, 750L);
+        mainHandler.removeCallbacks(agentScreenRetryRunnable);
+        mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
     }
 
     @Override
-    public synchronized void onAgentCommandFinished(String commandId) {
+    public void onAgentCommandFinished(String commandId) {
         if ("phone.wake".equals(commandId)) {
             return;
         }
+        postAgentScreenAction(this::finishAgentScreenCommand);
+    }
+
+    private void finishAgentScreenCommand() {
         if (activeAgentCommandCount > 0) {
             activeAgentCommandCount--;
         }

@@ -62,7 +62,7 @@ public final class ScreenCaptureService extends Service {
     private boolean stopping;
     private Bitmap frameBitmap;
     private Bitmap paddedFrameBitmap;
-    private long lastFrameCapturedAtEpochMs;
+    private long lastFrameCapturedElapsedMs;
 
     @Override
     public void onCreate() {
@@ -175,9 +175,20 @@ public final class ScreenCaptureService extends Service {
             Bitmap bitmap;
             if (freshFrame) {
                 bitmap = bitmapFromImage(image);
-                lastFrameCapturedAtEpochMs = System.currentTimeMillis();
+                lastFrameCapturedElapsedMs = SystemClock.elapsedRealtime();
             } else {
                 bitmap = frameBitmap;
+            }
+            long frameAgeMs = Math.max(0L, SystemClock.elapsedRealtime() - lastFrameCapturedElapsedMs);
+            if (ScreenFramePolicy.isExpired(freshFrame, frameAgeMs)) {
+                return new JSONObject()
+                        .put("captured", false)
+                        .put("error", "screen_frame_stale")
+                        .put("freshFrame", false)
+                        .put("frameAgeMs", frameAgeMs)
+                        .put("message", "No new screen frame is available; cached frame is "
+                                + frameAgeMs + " ms old and was not returned. Request a new capture before acting.")
+                        .put("toolCallCount", callCount);
             }
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes)) {
@@ -205,14 +216,14 @@ public final class ScreenCaptureService extends Service {
                     .put("path", relativePath)
                     .put("sizeBytes", jpeg.length)
                     .put("freshFrame", freshFrame)
-                    .put("frameAgeMs", Math.max(0L, System.currentTimeMillis() - lastFrameCapturedAtEpochMs))
+                    .put("frameAgeMs", frameAgeMs)
                     .put("timestamp", Instant.now().toString())
                     .put("toolCallCount", callCount);
             if (returnContent) {
                 result.put("_mcpContent", new JSONArray()
                         .put(new JSONObject()
                                 .put("type", "text")
-                                .put("text", "Captured current Android screen to " + relativePath))
+                                .put("text", ScreenFramePolicy.describe(freshFrame, frameAgeMs, relativePath)))
                         .put(new JSONObject()
                                 .put("type", "image")
                                 .put("mimeType", "image/jpeg")
@@ -291,7 +302,7 @@ public final class ScreenCaptureService extends Service {
             imageReader = null;
         }
         recycleFrameBitmaps();
-        lastFrameCapturedAtEpochMs = 0L;
+        lastFrameCapturedElapsedMs = 0L;
         if (projection != null) {
             try {
                 projection.stop();

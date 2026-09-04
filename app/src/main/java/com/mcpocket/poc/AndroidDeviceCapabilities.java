@@ -115,9 +115,11 @@ final class AndroidDeviceCapabilities {
         HandlerThread cameraThread = new HandlerThread("mcpocket-camera");
         cameraThread.start();
         Handler cameraHandler = new Handler(cameraThread.getLooper());
+        // Device/session callbacks must outlive the per-capture image thread:
+        // openCamera may deliver its result after our eight-second deadline.
+        Handler stateHandler = new Handler(Looper.getMainLooper());
+        CaptureResources resources = new CaptureResources();
         ImageReader reader = null;
-        CameraDevice camera = null;
-        CameraCaptureSession session = null;
         try {
             CameraSelection selection = selectCamera(manager, lens, maxWidth, maxHeight);
             reader = ImageReader.newInstance(
@@ -125,12 +127,11 @@ final class AndroidDeviceCapabilities {
                     selection.size.getHeight(),
                     ImageFormat.JPEG,
                     2);
+            resources.add(reader);
 
             CountDownLatch finished = new CountDownLatch(1);
             AtomicReference<byte[]> imageBytes = new AtomicReference<>();
             AtomicReference<Throwable> failure = new AtomicReference<>();
-            AtomicReference<CameraDevice> cameraRef = new AtomicReference<>();
-            AtomicReference<CameraCaptureSession> sessionRef = new AtomicReference<>();
             ImageReader captureReader = reader;
 
             reader.setOnImageAvailableListener(imageReader -> {
@@ -152,66 +153,74 @@ final class AndroidDeviceCapabilities {
             manager.openCamera(selection.cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(CameraDevice openedCamera) {
-                    cameraRef.set(openedCamera);
-                    try {
-                        openedCamera.createCaptureSession(
-                                Collections.singletonList(captureReader.getSurface()),
-                                new CameraCaptureSession.StateCallback() {
-                                    @Override
-                                    public void onConfigured(CameraCaptureSession captureSession) {
-                                        sessionRef.set(captureSession);
-                                        try {
-                                            CaptureRequest.Builder request = openedCamera.createCaptureRequest(
-                                                    CameraDevice.TEMPLATE_STILL_CAPTURE);
-                                            request.addTarget(captureReader.getSurface());
-                                            request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-                                            request.set(CaptureRequest.JPEG_QUALITY, (byte) quality);
-                                            if (selection.sensorOrientation != null) {
-                                                request.set(CaptureRequest.JPEG_ORIENTATION, selection.sensorOrientation);
+                    synchronized (resources) {
+                        if (!resources.add(openedCamera)) return;
+                        try {
+                            openedCamera.createCaptureSession(
+                                    Collections.singletonList(captureReader.getSurface()),
+                                    new CameraCaptureSession.StateCallback() {
+                                        @Override
+                                        public void onConfigured(CameraCaptureSession captureSession) {
+                                            synchronized (resources) {
+                                                if (!resources.add(captureSession)) return;
+                                                try {
+                                                    CaptureRequest.Builder request = openedCamera.createCaptureRequest(
+                                                            CameraDevice.TEMPLATE_STILL_CAPTURE);
+                                                    request.addTarget(captureReader.getSurface());
+                                                    request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                                                    request.set(CaptureRequest.JPEG_QUALITY, (byte) quality);
+                                                    if (selection.sensorOrientation != null) {
+                                                        request.set(CaptureRequest.JPEG_ORIENTATION, selection.sensorOrientation);
+                                                    }
+                                                    captureSession.capture(
+                                                            request.build(),
+                                                            new CameraCaptureSession.CaptureCallback() {},
+                                                            cameraHandler);
+                                                } catch (Throwable error) {
+                                                    failure.compareAndSet(null, error);
+                                                    finished.countDown();
+                                                }
                                             }
-                                            captureSession.capture(
-                                                    request.build(),
-                                                    new CameraCaptureSession.CaptureCallback() {},
-                                                    cameraHandler);
-                                        } catch (Throwable error) {
-                                            failure.compareAndSet(null, error);
+                                        }
+
+                                        @Override
+                                        public void onConfigureFailed(CameraCaptureSession captureSession) {
+                                            resources.add(captureSession);
+                                            resources.close();
+                                            failure.compareAndSet(
+                                                    null,
+                                                    new IllegalStateException("Camera capture session configuration failed"));
                                             finished.countDown();
                                         }
-                                    }
-
-                                    @Override
-                                    public void onConfigureFailed(CameraCaptureSession captureSession) {
-                                        failure.compareAndSet(
-                                                null,
-                                                new IllegalStateException("Camera capture session configuration failed"));
-                                        finished.countDown();
-                                    }
-                                },
-                                cameraHandler);
-                    } catch (Throwable error) {
-                        failure.compareAndSet(null, error);
-                        finished.countDown();
+                                    },
+                                    stateHandler);
+                        } catch (Throwable error) {
+                            failure.compareAndSet(null, error);
+                            finished.countDown();
+                        }
                     }
                 }
 
                 @Override
                 public void onDisconnected(CameraDevice disconnectedCamera) {
+                    resources.add(disconnectedCamera);
+                    resources.close();
                     failure.compareAndSet(null, new IllegalStateException("Camera disconnected"));
                     finished.countDown();
                 }
 
                 @Override
                 public void onError(CameraDevice errorCamera, int errorCode) {
+                    resources.add(errorCamera);
+                    resources.close();
                     failure.compareAndSet(
                             null,
                             new IllegalStateException("Camera error code " + errorCode));
                     finished.countDown();
                 }
-            }, cameraHandler);
+            }, stateHandler);
 
             boolean completed = finished.await(CAMERA_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            camera = cameraRef.get();
-            session = sessionRef.get();
             if (!completed) {
                 return failure("camera_timeout", "Timed out waiting for a camera frame", callCount);
             }
@@ -264,15 +273,7 @@ final class AndroidDeviceCapabilities {
                     error.getClass().getSimpleName() + ": " + safeMessage(error),
                     callCount);
         } finally {
-            if (session != null) {
-                session.close();
-            }
-            if (camera != null) {
-                camera.close();
-            }
-            if (reader != null) {
-                reader.close();
-            }
+            resources.close();
             cameraThread.quitSafely();
         }
     }
