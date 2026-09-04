@@ -233,6 +233,38 @@ final class CommandRuntime {
                 });
 
         register(
+                "audio.status",
+                "Inspect Android media, notification, ringtone, and alarm volume separately, plus ringer mode and Do Not Disturb state.",
+                "audio",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.audioStatus(callCount));
+
+        register(
+                "audio.set",
+                "Set one Android audio stream by percentage without changing unrelated streams or Do Not Disturb state.",
+                "audio",
+                "physical_action",
+                true,
+                audioSetSchema(),
+                (arguments, callCount) -> {
+                    String stream = arguments.optString("stream", "");
+                    if (!"media".equals(stream)
+                            && !"notification".equals(stream)
+                            && !"ring".equals(stream)
+                            && !"alarm".equals(stream)) {
+                        throw new CommandInputException(
+                                "audio.set stream must be media, notification, ring, or alarm");
+                    }
+                    int percent = arguments.optInt("percent", -1);
+                    if (percent < 0 || percent > 100) {
+                        throw new CommandInputException("audio.set percent must be between 0 and 100");
+                    }
+                    return actions.audioSet(arguments, callCount);
+                });
+
+        register(
                 "microphone.record",
                 "Record mono 16 kHz WAV audio from the Android microphone and persist it in the MCPocket workspace.",
                 "sensor",
@@ -1203,6 +1235,10 @@ final class CommandRuntime {
     }
 
     private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
+        // Every capability funnels through here. Android uses this hook to renew
+        // a short screen-awake lease while an Agent is actively operating the
+        // phone, without changing the owner's system screen-timeout setting.
+        actions.onAgentCommandActivity(command.id);
         if (requiresApproval(command)) {
             JSONObject approval = actions.requestApproval(
                     command.id,
@@ -1443,6 +1479,30 @@ final class CommandRuntime {
                                 .put("enum", new JSONArray().put("flush").put("add"))
                                 .put("default", "flush")))
                 .put("required", new JSONArray().put("text"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject audioSetSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("stream", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray()
+                                        .put("media")
+                                        .put("notification")
+                                        .put("ring")
+                                        .put("alarm")))
+                        .put("percent", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 0)
+                                .put("maximum", 100)
+                                .put("description", "Requested volume as a percentage of the stream maximum."))
+                        .put("showUi", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)
+                                .put("description", "Ask Android to briefly show its native volume UI.")))
+                .put("required", new JSONArray().put("stream").put("percent"))
                 .put("additionalProperties", false);
     }
 

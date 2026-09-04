@@ -61,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class McpNodeService extends Service implements McpToolActions {
+    private static final long AGENT_SCREEN_LEASE_MS = 90_000L;
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
@@ -99,6 +100,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private int previousAlarmVolume = -1;
     private AndroidDeviceCapabilities deviceCapabilities;
     private boolean mediaForegroundRequested;
+    private PowerManager.WakeLock agentScreenWakeLock;
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
 
@@ -183,6 +185,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public void onDestroy() {
         nodeActive = false;
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
+        releaseAgentScreenLease();
         stopAlertSound();
         stopAllProcessSessions();
         if (buttonBridge != null) {
@@ -200,6 +203,49 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_RUNNING, false).apply();
         super.onDestroy();
+    }
+
+    @Override
+    public void onAgentCommandActivity(String commandId) {
+        refreshAgentScreenLease();
+    }
+
+    @SuppressWarnings("deprecation")
+    private synchronized void refreshAgentScreenLease() {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null) {
+            return;
+        }
+        if (!power.isInteractive()) {
+            releaseAgentScreenLease();
+            return;
+        }
+        try {
+            if (agentScreenWakeLock == null) {
+                agentScreenWakeLock = power.newWakeLock(
+                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK,
+                        "PickPico:agentOperation");
+                agentScreenWakeLock.setReferenceCounted(false);
+            }
+            if (agentScreenWakeLock.isHeld()) {
+                agentScreenWakeLock.release();
+            }
+            agentScreenWakeLock.acquire(AGENT_SCREEN_LEASE_MS);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private synchronized void releaseAgentScreenLease() {
+        if (agentScreenWakeLock == null) {
+            return;
+        }
+        try {
+            if (agentScreenWakeLock.isHeld()) {
+                agentScreenWakeLock.release();
+            }
+        } catch (RuntimeException ignored) {
+        }
+        agentScreenWakeLock = null;
     }
 
     private void scheduleAutoUpdateCheck(long delayMs) {
@@ -1016,6 +1062,24 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         JSONObject result = deviceCapabilities.speak(arguments, callCount);
         recordCapabilityAction("phone.speak", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject audioStatus(long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("audio", callCount);
+        }
+        return deviceCapabilities.audioStatus(callCount);
+    }
+
+    @Override
+    public JSONObject audioSet(JSONObject arguments, long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("audio", callCount);
+        }
+        JSONObject result = deviceCapabilities.audioSet(arguments, callCount);
+        recordCapabilityAction("audio.set", result, callCount);
         return result;
     }
 

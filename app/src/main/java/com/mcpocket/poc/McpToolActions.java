@@ -5,6 +5,9 @@ import org.json.JSONObject;
 
 /** Android-facing actions that can be exposed as MCP tools. */
 interface McpToolActions {
+    default void onAgentCommandActivity(String commandId) {
+    }
+
     default JSONObject capabilityState(String commandId) throws JSONException {
         return new JSONObject()
                 .put("platform", "test")
@@ -114,6 +117,20 @@ interface McpToolActions {
         return new JSONObject()
                 .put("supported", false)
                 .put("capability", "phone.speak")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject audioStatus(long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "audio.status")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject audioSet(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "audio.set")
                 .put("toolCallCount", callCount);
     }
 

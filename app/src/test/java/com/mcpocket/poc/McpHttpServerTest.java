@@ -465,7 +465,7 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(56, listed.getInt("count"));
+        assertEquals(58, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
@@ -475,6 +475,8 @@ public final class McpHttpServerTest {
         assertTrue(listed.getJSONArray("commands").toString().contains("camera.capture"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.notify"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.speak"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("audio.status"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("audio.set"));
         assertTrue(listed.getJSONArray("commands").toString().contains("microphone.record"));
         assertTrue(listed.getJSONArray("commands").toString().contains("human.help"));
         assertTrue(listed.getJSONArray("commands").toString().contains("human.help.status"));
@@ -562,9 +564,11 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(56, capabilityList.getInt("count"));
+        assertEquals(58, capabilityList.getInt("count"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.status"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.set"));
 
         HttpResult status = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\"," +

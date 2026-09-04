@@ -433,6 +433,131 @@ final class AndroidDeviceCapabilities {
                 .put("decision", decisionReason);
     }
 
+    JSONObject audioStatus(long callCount) throws JSONException {
+        AudioManager audio = (AudioManager) service.getSystemService(Service.AUDIO_SERVICE);
+        if (audio == null) {
+            return failure("audio_unavailable", "Android AudioManager is unavailable", callCount);
+        }
+        return buildAudioStatus(audio)
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    JSONObject audioSet(JSONObject arguments, long callCount) throws JSONException {
+        AudioManager audio = (AudioManager) service.getSystemService(Service.AUDIO_SERVICE);
+        if (audio == null) {
+            return failure("audio_unavailable", "Android AudioManager is unavailable", callCount);
+        }
+        if (audio.isVolumeFixed()) {
+            return failure("audio_volume_fixed", "Android reports fixed device volume", callCount);
+        }
+
+        String streamName = arguments.optString("stream", "");
+        int requestedPercent = arguments.optInt("percent", -1);
+        boolean showUi = arguments.optBoolean("showUi", false);
+        int stream = audioStream(streamName);
+        int maxVolume = audio.getStreamMaxVolume(stream);
+        int before = audio.getStreamVolume(stream);
+        int notificationBefore = audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+        int ringBefore = audio.getStreamVolume(AudioManager.STREAM_RING);
+        int target = Math.round((maxVolume * requestedPercent) / 100f);
+        if (requestedPercent > 0 && target == 0 && maxVolume > 0) {
+            target = 1;
+        }
+
+        try {
+            audio.setStreamVolume(
+                    stream,
+                    target,
+                    showUi ? AudioManager.FLAG_SHOW_UI : 0);
+        } catch (SecurityException error) {
+            return failure(
+                    "audio_set_denied",
+                    "Android denied the volume change: " + safeMessage(error),
+                    callCount);
+        } catch (IllegalArgumentException error) {
+            return failure(
+                    "audio_set_invalid",
+                    "Android rejected the volume change: " + safeMessage(error),
+                    callCount);
+        }
+
+        int after = audio.getStreamVolume(stream);
+        int notificationAfter = audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+        int ringAfter = audio.getStreamVolume(AudioManager.STREAM_RING);
+        JSONObject result = new JSONObject()
+                .put("set", after == target)
+                .put("changed", before != after)
+                .put("stream", streamName)
+                .put("requestedPercent", requestedPercent)
+                .put("before", streamState(audio, streamName, stream, before))
+                .put("after", streamState(audio, streamName, stream, after))
+                .put("ringerMode", ringerModeName(audio.getRingerMode()))
+                .put("interruptionFilter", interruptionFilterName(currentInterruptionFilter()))
+                .put("linkedNotificationChanged", notificationBefore != notificationAfter && !"notification".equals(streamName))
+                .put("linkedRingChanged", ringBefore != ringAfter && !"ring".equals(streamName))
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+        if (notificationBefore != notificationAfter || ringBefore != ringAfter) {
+            result.put("notificationAfter", streamState(
+                    audio,
+                    "notification",
+                    AudioManager.STREAM_NOTIFICATION,
+                    notificationAfter));
+            result.put("ringAfter", streamState(
+                    audio,
+                    "ring",
+                    AudioManager.STREAM_RING,
+                    ringAfter));
+        }
+        return result;
+    }
+
+    private JSONObject buildAudioStatus(AudioManager audio) throws JSONException {
+        return new JSONObject()
+                .put("available", true)
+                .put("fixedVolume", audio.isVolumeFixed())
+                .put("ringerMode", ringerModeName(audio.getRingerMode()))
+                .put("interruptionFilter", interruptionFilterName(currentInterruptionFilter()))
+                .put("media", streamState(audio, "media", AudioManager.STREAM_MUSIC))
+                .put("notification", streamState(audio, "notification", AudioManager.STREAM_NOTIFICATION))
+                .put("ring", streamState(audio, "ring", AudioManager.STREAM_RING))
+                .put("alarm", streamState(audio, "alarm", AudioManager.STREAM_ALARM));
+    }
+
+    private static JSONObject streamState(AudioManager audio, String name, int stream) throws JSONException {
+        return streamState(audio, name, stream, audio.getStreamVolume(stream));
+    }
+
+    private static JSONObject streamState(
+            AudioManager audio,
+            String name,
+            int stream,
+            int currentVolume) throws JSONException {
+        int maxVolume = audio.getStreamMaxVolume(stream);
+        return new JSONObject()
+                .put("stream", name)
+                .put("volume", currentVolume)
+                .put("maxVolume", maxVolume)
+                .put("volumePercent", volumePercent(currentVolume, maxVolume))
+                .put("muted", Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audio.isStreamMute(stream));
+    }
+
+    private static int audioStream(String streamName) {
+        switch (streamName) {
+            case "media":
+                return AudioManager.STREAM_MUSIC;
+            case "notification":
+                return AudioManager.STREAM_NOTIFICATION;
+            case "ring":
+                return AudioManager.STREAM_RING;
+            case "alarm":
+                return AudioManager.STREAM_ALARM;
+            default:
+                throw new IllegalArgumentException("Unsupported audio stream: " + streamName);
+        }
+    }
+
     private int currentInterruptionFilter() {
         NotificationManager manager = (NotificationManager) service.getSystemService(Service.NOTIFICATION_SERVICE);
         if (manager == null) {
