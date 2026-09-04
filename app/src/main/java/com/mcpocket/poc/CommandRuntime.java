@@ -1235,24 +1235,30 @@ final class CommandRuntime {
     }
 
     private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
-        // Every capability funnels through here. Android uses this hook to renew
-        // a short screen-awake lease while an Agent is actively operating the
-        // phone, without changing the owner's system screen-timeout setting.
-        actions.onAgentCommandActivity(command.id);
-        if (requiresApproval(command)) {
-            JSONObject approval = actions.requestApproval(
-                    command.id,
-                    command.description,
-                    command.risk,
-                    arguments,
-                    callCount);
-            if (!approval.optBoolean("approved", false)) {
-                String status = approval.optString("status", "rejected");
-                throw new CommandInputException(
-                        "Human approval not granted for " + command.id + " (" + status + ")");
+        // Every capability funnels through here. Android uses these lifecycle
+        // hooks to keep the display awake for the whole Agent operation and to
+        // renew a short idle lease after the command finishes. The finish hook
+        // matters for commands such as phone.wake that turn the display on only
+        // after the start hook has already observed a sleeping device.
+        actions.onAgentCommandStarted(command.id);
+        try {
+            if (requiresApproval(command)) {
+                JSONObject approval = actions.requestApproval(
+                        command.id,
+                        command.description,
+                        command.risk,
+                        arguments,
+                        callCount);
+                if (!approval.optBoolean("approved", false)) {
+                    String status = approval.optString("status", "rejected");
+                    throw new CommandInputException(
+                            "Human approval not granted for " + command.id + " (" + status + ")");
+                }
             }
+            return command.handler.call(arguments, callCount);
+        } finally {
+            actions.onAgentCommandFinished(command.id);
         }
-        return command.handler.call(arguments, callCount);
     }
 
     private boolean requiresApproval(Command command) {

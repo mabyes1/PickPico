@@ -5,6 +5,14 @@ import org.json.JSONObject;
 
 /** Android-facing actions that can be exposed as MCP tools. */
 interface McpToolActions {
+    default void onAgentCommandStarted(String commandId) {
+        onAgentCommandActivity(commandId);
+    }
+
+    default void onAgentCommandFinished(String commandId) {
+        onAgentCommandActivity(commandId);
+    }
+
     default void onAgentCommandActivity(String commandId) {
     }
 

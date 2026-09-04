@@ -61,7 +61,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class McpNodeService extends Service implements McpToolActions {
-    private static final long AGENT_SCREEN_LEASE_MS = 90_000L;
+    private static final long AGENT_SCREEN_IDLE_LEASE_MS = 90_000L;
+    // human.help can legitimately wait for up to 360 seconds. Keep an active
+    // command covered longer than that, while retaining a bounded safety timeout
+    // in case Android tears down execution before the finish hook runs.
+    private static final long AGENT_SCREEN_ACTIVE_LEASE_MS = TimeUnit.MINUTES.toMillis(10L);
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
@@ -101,6 +105,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private AndroidDeviceCapabilities deviceCapabilities;
     private boolean mediaForegroundRequested;
     private PowerManager.WakeLock agentScreenWakeLock;
+    private int activeAgentCommandCount;
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
 
@@ -185,6 +190,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public void onDestroy() {
         nodeActive = false;
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
+        activeAgentCommandCount = 0;
         releaseAgentScreenLease();
         stopAlertSound();
         stopAllProcessSessions();
@@ -206,12 +212,35 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     @Override
-    public void onAgentCommandActivity(String commandId) {
-        refreshAgentScreenLease();
+    public synchronized void onAgentCommandStarted(String commandId) {
+        activeAgentCommandCount++;
+        refreshAgentScreenLease(AGENT_SCREEN_ACTIVE_LEASE_MS);
+        // Some commands (notably human.help / urgent notifications) wake the
+        // screen from inside their handler. If the start hook ran while the
+        // display was still asleep, retry once after that wake has had time to
+        // land so a long-running command remains visibly awake.
+        mainHandler.postDelayed(() -> {
+            synchronized (McpNodeService.this) {
+                if (activeAgentCommandCount > 0) {
+                    refreshAgentScreenLease(AGENT_SCREEN_ACTIVE_LEASE_MS);
+                }
+            }
+        }, 750L);
+    }
+
+    @Override
+    public synchronized void onAgentCommandFinished(String commandId) {
+        if (activeAgentCommandCount > 0) {
+            activeAgentCommandCount--;
+        }
+        refreshAgentScreenLease(
+                activeAgentCommandCount > 0
+                        ? AGENT_SCREEN_ACTIVE_LEASE_MS
+                        : AGENT_SCREEN_IDLE_LEASE_MS);
     }
 
     @SuppressWarnings("deprecation")
-    private synchronized void refreshAgentScreenLease() {
+    private synchronized void refreshAgentScreenLease(long leaseMs) {
         PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
         if (power == null) {
             return;
@@ -230,7 +259,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             if (agentScreenWakeLock.isHeld()) {
                 agentScreenWakeLock.release();
             }
-            agentScreenWakeLock.acquire(AGENT_SCREEN_LEASE_MS);
+            agentScreenWakeLock.acquire(leaseMs);
         } catch (RuntimeException ignored) {
         }
     }
