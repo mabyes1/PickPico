@@ -112,6 +112,22 @@ PickPico 支援區域網路直連，也能透過自行部署的 Relay 讓遠端 
 
 傳輸方式與自架說明請見 [遠端架構文件](docs/remote-transport.md)。
 
+## 未來：Android 原生 OpenAI Tunnel
+
+PickPico 現在使用自行部署的 Relay，讓手機可以獨立連上網路並被遠端 Agent 使用，同時保持對不同 MCP Client 與模型供應商的相容性。
+
+OpenAI Secure MCP Tunnel 提供了另一條很有吸引力的路徑：對 ChatGPT 使用者而言，可以省去自行部署公開 Relay 的需求。不過目前官方 Tunnel Client 主要運行在電腦或伺服器環境；若透過電腦中轉，會重新引入 PickPico 想移除的常駐電腦依賴。
+
+因此我們希望未來能在 **Android 端直接實作 OpenAI Tunnel 相容的 transport**：
+
+```text
+ChatGPT → OpenAI Tunnel → PickPico Android
+```
+
+這樣 ChatGPT 可以在 **不需要自架 Cloudflare Relay，也不需要另一台常駐電腦** 的情況下直接使用手機；現有 PickPico Relay 則繼續保留，提供 Claude、Gemini、本地模型與其他 MCP Client 使用。
+
+目標不是把 PickPico 綁定單一平台，而是讓 Agent 可以依環境選擇最適合的 transport。
+
 ## 能力很多，Agent 需要時再找
 
 PickPico 透過 MCP 提供穩定的探索與執行入口。Agent 先搜尋任務需要的能力，再確認狀態並呼叫。
