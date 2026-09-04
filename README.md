@@ -4,9 +4,9 @@
 
 Turn any Android phone into an AI Agent's **eyes, hands, runtime, and human connection**.
 
-PickPico 把 Android 手機變成可被 AI Agent 使用的 **Mobile Agent Node**。Agent 不只會呼叫雲端 API，也能透過手機取得相機、麥克風、位置、通知與目前畫面，操作 App、執行程式，甚至在真的需要人類時正式發出 **HUMAN HELP**，取得文字、選項或照片後再繼續原任務。
+PickPico 把 Android 手機變成可被 AI Agent 使用的 **Mobile Agent Node**。Agent 能透過手機看見現場、理解畫面、操作 App、執行程式；遇到需要人類的步驟時，**HUMAN HELP** 會把任務交給手機旁的人，拿到回覆後繼續工作。
 
-它不是另一套手機遙控器。PickPico 想解的是更直接的問題：
+PickPico 想解一個很直接的問題：
 
 > **AI Agent 已經活在雲端裡了，怎麼讓它跨進真實世界？**
 
@@ -14,26 +14,19 @@ FUTUREMODE × SITCON Hackathon 2026 · AI Agents & Automation
 
 ## 30 秒看懂
 
-AI Agent 通常已經有瀏覽器、程式碼、Cloud API 和大量工具，但它對身邊的世界幾乎是瞎的。
+AI Agent 已經很會用瀏覽器、程式碼和 Cloud API，卻很難碰到身邊的世界。
 
-Android 手機剛好是一台已經大量存在的 edge computer：
+Android 手機本身就是一台完整的 edge computer。它能看、能聽、知道自己在哪裡，也有螢幕、網路、電池和各種 App；更重要的是，手機通常就在人的身邊。
 
-- 有相機、麥克風、GPS、螢幕、喇叭、震動與通知。
-- 有 LINE、Maps、瀏覽器、相簿、行事曆等真實世界 App。
-- 有電池、Wi-Fi、行動網路，原本就適合長時間在線。
-- 還有一個最重要的周邊：**手機旁的人類。**
-
-PickPico 透過 MCP 把這些能力整理成 Agent 可以動態探索、呼叫、組合的能力面。
+PickPico 透過 MCP 把這支手機接進 Agent 的工作流程，讓 Agent 可以直接使用它的感知、操作、運算與人類協助能力。
 
 ## 為什麼是 PickPico
 
-多數 Agent 工具是在替 AI 增加「可以呼叫什麼」：更多 API、更多 function、更多 automation。
-
-PickPico 想做的不是再加一包 Android tools，而是把一支真實世界裡的 Android 手機變成 **Agent hardware platform**。相機、麥克風、GPS、螢幕、喇叭、震動、行動網路、Apps、運算環境，甚至手機旁的人，都可以成為同一個 Agent workflow 的一部分。
+多數 Agent 工具替 AI 增加更多可以呼叫的能力。PickPico 把 Agent 的執行邊界延伸到一支真實世界裡的 Android 手機。
 
 > **Most Agent tools extend what an AI can call. PickPico extends where an AI can exist.**
 
-所以 Agent 得到的不只是「遠端控制手機」，而是一個能感知、能行動、能執行程式，也能在必要時把任務交給真人處理的 **Mobile Agent Node**。
+這支手機會成為一個 **Mobile Agent Node**：Agent 可以透過它感知環境、操作 App、執行程式，必要時把任務交給附近的人。
 
 ```text
 AI Agent
@@ -63,7 +56,7 @@ PickPico
 
 ### Core Mode / Hyper Mode
 
-PickPico 把高權限能力另外放進 **Hyper Mode**。這些能力不是偷偷取得，而是必須由手機持有者在 Android 上明確開啟對應設定。
+PickPico 把高權限能力集中在 **Hyper Mode**。手機持有者必須在 Android 系統設定中明確開啟對應權限。
 
 目前 Hyper 能力包含：
 
@@ -74,7 +67,7 @@ PickPico 把高權限能力另外放進 **Hyper Mode**。這些能力不是偷�
 - urgent full-screen Agent handoff
 - 在 Hyper Mode 開啟時請 Android 嘗試 dismiss keyguard
 
-最後一項**不會繞過 PIN、圖形、指紋或其他安全驗證**；是否能 dismiss lock screen 仍由 Android Keyguard 決定。
+Keyguard dismissal 仍由 Android 決定，PIN、圖形、指紋等安全驗證維持系統原本的規則。
 
 ## 核心 Demo
 
@@ -105,7 +98,7 @@ PickPico 的 **HUMAN HELP** 是 Agent 面對真實世界阻礙時的標準出口
 
 Agent 可以在 PickPico 私有 workspace 寫檔、執行 shell，或啟動一個長駐 Node.js entry point。
 
-這代表一些小型 automation / bot / utility 不一定要靠機房，也不一定要讓家裡桌機 24 小時不關機；一支插著電、連著網路的 Android 手機就能成為實際執行節點。
+一支插著電、連著網路的 Android 手機，就能承載小型 automation、bot 或 utility，直接成為實際執行節點。
 
 ```text
 Agent → workspace.write → node.start → Android phone keeps the workload alive
@@ -115,13 +108,13 @@ Agent → workspace.write → node.start → Android phone keeps the workload al
 
 PickPico 也有 BLE button bridge，可搭配 Pico 手機架 / 實體按鈕，把手機變成 Agent 的隨身終端：按住說話、放開確認，再把語音需求送進 Agent。
 
-你不一定需要坐在電腦前才能叫 Agent 寫程式。手機本身就是入口。 📱🛋️
+坐在沙發上也能叫 Agent 寫程式。手機本身就是入口。 📱🛋️
 
 ### 4. 手機端小模型 + PickPico
 
 PickPico 的 MCP capability layer 與上層模型解耦。架構上可以讓 4B 級左右的手機端模型使用同一組 capabilities，變成真正能操作這支手機的 local assistant。
 
-> 這是目前的延伸方向，不代表 PickPico APK 已內建特定本地模型。
+> 這是目前的延伸方向；PickPico APK 尚未內建特定本地模型。
 
 ## 系統架構
 
@@ -161,9 +154,7 @@ https://relay.pickpico.workers.dev
 
 ## 為什麼 MCP 工具只有少數幾個
 
-PickPico 不會把每一項手機能力都做成頂層 MCP tool。
-
-公開的 `/v3` thin profile 只保留 10 個穩定入口：
+PickPico 將公開的 `/v3` thin profile 收斂成 10 個穩定入口，手機能力則由 Agent 在需要時動態探索：
 
 ```text
 server_info
@@ -194,7 +185,7 @@ command_run("screen.capture")
 
 ## 安全邊界
 
-PickPico 的原則不是「Agent 想做什麼都可以」，而是把能力放在 Android 原生權限與明確 owner policy 之內。
+PickPico 的能力受 Android 原生權限與明確的 owner policy 約束。
 
 | 能力 | 邊界 |
 | --- | --- |
