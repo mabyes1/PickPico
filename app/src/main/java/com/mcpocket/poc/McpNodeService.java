@@ -31,9 +31,14 @@ import android.os.StatFs;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.system.Os;
 import android.system.OsConstants;
 import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.View;
+import android.view.WindowManager;
+import android.graphics.PixelFormat;
 
 import org.json.JSONException;
 import org.json.JSONArray;
@@ -106,6 +111,16 @@ public final class McpNodeService extends Service implements McpToolActions {
     private boolean mediaForegroundRequested;
     private PowerManager.WakeLock agentScreenWakeLock;
     private int activeAgentCommandCount;
+    private WindowManager agentScreenWindowManager;
+    private View agentScreenKeepAwakeView;
+    private final Runnable agentScreenIdleReleaseRunnable = () -> {
+        synchronized (McpNodeService.this) {
+            if (activeAgentCommandCount == 0) {
+                releaseAgentScreenKeepAwakeWindow();
+                releaseAgentScreenLease();
+            }
+        }
+    };
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
 
@@ -190,7 +205,9 @@ public final class McpNodeService extends Service implements McpToolActions {
     public void onDestroy() {
         nodeActive = false;
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
+        mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
         activeAgentCommandCount = 0;
+        releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
         stopAlertSound();
         stopAllProcessSessions();
@@ -214,7 +231,8 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public synchronized void onAgentCommandStarted(String commandId) {
         activeAgentCommandCount++;
-        refreshAgentScreenLease(AGENT_SCREEN_ACTIVE_LEASE_MS);
+        mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+        refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
         // Some commands (notably human.help / urgent notifications) wake the
         // screen from inside their handler. If the start hook ran while the
         // display was still asleep, retry once after that wake has had time to
@@ -222,7 +240,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         mainHandler.postDelayed(() -> {
             synchronized (McpNodeService.this) {
                 if (activeAgentCommandCount > 0) {
-                    refreshAgentScreenLease(AGENT_SCREEN_ACTIVE_LEASE_MS);
+                    refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
                 }
             }
         }, 750L);
@@ -233,10 +251,76 @@ public final class McpNodeService extends Service implements McpToolActions {
         if (activeAgentCommandCount > 0) {
             activeAgentCommandCount--;
         }
-        refreshAgentScreenLease(
-                activeAgentCommandCount > 0
-                        ? AGENT_SCREEN_ACTIVE_LEASE_MS
-                        : AGENT_SCREEN_IDLE_LEASE_MS);
+        if (activeAgentCommandCount > 0) {
+            refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
+        } else {
+            // Keep the display awake briefly after the last Agent command so a
+            // multi-command flow can continue without racing the user's normal
+            // screen timeout. Manual power-button locking is still respected.
+            refreshAgentScreenAwakeState(AGENT_SCREEN_IDLE_LEASE_MS);
+            mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+            mainHandler.postDelayed(agentScreenIdleReleaseRunnable, AGENT_SCREEN_IDLE_LEASE_MS);
+        }
+    }
+
+    private synchronized void refreshAgentScreenAwakeState(long fallbackLeaseMs) {
+        if (ensureAgentScreenKeepAwakeWindow()) {
+            releaseAgentScreenLease();
+            return;
+        }
+        refreshAgentScreenLease(fallbackLeaseMs);
+    }
+
+    private synchronized boolean ensureAgentScreenKeepAwakeWindow() {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null || !power.isInteractive()) {
+            return false;
+        }
+        if (agentScreenKeepAwakeView != null) {
+            return true;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !Settings.canDrawOverlays(this)) {
+            return false;
+        }
+        try {
+            WindowManager manager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            if (manager == null) {
+                return false;
+            }
+            View marker = new View(this);
+            marker.setAlpha(0.01f);
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    1,
+                    1,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                            | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                    PixelFormat.TRANSLUCENT);
+            params.gravity = Gravity.TOP | Gravity.START;
+            manager.addView(marker, params);
+            agentScreenWindowManager = manager;
+            agentScreenKeepAwakeView = marker;
+            return true;
+        } catch (RuntimeException ignored) {
+            releaseAgentScreenKeepAwakeWindow();
+            return false;
+        }
+    }
+
+    private synchronized void releaseAgentScreenKeepAwakeWindow() {
+        View marker = agentScreenKeepAwakeView;
+        WindowManager manager = agentScreenWindowManager;
+        agentScreenKeepAwakeView = null;
+        agentScreenWindowManager = null;
+        if (marker == null || manager == null) {
+            return;
+        }
+        try {
+            manager.removeView(marker);
+        } catch (RuntimeException ignored) {
+        }
     }
 
     @SuppressWarnings("deprecation")
