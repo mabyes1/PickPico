@@ -17,19 +17,28 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class McpHttpServerTest {
     private static final String TOKEN = "unit-test-token";
 
     private McpHttpServer server;
     private int port;
+    private AtomicInteger capabilityStateProbeCount;
 
     @Before
     public void setUp() throws Exception {
         try (ServerSocket reservation = new ServerSocket(0)) {
             port = reservation.getLocalPort();
         }
+        capabilityStateProbeCount = new AtomicInteger();
         server = new McpHttpServer(port, TOKEN, new McpToolActions() {
+            @Override
+            public JSONObject capabilityState(String commandId) throws org.json.JSONException {
+                capabilityStateProbeCount.incrementAndGet();
+                return McpToolActions.super.capabilityState(commandId);
+            }
+
             @Override
             public JSONObject serverInfo(long callCount) throws org.json.JSONException {
                 return new JSONObject().put("name", "test-node").put("toolCallCount", callCount);
@@ -320,6 +329,7 @@ public final class McpHttpServerTest {
         assertTrue(!toolText.contains("camera_capture"));
         assertTrue(!toolText.contains("exec_command"));
 
+        capabilityStateProbeCount.set(0);
         HttpResult search = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":53,\"method\":\"tools/call\"," +
                         "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
@@ -332,6 +342,8 @@ public final class McpHttpServerTest {
         assertTrue(discovery.getJSONArray("matches").length() > 0);
         assertEquals("screen.capture", discovery.getJSONArray("matches").getJSONObject(0).getString("id"));
         assertTrue(discovery.getJSONArray("matches").getJSONObject(0).has("inputSchema"));
+        assertTrue(discovery.getInt("totalCandidates") < 10);
+        assertEquals(discovery.getInt("totalCandidates"), capabilityStateProbeCount.get());
 
         HttpResult chineseSearch = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":531,\"method\":\"tools/call\"," +

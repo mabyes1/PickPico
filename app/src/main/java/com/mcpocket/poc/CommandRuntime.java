@@ -949,22 +949,26 @@ final class CommandRuntime {
 
         List<SearchMatch> matches = new ArrayList<>();
         for (Command command : commands.values()) {
+            if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
+                continue;
+            }
+            int score = searchScore(query, command);
+            if (!query.isEmpty() && score <= 0) {
+                continue;
+            }
+
+            // Availability may consult Android system services (notification listener,
+            // accessibility settings, device admin, etc.). Do the cheap in-memory
+            // category/text filtering first so a narrow discovery query does not probe
+            // every unrelated capability and inherit an occasional Binder/settings stall.
             JSONObject state = actions.capabilityState(command.id);
             String commandGroup = state.optString(
                     "group",
                     AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
-            if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
-                continue;
-            }
             if (!group.isEmpty() && !group.equalsIgnoreCase(commandGroup)) {
                 continue;
             }
             if (availableOnly && !state.optBoolean("available", false)) {
-                continue;
-            }
-
-            int score = searchScore(query, command);
-            if (!query.isEmpty() && score <= 0) {
                 continue;
             }
             matches.add(new SearchMatch(command, state, score));
