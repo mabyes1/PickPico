@@ -69,7 +69,7 @@ final class PickerRequestStore {
                 .putExtra(EXTRA_REQUEST_ID, requestId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         boolean launched = false;
-        if (MainActivity.isUiVisible()) {
+        if (AgentAttention.canStartActivityNow(context)) {
             try {
                 context.startActivity(launch);
                 launched = true;
@@ -382,7 +382,7 @@ final class PickerRequestStore {
                 .setContentText("Tap to choose from Android")
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true);
-        AgentAttention.applyUrgentBehavior(context, builder, notificationId);
+        AgentAttention.applyUrgentBehavior(context, builder, notificationId, target);
         Notification notification = builder.build();
         manager.notify(notificationId, notification);
         AgentAttention.alert(context);

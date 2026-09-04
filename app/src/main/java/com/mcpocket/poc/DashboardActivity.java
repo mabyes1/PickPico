@@ -133,6 +133,7 @@ public final class DashboardActivity extends Activity {
     private Switch notificationSwitch;
     private Switch lockPhoneSwitch;
     private Switch hyperModeSwitch;
+    private Switch backgroundLaunchSwitch;
     private Switch accessibilitySwitch;
     private Switch screenCaptureSwitch;
     private TextView screenCaptureDetail;
@@ -398,6 +399,7 @@ public final class DashboardActivity extends Activity {
         notificationSwitch = null;
         lockPhoneSwitch = null;
         hyperModeSwitch = null;
+        backgroundLaunchSwitch = null;
         accessibilitySwitch = null;
         screenCaptureSwitch = null;
         screenCaptureDetail = null;
@@ -623,6 +625,33 @@ public final class DashboardActivity extends Activity {
                     Toast.LENGTH_SHORT).show();
             refreshStatus();
         });
+        addDivider(advancedCard);
+
+        backgroundLaunchSwitch = capabilityRow(
+                advancedCard,
+                "Background app launch",
+                "Allow Hyper Mode to move between apps while PickPico itself is not on screen.",
+                checked -> {
+                    if (updatingUi) return;
+                    if (!McpocketPolicySettings.isHyperModeEnabled(this)) {
+                        Toast.makeText(this, "Turn on Hyper Mode first", Toast.LENGTH_LONG).show();
+                        refreshStatus();
+                        return;
+                    }
+                    if (checked) {
+                        boolean opened = AgentAttention.requestBackgroundLaunchAccessIfNeeded(this);
+                        Toast.makeText(this,
+                                opened
+                                        ? "Allow PickPico to display over other apps so Android permits Agent app switching"
+                                        : "Background app launch is already allowed",
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        Intent settings = new Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + getPackageName()));
+                        startActivity(settings);
+                    }
+                });
         addDivider(advancedCard);
 
         accessibilitySwitch = capabilityRow(advancedCard, "Accessibility · UI Control", "Inspect and operate accessible UI elements in other apps.", checked -> {
@@ -1512,6 +1541,7 @@ public final class DashboardActivity extends Activity {
             if (notificationSwitch != null) notificationSwitch.setChecked(McpNotificationListenerService.hasAccess(this));
             if (lockPhoneSwitch != null) lockPhoneSwitch.setChecked(hasDeviceAdmin());
             if (hyperModeSwitch != null) hyperModeSwitch.setChecked(McpocketPolicySettings.isHyperModeEnabled(this));
+            if (backgroundLaunchSwitch != null) backgroundLaunchSwitch.setChecked(AgentAttention.canLaunchBackgroundActivities(this));
             if (accessibilitySwitch != null) accessibilitySwitch.setChecked(McpAccessibilityService.hasAccess(this));
             if (screenCaptureSwitch != null) screenCaptureSwitch.setChecked(ScreenCaptureService.isActive());
         } finally {
@@ -1611,6 +1641,7 @@ public final class DashboardActivity extends Activity {
                 McpNotificationListenerService.hasAccess(this),
                 hasDeviceAdmin(),
                 hyper,
+                hyper && AgentAttention.canLaunchBackgroundActivities(this),
                 hyper && McpAccessibilityService.hasAccess(this),
                 hyper && ScreenCaptureService.isActive()
         };

@@ -551,7 +551,15 @@ final class HumanHelpStore {
         }
     }
 
-    private static void postRequestNotification(Context context, JSONObject request) {
+    static void postRequestNotification(Context context, JSONObject request) {
+        String requestId = request.optString("requestId");
+        Intent open = new Intent(context, HumanHelpActivity.class)
+                .putExtra(EXTRA_REQUEST_ID, requestId)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        postRequestNotification(context, request, open);
+    }
+
+    static void postRequestNotification(Context context, JSONObject request, Intent open) {
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) {
             return;
@@ -565,9 +573,6 @@ final class HumanHelpStore {
         manager.createNotificationChannel(channel);
 
         String requestId = request.optString("requestId");
-        Intent open = new Intent(context, HumanHelpActivity.class)
-                .putExtra(EXTRA_REQUEST_ID, requestId)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pending = PendingIntent.getActivity(
                 context,
                 requestId.hashCode(),
@@ -582,7 +587,7 @@ final class HumanHelpStore {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(false)
                 .setContentIntent(pending);
-        AgentAttention.applyUrgentBehavior(context, builder, requestId.hashCode());
+        AgentAttention.applyUrgentBehavior(context, builder, requestId.hashCode(), open);
         Notification notification = builder.build();
         manager.notify(requestId.hashCode(), notification);
         AgentAttention.alert(context);

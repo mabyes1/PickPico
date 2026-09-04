@@ -390,6 +390,14 @@ final class McpToolRegistry {
                     .put("isError", false);
         } catch (ToolInputException | CommandRuntime.CommandInputException error) {
             return toolError(error.getMessage(), modern);
+        } catch (Exception error) {
+            String message = error.getMessage();
+            if (message == null || message.trim().isEmpty()) {
+                message = error.getClass().getSimpleName();
+            } else {
+                message = error.getClass().getSimpleName() + ": " + message;
+            }
+            return toolError("Tool execution failed: " + message, modern);
         }
     }
 

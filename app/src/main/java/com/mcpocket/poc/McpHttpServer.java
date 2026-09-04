@@ -161,7 +161,21 @@ final class McpHttpServer {
             }
 
             String toolProfile = request.header("x-pickpico-tool-profile");
-            McpProtocol.Response response = protocol.handle(json, protocolVersion, toolProfile);
+            McpProtocol.Response response;
+            try {
+                response = protocol.handle(json, protocolVersion, toolProfile);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                if (message == null || message.trim().isEmpty()) {
+                    message = error.getClass().getSimpleName();
+                } else {
+                    message = error.getClass().getSimpleName() + ": " + message;
+                }
+                JSONObject body = McpProtocol.error(json.opt("id"), -32603, "Internal error: " + message);
+                writeText(output, 500, "Internal Server Error", "application/json; charset=utf-8",
+                        body.toString(), corsHeaders(origin));
+                return;
+            }
             Map<String, String> headers = corsHeaders(origin);
             headers.put("MCP-Protocol-Version", response.protocolVersion);
             if (response.body == null) {

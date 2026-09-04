@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
@@ -59,6 +60,9 @@ public final class ScreenCaptureService extends Service {
     private int height;
     private int densityDpi;
     private boolean stopping;
+    private Bitmap frameBitmap;
+    private Bitmap paddedFrameBitmap;
+    private long lastFrameCapturedAtEpochMs;
 
     @Override
     public void onCreate() {
@@ -159,21 +163,26 @@ public final class ScreenCaptureService extends Service {
                     SystemClock.sleep(40L);
                 }
             }
-            if (image == null) {
+            boolean freshFrame = image != null;
+            if (!freshFrame && (frameBitmap == null || frameBitmap.isRecycled())) {
                 return new JSONObject()
                         .put("captured", false)
                         .put("error", "screen_frame_unavailable")
-                        .put("message", "No MediaProjection frame was available yet")
+                        .put("message", "No MediaProjection frame has been captured yet")
                         .put("toolCallCount", callCount);
             }
 
-            Bitmap bitmap = bitmapFromImage(image);
+            Bitmap bitmap;
+            if (freshFrame) {
+                bitmap = bitmapFromImage(image);
+                lastFrameCapturedAtEpochMs = System.currentTimeMillis();
+            } else {
+                bitmap = frameBitmap;
+            }
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes)) {
-                bitmap.recycle();
                 throw new IllegalStateException("Unable to encode screen frame as JPEG");
             }
-            bitmap.recycle();
 
             byte[] jpeg = bytes.toByteArray();
             String relativePath = "captures/screen-" + System.currentTimeMillis() + ".jpg";
@@ -195,6 +204,8 @@ public final class ScreenCaptureService extends Service {
                     .put("mimeType", "image/jpeg")
                     .put("path", relativePath)
                     .put("sizeBytes", jpeg.length)
+                    .put("freshFrame", freshFrame)
+                    .put("frameAgeMs", Math.max(0L, System.currentTimeMillis() - lastFrameCapturedAtEpochMs))
                     .put("timestamp", Instant.now().toString())
                     .put("toolCallCount", callCount);
             if (returnContent) {
@@ -279,6 +290,8 @@ public final class ScreenCaptureService extends Service {
             imageReader.close();
             imageReader = null;
         }
+        recycleFrameBitmaps();
+        lastFrameCapturedAtEpochMs = 0L;
         if (projection != null) {
             try {
                 projection.stop();
@@ -305,15 +318,43 @@ public final class ScreenCaptureService extends Service {
         int rowStride = plane.getRowStride();
         int rowPadding = Math.max(0, rowStride - pixelStride * width);
         int paddedWidth = width + rowPadding / Math.max(1, pixelStride);
+        buffer.rewind();
 
-        Bitmap padded = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888);
-        padded.copyPixelsFromBuffer(buffer);
+        frameBitmap = ensureBitmap(frameBitmap, width, height);
         if (paddedWidth == width) {
-            return padded;
+            frameBitmap.copyPixelsFromBuffer(buffer);
+            return frameBitmap;
         }
-        Bitmap cropped = Bitmap.createBitmap(padded, 0, 0, width, height);
-        padded.recycle();
-        return cropped;
+
+        paddedFrameBitmap = ensureBitmap(paddedFrameBitmap, paddedWidth, height);
+        paddedFrameBitmap.copyPixelsFromBuffer(buffer);
+        Canvas canvas = new Canvas(frameBitmap);
+        canvas.drawBitmap(paddedFrameBitmap, 0f, 0f, null);
+        return frameBitmap;
+    }
+
+    private static Bitmap ensureBitmap(Bitmap bitmap, int targetWidth, int targetHeight) {
+        if (bitmap != null
+                && !bitmap.isRecycled()
+                && bitmap.getWidth() == targetWidth
+                && bitmap.getHeight() == targetHeight) {
+            return bitmap;
+        }
+        if (bitmap != null && !bitmap.isRecycled()) {
+            bitmap.recycle();
+        }
+        return Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
+    }
+
+    private void recycleFrameBitmaps() {
+        if (frameBitmap != null && !frameBitmap.isRecycled()) {
+            frameBitmap.recycle();
+        }
+        frameBitmap = null;
+        if (paddedFrameBitmap != null && !paddedFrameBitmap.isRecycled()) {
+            paddedFrameBitmap.recycle();
+        }
+        paddedFrameBitmap = null;
     }
 
     private void startAsForeground() {

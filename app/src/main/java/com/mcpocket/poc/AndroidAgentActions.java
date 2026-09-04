@@ -110,7 +110,7 @@ final class AndroidAgentActions {
                     .put("toolCallCount", callCount);
         }
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-        if (!MainActivity.isUiVisible()) {
+        if (!AgentAttention.canStartActivityNow(context)) {
             AgentInboxStore.add(context, "app.launch", "Open app", packageName);
             int notificationId = postActionNotification(
                     context,
@@ -165,7 +165,7 @@ final class AndroidAgentActions {
                     .put("toolCallCount", callCount);
         }
         Intent intent = new Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (!MainActivity.isUiVisible()) {
+        if (!AgentAttention.canStartActivityNow(context)) {
             AgentInboxStore.add(context, "url.open", "Open URL", raw);
             int notificationId = postActionNotification(
                     context,
@@ -433,7 +433,7 @@ final class AndroidAgentActions {
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setCategory(Notification.CATEGORY_RECOMMENDATION);
-        AgentAttention.applyUrgentBehavior(context, builder, notificationId);
+        AgentAttention.applyUrgentBehavior(context, builder, notificationId, target);
         Notification notification = builder.build();
         manager.notify(notificationId, notification);
         AgentAttention.alert(context);

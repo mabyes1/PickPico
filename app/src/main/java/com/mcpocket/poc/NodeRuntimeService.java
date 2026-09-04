@@ -47,6 +47,7 @@ public final class NodeRuntimeService extends Service {
                     "error", "Invalid Node entry or cwd",
                     "timestamp", Instant.now().toString()));
             stopSelf();
+            Process.killProcess(Process.myPid());
             return START_NOT_STICKY;
         }
 
@@ -95,6 +96,11 @@ public final class NodeRuntimeService extends Service {
         } finally {
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
+            // nodejs-mobile cannot safely initialize node::Start twice in the
+            // same Linux process. The :node process is intentionally disposable:
+            // every completed run must force Android to create a fresh process
+            // for the next node.start invocation.
+            Process.killProcess(Process.myPid());
         }
     }
 
