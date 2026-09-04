@@ -18,7 +18,7 @@ PickPico 把 Android 手機變成 AI Agent 能使用的行動工具。接上支�
 
 FUTUREMODE × SITCON Hackathon 2026 · AI Agents & Automation
 
-## 一支手機，讓 Agent 多做四件事
+## PickPico，讓 Agent 能夠辦到的事情
 
 | | 能做什麼 | 你可以怎麼用 |
 | --- | --- | --- |
