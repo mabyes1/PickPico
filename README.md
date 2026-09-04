@@ -1,35 +1,28 @@
 # PickPico
-
-> Turn any Android phone into an AI Agent's eyes, hands, and human connection.
-
-PickPico 把 Android 手機變成可被 AI Agent 使用的 **Mobile Agent Node**。Agent 不只能呼叫雲端 API，還能透過手機看見現場、理解螢幕、操作 App、發出通知；遇到必須由真人判斷或動手處理的事情，則透過 HUMAN HELP 把任務交給手機旁的人，取得回覆後繼續工作。
-
+> Ｇive your AI Agent's eyes, hands, and human connection.
+PickPico 把手機變成可被 AI Agent 使用的 **Mobile Agent Node**。Agent 不只能呼叫雲端 API，還能透過手機看見現場、理解螢幕、操作 App、發出通知；
+遇到必須由人判斷或動手處理的事情，則透過 HUMAN HELP 工具把任務交給手機旁的人，取得回覆後繼續工作。
 FUTUREMODE × SITCON Hackathon 2026 · AI Agents & Automation
-
 ## 作品摘要
-
-AI Agent 很會處理雲端工作，卻難以跨進真實世界。PickPico 將 Android 手機變成標準 MCP 節點，讓 Agent 能跨網路使用相機、麥克風、位置、通知、螢幕與 App；當任務需要真人判斷或實體操作時，Agent 可透過 HUMAN HELP 請手機旁的人回覆文字、選項或照片，收到結果後繼續完成原任務。
-
+把 Android 手機變成 AI Agent 可以透過 MCP 使用的「Agent hardware platform」：
+camera + mic + GPS + screen + speaker + vibration + cellular + battery + apps + humanAgent 能讀取手機與現場資訊、操作 App；遇到 AI 無法自行完成的實體任務時，再透過 HUMAN HELP 請附近的人協助。
 ## 為什麼是 PickPico
+PickPico
+Most Agent tools extend what an AI can call. PickPico extends where an AI can exist.
+## 核心架構
+  AI Agent
+     ↓ HTTPS / MCP
+  Cloudflare Relay
+     ↓ WebSocket
+  Android PickPico
+     ↓
+  相機、麥克風、GPS、螢幕、App、通知、Shell
+     ↓
+  必要時 HUMAN HELP → 真人回答／拍照／按實體按鈕
 
-手機擁有相機、麥克風、GPS、螢幕、通知、喇叭與大量 App，卻通常不在 Agent 的執行環境裡。PickPico 將這些能力整理成三類：
 
-- **Execute**：工作區檔案、Shell、背景程序與內嵌 Node.js。
-- **Sense**：相機、麥克風、位置、通知、螢幕與介面結構。
-- **Interact**：通知、語音、App、網址、剪貼簿與跨 App 操作。
 
-最關鍵的是 **HUMAN HELP**：AI 不必在無法處理的地方反覆失敗，而是能正式請附近的人協助，等待文字、選項或照片回覆，再接回原本的工作流程。
 
-## 核心 Demo
-
-1. 手機透過行動網路主動連上 PickPico Relay，Agent 與手機不必位於相同區域網路。
-2. Agent 根據任務動態搜尋手機能力，而不是預先載入一長串工具。
-3. Agent 取得相機、位置、通知或目前畫面等真實狀態。
-4. Agent 操作 App、發出通知或用語音和現場互動。
-5. 遇到需要真人判斷或實體操作的步驟時，Agent 發出 HUMAN HELP。
-6. 使用者在手機回覆文字、選項或照片；Agent 收到結果後繼續完成任務。
-
-> Agent 原本被困在雲端；PickPico 給它一支位於真實世界的手機。
 
 ## 系統架構
 
@@ -214,7 +207,21 @@ MCPocket/
 - Cloudflare Workers、Durable Objects、Workers KV
 - JUnit
 
+
+Demo
+
+1. 手機透過行動網路主動連上 PickPico Relay，Agent 與手機不必位於相同區域網路。
+2. Agent 根據任務動態搜尋手機能力，而不是預先載入一長串工具。
+3. Agent 取得相機、位置、通知或目前畫面等真實狀態。
+4. Agent 操作 App、發出通知或用語音和現場互動。
+5. 遇到需要真人判斷或實體操作的步驟時，Agent 發出 HUMAN HELP。
+6. 使用者在手機回覆文字、選項或照片；Agent 收到結果後繼續完成任務。
+
+> Agent 原本被困在雲端；PickPico 給它一支位於真實世界的手機。
+
+
 本專案使用 AI coding agents 協助開發與測試；產品設計、整合與驗證由團隊負責。第三方元件各自適用其原始授權條款。
+
 
 ## License
 
