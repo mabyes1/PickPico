@@ -53,6 +53,7 @@ import org.json.JSONObject;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Product-facing PickPico dashboard.
@@ -70,9 +71,10 @@ public final class DashboardActivity extends Activity {
     private static final int REQUEST_CONTACTS = 206;
     private static final int REQUEST_CALENDAR = 207;
 
-    private static final int PAGE_HOME = 0;
-    private static final int PAGE_CAPABILITIES = 1;
-    private static final int PAGE_SETTINGS = 2;
+    static final String EXTRA_PAGE = "dashboardPage";
+    static final int PAGE_HOME = 0;
+    static final int PAGE_CAPABILITIES = 1;
+    static final int PAGE_SETTINGS = 2;
     private static final int PAGE_REMOTE = 3;
     private static final int PAGE_DEVELOPER = 4;
 
@@ -98,6 +100,7 @@ public final class DashboardActivity extends Activity {
     private TextView topBack;
     private TextView topTitle;
     private TextView topMeta;
+    private TextView topStatusDot;
     private LinearLayout bottomNav;
     private TextView navHome;
     private TextView navCapabilities;
@@ -139,9 +142,11 @@ public final class DashboardActivity extends Activity {
     private TextView settingsVersionState;
     private TextView settingsUpdateState;
     private TextView updateAction;
+    private boolean updateCheckInProgress;
+    private String updateCheckError;
     private Switch appearanceGradientSwitch;
-    private EditText appearanceColorA;
-    private EditText appearanceColorB;
+    private TextView appearanceColorA;
+    private TextView appearanceColorB;
     private SeekBar appearanceGlassOpacity;
     private TextView appearanceGlassValue;
     private SeekBar appearanceHighlight;
@@ -171,7 +176,14 @@ public final class DashboardActivity extends Activity {
         configureWindow();
         setContentView(buildShell());
         requestNotificationPermissionIfNeeded();
-        showPage(PAGE_HOME);
+        showPage(requestedPage(getIntent()));
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        showPage(requestedPage(intent));
     }
 
     @Override
@@ -200,11 +212,21 @@ public final class DashboardActivity extends Activity {
     }
 
     private void configureWindow() {
+        applyWindowTheme();
+    }
+
+    private void applyWindowTheme() {
         Window window = getWindow();
-        window.setStatusBarColor(BG);
-        window.setNavigationBarColor(BG);
+        boolean light = PickPicoTheme.isLightBackground(theme);
+        int barColor = theme != null && !theme.gradient ? theme.colorA : BG;
+        window.setStatusBarColor(barColor);
+        window.setNavigationBarColor(barColor);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(0);
+            int flags = light ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && light) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            window.getDecorView().setSystemUiVisibility(flags);
         }
     }
 
@@ -260,10 +282,15 @@ public final class DashboardActivity extends Activity {
         topMeta.setLetterSpacing(0.08f);
         titles.addView(topMeta);
 
-        TextView statusDot = text("●", 13, Typeface.BOLD, GREEN);
-        statusDot.setGravity(Gravity.CENTER);
-        bar.addView(statusDot, new LinearLayout.LayoutParams(dp(28), dp(48)));
+        topStatusDot = text("●", 13, Typeface.BOLD, DIM);
+        topStatusDot.setGravity(Gravity.CENTER);
+        bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(28), dp(48)));
         return bar;
+    }
+
+    private int requestedPage(Intent intent) {
+        int page = intent == null ? PAGE_HOME : intent.getIntExtra(EXTRA_PAGE, PAGE_HOME);
+        return page == PAGE_CAPABILITIES || page == PAGE_SETTINGS ? page : PAGE_HOME;
     }
 
     private LinearLayout buildBottomNav() {
@@ -272,6 +299,7 @@ public final class DashboardActivity extends Activity {
         nav.setGravity(Gravity.CENTER_VERTICAL);
         nav.setPadding(dp(10), dp(7), dp(10), dp(8));
         nav.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
+        nav.setElevation(dp(16));
 
         navHome = navItem("HOME", () -> showPage(PAGE_HOME));
         TextView navInbox = navItem("INBOX", () ->
@@ -346,7 +374,7 @@ public final class DashboardActivity extends Activity {
     }
 
     private void setNavActive(TextView view, boolean active) {
-        view.setTextColor(active ? GREEN : MUTED);
+        applyTextColor(view, active ? GREEN : MUTED);
         view.setBackground(active ? pillDrawable(Color.argb(28, 61, 214, 129), Color.argb(80, 61, 214, 129)) : null);
     }
 
@@ -584,11 +612,14 @@ public final class DashboardActivity extends Activity {
         root.addView(advancedHeading);
 
         LinearLayout advancedCard = glassCard(false);
-        hyperModeSwitch = capabilityRow(advancedCard, "Hyper Mode", "Unlock advanced UI control and screen capabilities.", checked -> {
+        hyperModeSwitch = capabilityRow(advancedCard, "Hyper Mode", "Advanced UI/screen control plus lock-screen dismissal for urgent Agent handoffs. Secure locks still require Android authentication.", checked -> {
             if (updatingUi) return;
             McpocketPolicySettings.setHyperModeEnabled(this, checked);
+            boolean openedUnlockSetup = checked && AgentAttention.requestHyperUnlockAccessIfNeeded(this);
             Toast.makeText(this,
-                    checked ? "Hyper Mode enabled" : "Hyper Mode disabled",
+                    openedUnlockSetup
+                            ? "Allow full-screen alerts so Hyper Mode can dismiss the lock screen"
+                            : checked ? "Hyper Mode enabled" : "Hyper Mode disabled",
                     Toast.LENGTH_SHORT).show();
             refreshStatus();
         });
@@ -712,7 +743,7 @@ public final class DashboardActivity extends Activity {
         copy.setOrientation(LinearLayout.VERTICAL);
         header.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         copy.addView(text("THEME", 14, Typeface.BOLD, TEXT));
-        TextView note = text("Background sets the scene. Glass controls how clearly the cards reveal it.", 12, Typeface.NORMAL, MUTED);
+        TextView note = text("Choose a solid color or gradient, then tune how the glass sits above it.", 12, Typeface.NORMAL, MUTED);
         note.setPadding(0, dp(4), dp(12), 0);
         copy.addView(note);
 
@@ -722,7 +753,7 @@ public final class DashboardActivity extends Activity {
 
         appearanceGradientSwitch = new Switch(this);
         appearanceGradientSwitch.setText("Gradient background");
-        appearanceGradientSwitch.setTextColor(TEXT);
+        applyTextColor(appearanceGradientSwitch, TEXT);
         appearanceGradientSwitch.setTextSize(13);
         appearanceGradientSwitch.setChecked(theme.gradient);
         appearanceGradientSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -746,14 +777,12 @@ public final class DashboardActivity extends Activity {
         colors.addView(appearanceColorControl("COLOR B", appearanceColorB), bParams);
         card.addView(colors);
 
-        LinearLayout presets = new LinearLayout(this);
-        presets.setOrientation(LinearLayout.HORIZONTAL);
-        presets.setPadding(0, dp(12), 0, 0);
-        addAppearancePreset(presets, "NEBULA", "#4b1f66", "#17344d");
-        addAppearancePreset(presets, "AURORA", "#155d4a", "#173d57");
-        addAppearancePreset(presets, "EMBER", "#6b3327", "#3d244f");
-        addAppearancePreset(presets, "MIDNIGHT", "#25265c", "#102f45");
-        card.addView(presets);
+        LinearLayout solidPresets = new LinearLayout(this);
+        solidPresets.setOrientation(LinearLayout.HORIZONTAL);
+        solidPresets.setPadding(0, dp(12), 0, 0);
+        addSolidBackgroundPreset(solidPresets, "BLACK", "#000000");
+        addSolidBackgroundPreset(solidPresets, "WHITE", "#ffffff");
+        card.addView(solidPresets);
 
         TextView styleLabel = sectionLabel("GLASS");
         styleLabel.setPadding(dp(2), dp(16), 0, dp(7));
@@ -761,9 +790,9 @@ public final class DashboardActivity extends Activity {
 
         LinearLayout glassPresets = new LinearLayout(this);
         glassPresets.setOrientation(LinearLayout.HORIZONTAL);
-        addGlassPreset(glassPresets, "VIBEDECK", 7, 12, 72);
+        addGlassPreset(glassPresets, "SOFT", 7, 12, 72);
         addGlassPreset(glassPresets, "CLEAR", 3, 30, 96);
-        addGlassPreset(glassPresets, "TUNNEL", 1, 44, 76);
+        addGlassPreset(glassPresets, "CRISP", 1, 44, 76);
         card.addView(glassPresets);
 
         LinearLayout glassHeader = new LinearLayout(this);
@@ -854,21 +883,21 @@ public final class DashboardActivity extends Activity {
         return card;
     }
 
-    private EditText appearanceColorInput(String value) {
-        EditText input = new EditText(this);
+    private TextView appearanceColorInput(String value) {
+        TextView input = new TextView(this);
         input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setText(value);
-        input.setTextColor(TEXT);
-        input.setHintTextColor(DIM);
+        applyTextColor(input, TEXT);
         input.setTextSize(13);
         input.setTypeface(Typeface.MONOSPACE);
+        input.setGravity(Gravity.CENTER_VERTICAL);
         input.setPadding(dp(12), 0, dp(12), 0);
+        input.setContentDescription("Choose color " + value);
         input.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), false));
         return input;
     }
 
-    private View appearanceColorControl(String label, EditText input) {
+    private View appearanceColorControl(String label, TextView input) {
         LinearLayout wrapper = new LinearLayout(this);
         wrapper.setOrientation(LinearLayout.VERTICAL);
 
@@ -886,35 +915,35 @@ public final class DashboardActivity extends Activity {
         TextView swatch = text("", 1, Typeface.NORMAL, TEXT);
         int fallback = input == appearanceColorA ? theme.colorA : theme.colorB;
         setColorSwatch(swatch, PickPicoTheme.parseHex(input.getText().toString(), fallback));
-        swatch.setOnClickListener(v -> showColorPicker(input, swatch));
+        View.OnClickListener chooseColor = v -> showColorPicker(input, swatch);
+        swatch.setOnClickListener(chooseColor);
+        input.setOnClickListener(chooseColor);
         row.addView(swatch, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         inputParams.leftMargin = dp(7);
         row.addView(input, inputParams);
-        input.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) {
-                setColorSwatch(swatch, PickPicoTheme.parseHex(input.getText().toString(), fallback));
-                refreshAppearancePreview();
-                saveAppearanceFromControls();
-            }
-        });
         return wrapper;
     }
 
-    private void addAppearancePreset(LinearLayout parent, String label, String a, String b) {
+    private void addSolidBackgroundPreset(LinearLayout parent, String label, String color) {
         TextView preset = text(label, 9, Typeface.BOLD, TEXT);
         preset.setGravity(Gravity.CENTER);
+        int presetColor = PickPicoTheme.parseHex(color, theme.colorA);
+        preset.setTag(R.id.theme_text_role, null);
+        preset.setTextColor(Color.luminance(presetColor) >= 0.56f
+                ? Color.rgb(22, 26, 29)
+                : Color.rgb(242, 246, 248));
         PickPicoTheme.State previewTheme = new PickPicoTheme.State(
-                true,
-                PickPicoTheme.parseHex(a, theme.colorA),
-                PickPicoTheme.parseHex(b, theme.colorB),
+                false,
+                presetColor,
+                presetColor,
                 theme.glassOpacity);
         preset.setBackground(PickPicoTheme.preview(previewTheme, dp(10)));
         preset.setOnClickListener(v -> {
-            appearanceColorA.setText(a);
-            appearanceColorB.setText(b);
-            appearanceGradientSwitch.setChecked(true);
+            appearanceColorA.setText(color);
+            appearanceColorB.setText(color);
+            appearanceGradientSwitch.setChecked(false);
             refreshAppearancePreview();
             saveAppearanceFromControls();
         });
@@ -962,6 +991,7 @@ public final class DashboardActivity extends Activity {
 
     private void applyThemeLive(PickPicoTheme.State next) {
         theme = next;
+        applyWindowTheme();
         if (themeBackgroundView != null) {
             themeBackgroundView.setState(theme);
         }
@@ -974,6 +1004,20 @@ public final class DashboardActivity extends Activity {
         if (appearancePreview != null) {
             appearancePreview.setBackground(PickPicoTheme.preview(theme, dp(10)));
         }
+        if (appearanceGlassOpacity != null) {
+            appearanceGlassOpacity.setProgressTintList(ColorStateList.valueOf(PickPicoTheme.accentA(theme)));
+            appearanceGlassOpacity.setThumbTintList(ColorStateList.valueOf(PickPicoTheme.accentA(theme)));
+        }
+        if (appearanceHighlight != null) {
+            appearanceHighlight.setProgressTintList(ColorStateList.valueOf(PickPicoTheme.accentB(theme)));
+            appearanceHighlight.setThumbTintList(ColorStateList.valueOf(PickPicoTheme.accentB(theme)));
+        }
+        if (appearanceBackgroundIntensity != null) {
+            appearanceBackgroundIntensity.setProgressTintList(ColorStateList.valueOf(PickPicoTheme.accentA(theme)));
+            appearanceBackgroundIntensity.setThumbTintList(ColorStateList.valueOf(PickPicoTheme.accentA(theme)));
+        }
+        View decor = getWindow().getDecorView();
+        if (decor != null) refreshThemeTextColors(decor);
     }
 
     private void saveAppearanceFromControls() {
@@ -997,7 +1041,7 @@ public final class DashboardActivity extends Activity {
         swatch.setBackground(drawable);
     }
 
-    private void showColorPicker(EditText target, View externalSwatch) {
+    private void showColorPicker(TextView target, View externalSwatch) {
         int fallback = target == appearanceColorA ? theme.colorA : theme.colorB;
         int initial = PickPicoTheme.parseHex(target.getText().toString(), fallback);
         float[] hsv = new float[3];
@@ -1052,8 +1096,8 @@ public final class DashboardActivity extends Activity {
         LinearLayout quick = new LinearLayout(this);
         quick.setOrientation(LinearLayout.HORIZONTAL);
         int[] quickColors = new int[]{
-                Color.rgb(75, 31, 102), Color.rgb(23, 52, 77), Color.rgb(21, 93, 74),
-                Color.rgb(107, 51, 39), Color.rgb(55, 63, 153), Color.rgb(170, 80, 146)
+                Color.BLACK, Color.WHITE, Color.rgb(75, 31, 102),
+                Color.rgb(23, 52, 77), Color.rgb(21, 93, 74), Color.rgb(170, 80, 146)
         };
         for (int color : quickColors) {
             View chip = new View(this);
@@ -1134,8 +1178,8 @@ public final class DashboardActivity extends Activity {
         relayUrlInput = new EditText(this);
         relayUrlInput.setSingleLine(true);
         relayUrlInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        relayUrlInput.setTextColor(TEXT);
-        relayUrlInput.setHintTextColor(DIM);
+        applyTextColor(relayUrlInput, TEXT);
+        applyHintColor(relayUrlInput, DIM);
         relayUrlInput.setTextSize(14);
         relayUrlInput.setHint("https://your-relay.workers.dev");
         relayUrlInput.setPadding(dp(14), 0, dp(14), 0);
@@ -1256,7 +1300,7 @@ public final class DashboardActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(15), dp(14), dp(15), dp(14));
         card.setBackground(PickPicoTheme.card(theme, dp(18), accented));
-        card.setElevation(dp(10));
+        card.setElevation(dp(14));
         themedCards.add(new ThemedCardRef(card, accented));
         return card;
     }
@@ -1280,10 +1324,52 @@ public final class DashboardActivity extends Activity {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(sp);
-        view.setTextColor(color);
+        applyTextColor(view, color);
         view.setTypeface(Typeface.create("sans-serif", style));
         view.setIncludeFontPadding(false);
         return view;
+    }
+
+    private void applyTextColor(TextView view, int roleColor) {
+        view.setTag(R.id.theme_text_role, roleColor);
+        view.setTextColor(resolveThemeTextColor(roleColor));
+    }
+
+    private void applyHintColor(TextView view, int roleColor) {
+        view.setTag(R.id.theme_hint_role, roleColor);
+        view.setHintTextColor(resolveThemeTextColor(roleColor));
+    }
+
+    private int resolveThemeTextColor(int roleColor) {
+        if (!PickPicoTheme.isLightBackground(theme)) return roleColor;
+        if (roleColor == TEXT) return Color.rgb(22, 26, 29);
+        if (roleColor == MUTED) return Color.rgb(73, 82, 90);
+        if (roleColor == DIM) return Color.rgb(108, 117, 125);
+        if (roleColor == GREEN) return Color.rgb(18, 121, 67);
+        if (roleColor == AMBER) return Color.rgb(166, 94, 0);
+        if (roleColor == RED) return Color.rgb(194, 39, 49);
+        if (roleColor == BLUE) return Color.rgb(24, 101, 174);
+        return roleColor;
+    }
+
+    private void refreshThemeTextColors(View view) {
+        if (view instanceof TextView) {
+            TextView textView = (TextView) view;
+            Object role = textView.getTag(R.id.theme_text_role);
+            if (role instanceof Integer) {
+                textView.setTextColor(resolveThemeTextColor((Integer) role));
+            }
+            Object hintRole = textView.getTag(R.id.theme_hint_role);
+            if (hintRole instanceof Integer) {
+                textView.setHintTextColor(resolveThemeTextColor((Integer) hintRole));
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                refreshThemeTextColors(group.getChildAt(i));
+            }
+        }
     }
 
     private TextView actionButton(String label, boolean danger, boolean compact) {
@@ -1342,22 +1428,31 @@ public final class DashboardActivity extends Activity {
         boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
         boolean relayConnected = "connected".equals(relayStatus) && !TextUtils.isEmpty(remoteEndpoint);
 
-        int enabledCapabilities = enabledCapabilityCount();
-        int totalCapabilities = 9;
-        int needSetup = Math.max(0, totalCapabilities - enabledCapabilities);
+        CapabilitySummary capabilitySummary = capabilitySummary();
+        int enabledCapabilities = capabilitySummary.available;
+        int needSetup = capabilitySummary.total - enabledCapabilities;
+
+        if (topStatusDot != null) {
+            int dotColor = !running ? RED : relayConfigured && !relayConnected ? AMBER : GREEN;
+            String dotState = !running
+                    ? "Node stopped"
+                    : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready";
+            applyTextColor(topStatusDot, dotColor);
+            topStatusDot.setContentDescription(dotState);
+        }
 
         if (homeReadyTitle != null) {
             if (!running) {
                 homeReadyTitle.setText("OFFLINE");
-                homeReadyTitle.setTextColor(RED);
+                applyTextColor(homeReadyTitle, RED);
                 homeReadyDetail.setText("PickPico is not available to agents.");
             } else if (relayConnected) {
                 homeReadyTitle.setText("READY · LOCAL + RELAY");
-                homeReadyTitle.setTextColor(GREEN);
+                applyTextColor(homeReadyTitle, GREEN);
                 homeReadyDetail.setText("Available on this network and remotely.");
             } else {
                 homeReadyTitle.setText("READY · LOCAL");
-                homeReadyTitle.setTextColor(GREEN);
+                applyTextColor(homeReadyTitle, GREEN);
                 homeReadyDetail.setText("Available to agents on this network.");
             }
             homeCopyAction.setVisibility(running ? View.VISIBLE : View.GONE);
@@ -1393,14 +1488,15 @@ public final class DashboardActivity extends Activity {
         }
 
         if (homeCapabilitiesState != null) {
-            String value = enabledCapabilities + " ENABLED" + (needSetup > 0 ? " · " + needSetup + " NEED SETUP" : "");
+            String value = enabledCapabilities + " OF " + capabilitySummary.total + " READY"
+                    + (needSetup > 0 ? " · " + needSetup + " NEED SETUP" : "");
             setState(homeCapabilitiesState, value, needSetup > 0 ? AMBER : GREEN);
         }
 
         if (homeNodeState != null) {
             setState(homeNodeState, running ? "RUNNING" : "STOPPED", running ? GREEN : RED);
             homeNodeAction.setText(running ? "STOP" : "START");
-            homeNodeAction.setTextColor(running ? RED : GREEN);
+            applyTextColor(homeNodeAction, running ? RED : GREEN);
             homeNodeAction.setBackground(pillDrawable(
                     running ? Color.argb(30, 255, 91, 99) : Color.argb(22, 61, 214, 129),
                     running ? Color.argb(95, 255, 91, 99) : Color.argb(95, 61, 214, 129)));
@@ -1437,22 +1533,28 @@ public final class DashboardActivity extends Activity {
         String version = updateState.optString("currentVersionName", BuildConfig.VERSION_NAME);
         long versionCode = updateState.optLong("currentVersionCode", BuildConfig.VERSION_CODE);
         String rawUpdateStatus = updateState.optString("status", "idle");
-        String candidateVersion = updateState.optString("candidateVersionName", "");
+        String candidateVersion = updateState.optString(
+                "candidateVersionName",
+                updateState.optString("latestVersionName", ""));
         boolean hasCandidate = SelfUpdateManager.hasInstallableCandidate(this);
 
         if (settingsVersionState != null) {
             settingsVersionState.setText("Version " + version + " · build " + versionCode);
         }
         if (settingsUpdateState != null) {
-            String label = rawUpdateStatus.toUpperCase();
-            if (!TextUtils.isEmpty(candidateVersion)) label += " · " + candidateVersion;
-            setState(settingsUpdateState, label, hasCandidate ? GREEN : DIM);
+            setState(
+                    settingsUpdateState,
+                    formatUpdateStatus(updateState, updateCheckInProgress, updateCheckError),
+                    !TextUtils.isEmpty(updateCheckError) ? RED : updateStatusColor(rawUpdateStatus, hasCandidate));
         }
         if (updateAction != null) {
             boolean downloading = "downloading".equals(rawUpdateStatus) || "staging".equals(rawUpdateStatus);
-            updateAction.setEnabled(!downloading);
+            boolean busy = updateCheckInProgress || downloading;
+            updateAction.setEnabled(!busy);
             updateAction.setAlpha(updateAction.isEnabled() ? 1f : 0.45f);
-            if (downloading) {
+            if (updateCheckInProgress) {
+                updateAction.setText("CHECKING FOR UPDATE…");
+            } else if (downloading) {
                 updateAction.setText("DOWNLOADING UPDATE…");
             } else if (hasCandidate && !TextUtils.isEmpty(candidateVersion)) {
                 updateAction.setText("INSTALL " + candidateVersion);
@@ -1481,35 +1583,106 @@ public final class DashboardActivity extends Activity {
         if (devRemoteEndpoint != null) devRemoteEndpoint.setText(orDash(remoteEndpoint));
         if (devRelayStatus != null) {
             devRelayStatus.setText(relayStatus.toUpperCase());
-            devRelayStatus.setTextColor(relayConnected ? GREEN : AMBER);
+            applyTextColor(devRelayStatus, relayConnected ? GREEN : AMBER);
         }
         if (devRelayUrl != null) devRelayUrl.setText(orDash(relayUrl));
         if (devBearer != null) devBearer.setText(maskSecret(token));
         if (devRuntime != null) {
             long calls = prefs.getLong(McpNodeService.KEY_CALL_COUNT, 0L);
             devRuntime.setText((running ? "RUNNING" : "STOPPED") + " · tool calls " + calls + " · app " + version + "/" + versionCode);
-            devRuntime.setTextColor(running ? GREEN : RED);
+            applyTextColor(devRuntime, running ? GREEN : RED);
         }
         if (devRecent != null) devRecent.setText(prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet"));
     }
 
     private void setState(TextView view, String value, int color) {
         view.setText(value);
-        view.setTextColor(color);
+        applyTextColor(view, color);
     }
 
-    private int enabledCapabilityCount() {
-        int count = 0;
-        if (hasPermission(Manifest.permission.CAMERA)) count++;
-        if (hasPermission(Manifest.permission.RECORD_AUDIO)) count++;
-        if (hasLocationPermission()) count++;
-        if (hasPermission(Manifest.permission.READ_CONTACTS)) count++;
-        if (hasCalendarPermission()) count++;
-        if (McpNotificationListenerService.hasAccess(this)) count++;
-        if (hasDeviceAdmin()) count++;
-        if (McpocketPolicySettings.isHyperModeEnabled(this)) count++;
-        if (McpAccessibilityService.hasAccess(this)) count++;
-        return count;
+    private CapabilitySummary capabilitySummary() {
+        boolean hyper = McpocketPolicySettings.isHyperModeEnabled(this);
+        boolean[] readiness = new boolean[]{
+                hasPermission(Manifest.permission.CAMERA),
+                hasPermission(Manifest.permission.RECORD_AUDIO),
+                hasLocationPermission(),
+                hasPermission(Manifest.permission.READ_CONTACTS),
+                hasCalendarPermission(),
+                McpNotificationListenerService.hasAccess(this),
+                hasDeviceAdmin(),
+                hyper,
+                hyper && McpAccessibilityService.hasAccess(this),
+                hyper && ScreenCaptureService.isActive()
+        };
+        int available = 0;
+        for (boolean ready : readiness) {
+            if (ready) available++;
+        }
+        return new CapabilitySummary(available, readiness.length);
+    }
+
+    private String formatUpdateStatus(JSONObject state, boolean checking, String transientError) {
+        if (checking) return "Checking the official update channel…";
+        if (!TextUtils.isEmpty(transientError)) return "Update check failed · " + transientError;
+
+        String status = state.optString("status", "idle");
+        String version = state.optString("candidateVersionName", state.optString("latestVersionName", ""));
+        if ("downloading".equals(status)) {
+            long downloaded = state.optLong("bytesDownloaded", 0L);
+            long total = state.optLong("totalBytes", 0L);
+            if (total > 0L) {
+                long percent = Math.min(100L, downloaded * 100L / total);
+                return "Downloading " + percent + "% · " + formatMegabytes(downloaded)
+                        + " / " + formatMegabytes(total);
+            }
+            return "Downloading · " + formatMegabytes(downloaded);
+        }
+        if ("staging".equals(status) || "verified".equals(status)) {
+            return "Download verified · preparing the installer";
+        }
+        if ("pending_user_action".equals(status)) {
+            return TextUtils.isEmpty(version)
+                    ? "Update ready · tap Install to continue"
+                    : "Version " + version + " is ready to install";
+        }
+        if ("requires_setup".equals(status)) {
+            return "Android permission needed · allow PickPico to install updates";
+        }
+        if ("failed".equals(status)) {
+            String error = state.optString("error", "Unknown update error");
+            return "Update failed · " + simplifyUpdateError(error);
+        }
+        if ("up_to_date".equals(status)) return "PickPico is up to date";
+        if ("installed".equals(status)) return "Update installed successfully";
+        return "Ready to check the official update channel";
+    }
+
+    private int updateStatusColor(String status, boolean hasCandidate) {
+        if (updateCheckInProgress || "downloading".equals(status) || "staging".equals(status)) return BLUE;
+        if ("failed".equals(status)) return RED;
+        if ("requires_setup".equals(status)) return AMBER;
+        if (hasCandidate || "installed".equals(status) || "up_to_date".equals(status)) return GREEN;
+        return DIM;
+    }
+
+    private String simplifyUpdateError(String error) {
+        if (error == null) return "Unknown error";
+        int separator = error.indexOf(": ");
+        return separator > 0 ? error.substring(separator + 2) : error;
+    }
+
+    private String formatMegabytes(long bytes) {
+        return String.format(Locale.US, "%.1f MB", Math.max(0L, bytes) / (1024d * 1024d));
+    }
+
+    private static final class CapabilitySummary {
+        final int available;
+        final int total;
+
+        CapabilitySummary(int available, int total) {
+            this.available = available;
+            this.total = total;
+        }
     }
 
     private boolean hasPermission(String permission) {
@@ -1783,27 +1956,59 @@ public final class DashboardActivity extends Activity {
     }
 
     private void checkOrInstallUpdate() {
-        if (!SelfUpdateManager.hasInstallableCandidate(this)) {
+        if (updateCheckInProgress) {
+            return;
+        }
+
+        if (SelfUpdateManager.hasInstallableCandidate(this)) {
+            updateCheckError = null;
             try {
-                JSONObject state = SelfUpdateManager.startLatest(this, new JSONObject(), 0L);
-                String status = state.optString("status", "checking");
-                if ("up_to_date".equals(status)) {
-                    Toast.makeText(this, "PickPico is already up to date", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "PickPico update: " + status, Toast.LENGTH_SHORT).show();
-                }
-                handler.postDelayed(this::refreshStatus, 250L);
+                JSONObject state = SelfUpdateManager.installStagedFromForeground(this);
+                Toast.makeText(this, "PickPico update: " + state.optString("status", "staging"), Toast.LENGTH_SHORT).show();
             } catch (RuntimeException error) {
                 Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
             }
+            handler.postDelayed(this::refreshStatus, 250L);
             return;
         }
+
+        updateCheckInProgress = true;
+        updateCheckError = null;
+        refreshStatus();
+        Context appContext = getApplicationContext();
+        new Thread(() -> {
+            try {
+                JSONObject latest = SelfUpdateManager.checkLatest(appContext, new JSONObject(), 0L);
+                handler.post(() -> finishUpdateCheck(latest, null));
+            } catch (RuntimeException error) {
+                handler.post(() -> finishUpdateCheck(null, error));
+            }
+        }, "pickpico-manual-update-check").start();
+    }
+
+    private void finishUpdateCheck(JSONObject latest, RuntimeException error) {
+        updateCheckInProgress = false;
+        if (error != null) {
+            updateCheckError = simplifyUpdateError(error.getMessage());
+            Toast.makeText(this, "Update check failed: " + updateCheckError, Toast.LENGTH_LONG).show();
+            refreshStatus();
+            return;
+        }
+        updateCheckError = null;
+
         try {
-            JSONObject state = SelfUpdateManager.installStagedFromForeground(this);
+            boolean updateAvailable = latest.optBoolean("updateAvailable", false);
+            if (!updateAvailable) {
+                Toast.makeText(this, "PickPico is already up to date", Toast.LENGTH_SHORT).show();
+                refreshStatus();
+                return;
+            }
+            JSONObject state = SelfUpdateManager.startResolvedLatest(this, latest, 0L);
             Toast.makeText(this, "PickPico update: " + state.optString("status", "staging"), Toast.LENGTH_SHORT).show();
             handler.postDelayed(this::refreshStatus, 250L);
-        } catch (RuntimeException error) {
-            Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
+        } catch (RuntimeException startError) {
+            Toast.makeText(this, startError.getMessage(), Toast.LENGTH_LONG).show();
+            refreshStatus();
         }
     }
 

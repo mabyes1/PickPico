@@ -1,6 +1,7 @@
 package com.mcpocket.poc;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -9,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,6 +38,8 @@ public final class AgentInboxActivity extends Activity {
 
     private LinearLayout itemsContainer;
     private TextView inboxCount;
+    private TextView clearAction;
+    private TextView topStatusDot;
     private PickPicoTheme.State theme;
 
     @Override
@@ -51,12 +55,20 @@ public final class AgentInboxActivity extends Activity {
         super.onResume();
         theme = PickPicoTheme.load(this);
         renderItems();
+        refreshTopStatus();
     }
 
     private void configureWindow() {
         Window window = getWindow();
-        window.setStatusBarColor(BG);
-        window.setNavigationBarColor(BG);
+        boolean light = PickPicoTheme.isLightBackground(theme);
+        int barColor = theme != null && !theme.gradient ? theme.colorA : BG;
+        window.setStatusBarColor(barColor);
+        window.setNavigationBarColor(barColor);
+        int flags = light ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && light) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        window.getDecorView().setSystemUiVisibility(flags);
     }
 
     private View buildContent() {
@@ -110,15 +122,12 @@ public final class AgentInboxActivity extends Activity {
         introHeader.addView(inboxCount, new LinearLayout.LayoutParams(dp(56), dp(44)));
         root.addView(intro);
 
-        TextView clear = actionButton("CLEAR INBOX", RED);
-        clear.setOnClickListener(v -> {
-            AgentInboxStore.clear(this);
-            renderItems();
-        });
+        clearAction = actionButton("CLEAR INBOX", RED);
+        clearAction.setOnClickListener(v -> confirmClearInbox());
         LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
         clearParams.topMargin = dp(12);
-        root.addView(clear, clearParams);
+        root.addView(clearAction, clearParams);
 
         TextView section = text("MESSAGES", 10, Typeface.BOLD, MUTED);
         section.setLetterSpacing(.08f);
@@ -128,7 +137,62 @@ public final class AgentInboxActivity extends Activity {
         itemsContainer = new LinearLayout(this);
         itemsContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(itemsContainer);
+
+        shell.addView(buildBottomNav(), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
         return stage;
+    }
+
+    private View buildBottomNav() {
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setGravity(Gravity.CENTER_VERTICAL);
+        nav.setPadding(dp(10), dp(7), dp(10), dp(8));
+        nav.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
+        nav.setElevation(dp(16));
+        nav.addView(navItem("HOME", false, DashboardActivity.PAGE_HOME), navParams());
+        nav.addView(navItem("INBOX", true, -1), navParams());
+        nav.addView(navItem("CAPABILITIES", false, DashboardActivity.PAGE_CAPABILITIES), navParams());
+        nav.addView(navItem("SETTINGS", false, DashboardActivity.PAGE_SETTINGS), navParams());
+        return nav;
+    }
+
+    private LinearLayout.LayoutParams navParams() {
+        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+    }
+
+    private TextView navItem(String label, boolean active, int page) {
+        TextView item = text(label, 10, Typeface.BOLD, active ? GREEN : MUTED);
+        item.setGravity(Gravity.CENTER);
+        item.setLetterSpacing(.04f);
+        if (active) {
+            item.setBackground(PickPicoTheme.control(theme, dp(12), GREEN, true));
+        } else {
+            item.setOnClickListener(v -> openDashboard(page));
+        }
+        return item;
+    }
+
+    private void openDashboard(int page) {
+        Intent intent = new Intent(this, DashboardActivity.class)
+                .putExtra(DashboardActivity.EXTRA_PAGE, page)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
+    }
+
+    private void confirmClearInbox() {
+        if (AgentInboxStore.count(this) == 0) return;
+        new AlertDialog.Builder(this)
+                .setTitle("Clear Agent Inbox?")
+                .setMessage("This removes every saved Agent message from this phone.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Clear", (dialog, which) -> {
+                    AgentInboxStore.clear(this);
+                    renderItems();
+                    Toast.makeText(this, "Agent Inbox cleared", Toast.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
     private View buildTopBar() {
@@ -137,6 +201,7 @@ public final class AgentInboxActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(14), dp(8), dp(16), 0);
         bar.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
+        bar.setElevation(dp(16));
 
         TextView back = text("‹", 34, Typeface.NORMAL, TEXT);
         back.setGravity(Gravity.CENTER);
@@ -152,10 +217,25 @@ public final class AgentInboxActivity extends Activity {
         meta.setLetterSpacing(.08f);
         titles.addView(meta);
 
-        TextView dot = text("●", 13, Typeface.BOLD, GREEN);
-        dot.setGravity(Gravity.CENTER);
-        bar.addView(dot, new LinearLayout.LayoutParams(dp(28), dp(48)));
+        topStatusDot = text("●", 13, Typeface.BOLD, DIM);
+        topStatusDot.setGravity(Gravity.CENTER);
+        bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(28), dp(48)));
         return bar;
+    }
+
+    private void refreshTopStatus() {
+        if (topStatusDot == null) return;
+        android.content.SharedPreferences prefs = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE);
+        boolean running = McpNodeService.isNodeRunning();
+        String relayUrl = prefs.getString(McpNodeService.KEY_RELAY_BASE_URL, "");
+        String relayStatus = prefs.getString(McpNodeService.KEY_RELAY_STATUS, "disabled");
+        boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
+        boolean relayConnected = "connected".equals(relayStatus);
+        int color = !running ? RED : relayConfigured && !relayConnected ? Color.rgb(246, 169, 69) : GREEN;
+        topStatusDot.setTextColor(resolveThemeTextColor(color));
+        topStatusDot.setContentDescription(!running
+                ? "Node stopped"
+                : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready");
     }
 
     private void renderItems() {
@@ -163,6 +243,10 @@ public final class AgentInboxActivity extends Activity {
         itemsContainer.removeAllViews();
         JSONArray items = AgentInboxStore.list(this);
         if (inboxCount != null) inboxCount.setText(String.valueOf(items.length()));
+        if (clearAction != null) {
+            clearAction.setEnabled(items.length() > 0);
+            clearAction.setAlpha(items.length() > 0 ? 1f : 0.35f);
+        }
 
         String highlightedId = getIntent() == null ? "" : getIntent().getStringExtra(EXTRA_ENTRY_ID);
         if (items.length() == 0) {
@@ -239,7 +323,7 @@ public final class AgentInboxActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(15), dp(14), dp(15), dp(14));
         card.setBackground(PickPicoTheme.card(theme, dp(18), accented));
-        card.setElevation(dp(10));
+        card.setElevation(dp(14));
         return card;
     }
 
@@ -281,10 +365,21 @@ public final class AgentInboxActivity extends Activity {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(sp);
-        view.setTextColor(color);
+        view.setTextColor(resolveThemeTextColor(color));
         view.setTypeface(Typeface.create("sans-serif", style));
         view.setIncludeFontPadding(false);
         return view;
+    }
+
+    private int resolveThemeTextColor(int roleColor) {
+        if (!PickPicoTheme.isLightBackground(theme)) return roleColor;
+        if (roleColor == TEXT) return Color.rgb(22, 26, 29);
+        if (roleColor == MUTED) return Color.rgb(73, 82, 90);
+        if (roleColor == DIM) return Color.rgb(108, 117, 125);
+        if (roleColor == GREEN) return Color.rgb(18, 121, 67);
+        if (roleColor == RED) return Color.rgb(194, 39, 49);
+        if (roleColor == BLUE) return Color.rgb(24, 101, 174);
+        return roleColor;
     }
 
     private int dp(int value) {

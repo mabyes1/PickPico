@@ -141,7 +141,7 @@ public final class MainActivity extends Activity {
 
         root.addView(label("AGENT CONTROL"));
         TextView controlNote = text(
-                "Hyper Mode controls advanced Android capabilities. Approval Mode controls whether the Agent must ask before side effects.",
+                "Hyper Mode controls advanced Android capabilities and lets urgent Agent handoffs request lock-screen dismissal. Secure PIN/password/biometric locks remain Android-owned. Approval Mode controls whether the Agent must ask before side effects.",
                 13,
                 Typeface.NORMAL);
         controlNote.setTextColor(Color.DKGRAY);
@@ -154,9 +154,12 @@ public final class MainActivity extends Activity {
         hyperModeSwitch.setChecked(McpocketPolicySettings.isHyperModeEnabled(this));
         hyperModeSwitch.setOnCheckedChangeListener((button, checked) -> {
             McpocketPolicySettings.setHyperModeEnabled(this, checked);
+            boolean openedUnlockSetup = checked && AgentAttention.requestHyperUnlockAccessIfNeeded(this);
             Toast.makeText(
                     this,
-                    checked
+                    openedUnlockSetup
+                            ? "Allow full-screen alerts so Hyper Mode can dismiss the lock screen."
+                            : checked
                             ? "Hyper Mode enabled. Android requires the phone owner to finish Special Access setup locally."
                             : "Hyper Mode disabled. Android access may remain granted, but Hyper commands are hidden from the Agent.",
                     Toast.LENGTH_LONG).show();

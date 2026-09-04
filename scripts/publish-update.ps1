@@ -8,10 +8,64 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# The current stable OTA channel is signed with the interactive Windows user's
+# Android debug keystore. Running this script from Session 0 (for example the
+# coding-tools Windows service) causes Gradle to create/use a different debug
+# keystore, producing an APK Android will reject as a signature mismatch.
+# Keep publishing in the signed-in desktop session until PickPico moves to a
+# dedicated release signing key.
+if ([System.Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0) {
+    throw 'PickPico OTA publish must run in the signed-in Windows user session, not Session 0. Use an active-user execution context so the existing Android signing key and Wrangler login are reused.'
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 $gradle = Join-Path $root 'app\build.gradle'
 $relayDir = Join-Path $root 'relay'
 $apk = Join-Path $root 'app\build\outputs\apk\debug\app-debug.apk'
+$jdk = 'D:\DevTools\PhoneMonitorAndroid\jdk-17'
+$androidSdk = 'D:\DevTools\PhoneMonitorAndroid\android-sdk'
+$apksigner = Join-Path $androidSdk 'build-tools\35.0.0\apksigner.bat'
+$keytool = Join-Path $jdk 'bin\keytool.exe'
+
+function Resolve-PickPicoSigningKeystore {
+    if (-not [string]::IsNullOrWhiteSpace($env:PICKPICO_SIGNING_KEYSTORE)) {
+        return $env:PICKPICO_SIGNING_KEYSTORE
+    }
+    return Join-Path $env:USERPROFILE '.android\debug.keystore'
+}
+
+function Get-KeystoreCertificateSha256 {
+    param([string]$KeystorePath)
+    $temporaryCertificate = Join-Path ([System.IO.Path]::GetTempPath()) ("pickpico-cert-" + [Guid]::NewGuid().ToString('N') + '.der')
+    try {
+        & $keytool -exportcert -alias androiddebugkey -keystore $KeystorePath -storepass android -file $temporaryCertificate | Out-Null
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $temporaryCertificate)) {
+            throw 'Unable to export the PickPico signing certificate.'
+        }
+        $bytes = [System.IO.File]::ReadAllBytes($temporaryCertificate)
+        $digest = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return ([BitConverter]::ToString($digest.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+        } finally {
+            $digest.Dispose()
+        }
+    } finally {
+        Remove-Item -LiteralPath $temporaryCertificate -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-ApkCertificateSha256 {
+    param([string]$ApkPath)
+    $lines = & $apksigner verify --print-certs $ApkPath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'apksigner could not verify the PickPico APK.'
+    }
+    $match = [regex]::Match(($lines -join "`n"), 'Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]{64})')
+    if (-not $match.Success) {
+        throw 'Unable to read the APK signing certificate SHA-256 digest.'
+    }
+    return $match.Groups[1].Value.ToLowerInvariant()
+}
 
 if (-not $SkipBuild) {
     & (Join-Path $PSScriptRoot 'build-debug.ps1')
@@ -20,6 +74,22 @@ if (-not $SkipBuild) {
 
 if (-not (Test-Path -LiteralPath $apk)) {
     throw "APK not found: $apk"
+}
+if (-not (Test-Path -LiteralPath $keytool)) {
+    throw "keytool not found: $keytool"
+}
+if (-not (Test-Path -LiteralPath $apksigner)) {
+    throw "apksigner not found: $apksigner"
+}
+
+$signingKeystore = Resolve-PickPicoSigningKeystore
+if (-not (Test-Path -LiteralPath $signingKeystore)) {
+    throw "PickPico signing keystore not found: $signingKeystore"
+}
+$expectedCertificateSha256 = Get-KeystoreCertificateSha256 $signingKeystore
+$apkCertificateSha256 = Get-ApkCertificateSha256 $apk
+if ($apkCertificateSha256 -ne $expectedCertificateSha256) {
+    throw "Refusing to publish PickPico: APK signing certificate $apkCertificateSha256 does not match expected certificate $expectedCertificateSha256. Rebuild with scripts/build-debug.ps1 in a compatible signing context."
 }
 
 $gradleText = Get-Content -LiteralPath $gradle -Raw

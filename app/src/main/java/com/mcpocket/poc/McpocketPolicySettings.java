@@ -44,7 +44,7 @@ final class McpocketPolicySettings {
         return new JSONObject()
                 .put("hyperMode", new JSONObject()
                         .put("enabled", isHyperModeEnabled(context))
-                        .put("meaning", "Unlock Android special-access capability families; underlying OS grants remain independent."))
+                        .put("meaning", "Unlock Android special-access capability families and allow urgent Agent handoffs to request keyguard dismissal; secure authentication remains OS-owned."))
                 .put("approvalMode", new JSONObject()
                         .put("value", approval)
                         .put("ask", APPROVAL_ASK.equals(approval))

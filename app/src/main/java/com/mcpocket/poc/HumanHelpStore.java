@@ -32,7 +32,7 @@ final class HumanHelpStore {
     static final String EXTRA_REQUEST_ID = "humanHelpRequestId";
     private static final String PREFS = "mcpocket_human_help";
     private static final String KEY_PREFIX = "request:";
-    private static final String CHANNEL_ID = "mcpocket_human_help";
+    private static final String CHANNEL_ID = "mcpocket_human_help_v2";
     private static final int MAX_INLINE_ATTACHMENT_BYTES = 2_500_000;
     private static final int DEFAULT_IDLE_TIMEOUT_SECONDS = 180;
     private static final long MAX_STORAGE_BYTES = 100L * 1024L * 1024L;
@@ -561,6 +561,7 @@ final class HumanHelpStore {
                 "Human interaction requests",
                 NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("Help and approval requests from an Agent that need a nearby human response");
+        AgentAttention.configureUrgentChannel(channel);
         manager.createNotificationChannel(channel);
 
         String requestId = request.optString("requestId");
@@ -572,7 +573,7 @@ final class HumanHelpStore {
                 requestId.hashCode(),
                 open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(request.optString("title", "AI needs your help"))
                 .setContentText(request.optString("instruction", ""))
@@ -580,9 +581,11 @@ final class HumanHelpStore {
                 .setCategory(Notification.CATEGORY_MESSAGE)
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(false)
-                .setContentIntent(pending)
-                .build();
+                .setContentIntent(pending);
+        AgentAttention.applyUrgentBehavior(context, builder, requestId.hashCode());
+        Notification notification = builder.build();
         manager.notify(requestId.hashCode(), notification);
+        AgentAttention.alert(context);
     }
 
     private static void postTerminalNotification(
@@ -599,6 +602,7 @@ final class HumanHelpStore {
                 CHANNEL_ID,
                 "Human help requests",
                 NotificationManager.IMPORTANCE_HIGH);
+        AgentAttention.configureUrgentChannel(channel);
         manager.createNotificationChannel(channel);
         String requestId = request.optString("requestId");
         Intent open = new Intent(context, HumanHelpActivity.class)
@@ -609,7 +613,7 @@ final class HumanHelpStore {
                 requestId.hashCode(),
                 open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(icon)
                 .setContentTitle(title)
                 .setContentText(message)
@@ -618,8 +622,9 @@ final class HumanHelpStore {
                         .bigText(request.optString("title", "AI needs your help") + "\n\n" + message))
                 .setCategory(Notification.CATEGORY_STATUS)
                 .setAutoCancel(true)
-                .setContentIntent(pending)
-                .build();
+                .setContentIntent(pending);
+        AgentAttention.applyPublicLockscreen(builder);
+        Notification notification = builder.build();
         manager.notify(requestId.hashCode(), notification);
     }
 }

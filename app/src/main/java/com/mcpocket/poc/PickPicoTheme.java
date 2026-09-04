@@ -18,7 +18,7 @@ import android.view.View;
 
 import java.util.Locale;
 
-/** Shared PickPico appearance model, intentionally mirroring VibeDeck's glass/theme tokens. */
+/** Shared PickPico appearance model for background and glass controls. */
 final class PickPicoTheme {
     static final String PREFS = "pickpico_appearance";
 
@@ -115,11 +115,15 @@ final class PickPicoTheme {
     }
 
     static int accentA(State state) {
-        return mix(state.colorA, Color.WHITE, 0.36f);
+        return mix(state.colorA, isLightBackground(state) ? Color.BLACK : Color.WHITE, 0.36f);
     }
 
     static int accentB(State state) {
-        return mix(state.colorB, Color.WHITE, 0.44f);
+        return mix(state.colorB, isLightBackground(state) ? Color.BLACK : Color.WHITE, 0.44f);
+    }
+
+    static boolean isLightBackground(State state) {
+        return state != null && !state.gradient && Color.luminance(state.colorA) >= 0.56f;
     }
 
     static Drawable card(State state, float radius, boolean accented) {
@@ -162,13 +166,6 @@ final class PickPicoTheme {
 
             if (!state.gradient) {
                 canvas.drawColor(state.colorA);
-                paint.setShader(new LinearGradient(
-                        0f, 0f, w, h,
-                        new int[]{Color.argb(35, 255, 255, 255), Color.argb(90, 0, 0, 0)},
-                        null,
-                        Shader.TileMode.CLAMP));
-                canvas.drawRect(0f, 0f, w, h, paint);
-                paint.setShader(null);
                 return;
             }
 
@@ -210,7 +207,7 @@ final class PickPicoTheme {
         }
     }
 
-    /** VibeDeck surface formula translated to native Canvas layers. */
+    /** Self-lit glass surface: transmitted scene plus independent highlight and shadow. */
     private static final class GlassDrawable extends Drawable {
         private final State state;
         private final float radius;
@@ -231,21 +228,86 @@ final class PickPicoTheme {
         @Override
         public void draw(Canvas canvas) {
             RectF rect = new RectF(getBounds());
-            int glassAlpha = Math.round(255f * state.glassOpacity / 100f);
-            float highlightStrength = state.highlight / 100f;
+            boolean lightBackground = isLightBackground(state);
+            float opacity = state.glassOpacity / 100f;
+            // DEFAULT_HIGHLIGHT is the Tunnel-Coding reference recipe at 1.0x.
+            // The previous implementation divided this value by 100, which made
+            // the optical highlight far too weak to read as glass.
+            float shine = clamp(state.highlight / (float) DEFAULT_HIGHLIGHT, .25f, 1.70f);
+
+            float glassHi = (lightBackground ? .52f : .34f) * shine;
+            float glassMid = (lightBackground ? .22f : .13f) * shine;
+            float glassLow = (lightBackground ? .05f : .025f) * shine;
+            float baseAlpha = lightBackground
+                    ? .06f + opacity * .65f
+                    : .025f + opacity * .95f;
 
             paint.setShader(null);
             if (strong) {
-                paint.setColor(Color.argb(Math.min(138, 18 + glassAlpha * 3), 6, 8, 12));
+                paint.setColor(lightBackground
+                        ? withAlpha(Color.WHITE, clamp(.11f + opacity * .35f, 0f, .28f))
+                        : withAlpha(Color.rgb(10, 14, 18), clamp(.20f + opacity * .70f, 0f, .42f)));
             } else {
-                paint.setColor(Color.argb(glassAlpha, 255, 255, 255));
+                paint.setColor(withAlpha(Color.WHITE, clamp(baseAlpha, 0f, .30f)));
             }
             canvas.drawRoundRect(rect, radius, radius, paint);
 
+            // Tunnel-Coding's 145deg surface gradient.
             paint.setShader(new LinearGradient(
                     rect.left, rect.top, rect.right, rect.bottom,
-                    new int[]{Color.argb(Math.round(255f * (.025f + highlightStrength * .18f)), 255, 255, 255), Color.argb(1, 255, 255, 255)},
-                    null,
+                    new int[]{
+                            withAlpha(Color.WHITE, clamp(glassMid, 0f, .65f)),
+                            withAlpha(Color.WHITE, clamp(glassLow, 0f, .28f)),
+                            Color.TRANSPARENT},
+                    new float[]{0f, .34f, .70f},
+                    Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(rect, radius, radius, paint);
+
+            // Opposing low light, matching the shell's secondary 325deg layer.
+            paint.setShader(new LinearGradient(
+                    rect.right, rect.bottom, rect.left, rect.top,
+                    new int[]{withAlpha(Color.WHITE, clamp(glassLow, 0f, .22f)), Color.TRANSPARENT},
+                    new float[]{0f, .34f},
+                    Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(rect, radius, radius, paint);
+
+            // Large top-left incident light. This is the layer that makes the
+            // material look illuminated rather than merely transparent.
+            paint.setShader(new RadialGradient(
+                    rect.left + rect.width() * .06f,
+                    rect.top - rect.height() * .04f,
+                    Math.max(rect.width(), rect.height()) * 1.18f,
+                    new int[]{
+                            withAlpha(Color.WHITE, clamp(glassHi * .78f, 0f, .72f)),
+                            withAlpha(Color.WHITE, clamp(glassMid * .78f, 0f, .42f)),
+                            Color.TRANSPARENT},
+                    new float[]{0f, .18f, .48f},
+                    Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(rect, radius, radius, paint);
+
+            // Smaller reflected light from the opposite corner.
+            paint.setShader(new RadialGradient(
+                    rect.right + rect.width() * .04f,
+                    rect.bottom + rect.height() * .04f,
+                    Math.max(rect.width(), rect.height()) * .72f,
+                    new int[]{withAlpha(Color.WHITE, clamp(glassMid * .78f, 0f, .38f)), Color.TRANSPARENT},
+                    new float[]{0f, .58f},
+                    Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(rect, radius, radius, paint);
+
+            // Narrow diagonal light streak, equivalent to Tunnel-Coding's
+            // ::before linear-gradient(112deg, ...).
+            paint.setShader(new LinearGradient(
+                    rect.left, rect.bottom,
+                    rect.right, rect.top,
+                    new int[]{
+                            Color.TRANSPARENT,
+                            Color.TRANSPARENT,
+                            withAlpha(Color.WHITE, clamp(.10f * .78f * shine, 0f, .18f)),
+                            withAlpha(Color.WHITE, clamp(.025f * .78f * shine, 0f, .08f)),
+                            Color.TRANSPARENT,
+                            Color.TRANSPARENT},
+                    new float[]{0f, .34f, .44f, .54f, .64f, 1f},
                     Shader.TileMode.CLAMP));
             canvas.drawRoundRect(rect, radius, radius, paint);
 
@@ -258,18 +320,34 @@ final class PickPicoTheme {
                 canvas.drawRoundRect(rect, radius, radius, paint);
             }
 
-            stroke.setColor(Color.argb(Math.round(255f * (.06f + highlightStrength * .44f)), 255, 255, 255));
+            // On bright scenes a dark hairline gives the white optical border
+            // somewhere to land, the same job done by Tunnel's shadow/line pair.
             RectF edge = new RectF(rect.left + .5f, rect.top + .5f, rect.right - .5f, rect.bottom - .5f);
+            if (lightBackground) {
+                stroke.setColor(withAlpha(Color.rgb(17, 24, 39), .13f));
+                canvas.drawRoundRect(edge, radius, radius, stroke);
+            }
+
+            stroke.setColor(withAlpha(Color.WHITE, lightBackground ? .56f : .42f));
             canvas.drawRoundRect(edge, radius, radius, stroke);
 
-            canvas.save();
-            canvas.clipRect(rect.left, rect.top, rect.right, rect.top + Math.max(12f, rect.height() * .26f));
-            stroke.setColor(accented
-                    ? withAlpha(accentA(state), .26f + highlightStrength * .62f)
-                    : Color.argb(Math.round(255f * (.10f + highlightStrength * .68f)), 255, 255, 255));
-            RectF shine = new RectF(rect.left + 1.5f, rect.top + 1.5f, rect.right - 1.5f, rect.bottom - 1.5f);
-            canvas.drawRoundRect(shine, radius, radius, stroke);
-            canvas.restore();
+            RectF inner = new RectF(rect.left + 1.5f, rect.top + 1.5f, rect.right - 1.5f, rect.bottom - 1.5f);
+            stroke.setColor(withAlpha(Color.WHITE, clamp(.07f * shine, 0f, .16f)));
+            canvas.drawRoundRect(inner, radius, radius, stroke);
+
+            // Soft top inset light and bottom inset shade, corresponding to the
+            // CSS ::after inset 0 18px 34px / inset 0 -20px 30px pair.
+            paint.setShader(new LinearGradient(
+                    rect.left, rect.top,
+                    rect.left, rect.bottom,
+                    new int[]{
+                            withAlpha(Color.WHITE, clamp(.055f * shine, 0f, .12f)),
+                            Color.TRANSPARENT,
+                            Color.TRANSPARENT,
+                            withAlpha(Color.BLACK, lightBackground ? .065f : .035f)},
+                    new float[]{0f, .34f, .68f, 1f},
+                    Shader.TileMode.CLAMP));
+            canvas.drawRoundRect(inner, radius, radius, paint);
             paint.setShader(null);
         }
 
@@ -305,16 +383,21 @@ final class PickPicoTheme {
         @Override
         public void draw(Canvas canvas) {
             RectF rect = new RectF(getBounds());
-            paint.setColor(filled ? withAlpha(accent, .16f) : Color.argb(12, 255, 255, 255));
+            boolean lightBackground = isLightBackground(state);
+            paint.setColor(filled
+                    ? withAlpha(accent, .16f)
+                    : (lightBackground ? Color.argb(10, 0, 0, 0) : Color.argb(12, 255, 255, 255)));
             canvas.drawRoundRect(rect, radius, radius, paint);
             paint.setShader(new LinearGradient(
                     rect.left, rect.top, rect.right, rect.bottom,
-                    new int[]{Color.argb(18, 255, 255, 255), Color.TRANSPARENT},
-                    null,
+                    new int[]{Color.argb(24, 255, 255, 255), Color.TRANSPARENT, Color.argb(18, 0, 0, 0)},
+                    new float[]{0f, .58f, 1f},
                     Shader.TileMode.CLAMP));
             canvas.drawRoundRect(rect, radius, radius, paint);
             paint.setShader(null);
-            stroke.setColor(filled ? withAlpha(accent, .38f) : Color.argb(31, 255, 255, 255));
+            stroke.setColor(filled
+                    ? withAlpha(accent, .38f)
+                    : (lightBackground ? Color.argb(45, 0, 0, 0) : Color.argb(31, 255, 255, 255)));
             canvas.drawRoundRect(new RectF(rect.left + .5f, rect.top + .5f, rect.right - .5f, rect.bottom - .5f), radius, radius, stroke);
         }
 
@@ -340,6 +423,7 @@ final class PickPicoTheme {
         @Override
         public void draw(Canvas canvas) {
             RectF rect = new RectF(getBounds());
+            boolean lightBackground = isLightBackground(state);
             if (state.gradient) {
                 paint.setShader(new LinearGradient(rect.left, rect.bottom, rect.right, rect.top,
                         state.colorA, state.colorB, Shader.TileMode.CLAMP));
@@ -355,19 +439,28 @@ final class PickPicoTheme {
                     rect.top + rect.height() * .16f,
                     rect.right - rect.width() * .13f,
                     rect.bottom - rect.height() * .16f);
-            paint.setColor(Color.argb(Math.round(255f * state.glassOpacity / 100f), 255, 255, 255));
+            paint.setColor(lightBackground
+                    ? Color.argb(Math.max(5, Math.round(255f * state.glassOpacity / 200f)), 0, 0, 0)
+                    : Color.argb(Math.round(255f * state.glassOpacity / 100f), 255, 255, 255));
             canvas.drawRoundRect(glass, radius * .72f, radius * .72f, paint);
             paint.setShader(new LinearGradient(
                     glass.left, glass.top, glass.right, glass.bottom,
-                    new int[]{Color.argb(Math.round(255f * (.03f + state.highlight / 100f * .22f)), 255, 255, 255), Color.TRANSPARENT},
-                    null,
+                    new int[]{
+                            Color.argb(Math.round(255f * (.05f + state.highlight / 100f * .22f)), 255, 255, 255),
+                            Color.TRANSPARENT,
+                            Color.argb(Math.round(255f * (.03f + state.highlight / 100f * .10f)), 0, 0, 0)},
+                    new float[]{0f, .58f, 1f},
                     Shader.TileMode.CLAMP));
             canvas.drawRoundRect(glass, radius * .72f, radius * .72f, paint);
             paint.setShader(null);
-            stroke.setColor(Color.argb(Math.round(255f * (.10f + state.highlight / 100f * .62f)), 255, 255, 255));
+            stroke.setColor(lightBackground
+                    ? Color.argb(Math.round(255f * (.10f + state.highlight / 100f * .26f)), 0, 0, 0)
+                    : Color.argb(Math.round(255f * (.10f + state.highlight / 100f * .62f)), 255, 255, 255));
             canvas.drawRoundRect(new RectF(glass.left + .5f, glass.top + .5f, glass.right - .5f, glass.bottom - .5f), radius * .72f, radius * .72f, stroke);
 
-            stroke.setColor(Color.argb(52, 255, 255, 255));
+            stroke.setColor(lightBackground
+                    ? Color.argb(52, 0, 0, 0)
+                    : Color.argb(52, 255, 255, 255));
             canvas.drawRoundRect(new RectF(rect.left + .5f, rect.top + .5f, rect.right - .5f, rect.bottom - .5f), radius, radius, stroke);
         }
 

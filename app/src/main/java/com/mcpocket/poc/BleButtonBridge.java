@@ -30,6 +30,7 @@ import android.speech.SpeechRecognizer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -601,7 +602,11 @@ final class BleButtonBridge {
             current.disconnect();
         } catch (SecurityException ignored) {
         }
-        current.close();
+        try {
+            current.close();
+        } catch (SecurityException ignored) {
+            recordRecent("Button pad close blocked after Bluetooth permission was removed");
+        }
     }
 
     private void scheduleRetry() {
@@ -661,7 +666,7 @@ final class BleButtonBridge {
         byte[] stopAndRead() throws IOException {
             stopRecorder();
             try (FileInputStream input = new FileInputStream(outputFile)) {
-                byte[] bytes = input.readAllBytes();
+                byte[] bytes = readFully(input);
                 outputFile.delete();
                 return bytes;
             }
@@ -690,5 +695,17 @@ final class BleButtonBridge {
                 }
             }
         }
+    }
+
+    private static byte[] readFully(FileInputStream input) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = input.read(buffer)) >= 0) {
+            if (read > 0) {
+                output.write(buffer, 0, read);
+            }
+        }
+        return output.toByteArray();
     }
 }

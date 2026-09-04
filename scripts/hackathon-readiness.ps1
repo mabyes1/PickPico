@@ -8,6 +8,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $adb = 'D:\DevTools\Android\platform-tools\adb.exe'
+$jdk = 'D:\DevTools\PhoneMonitorAndroid\jdk-17'
+$androidSdk = 'D:\DevTools\PhoneMonitorAndroid\android-sdk'
+$apksigner = Join-Path $androidSdk 'build-tools\35.0.0\apksigner.bat'
+$keytool = Join-Path $jdk 'bin\keytool.exe'
 $results = [System.Collections.Generic.List[object]]::new()
 $failureMessage = $null
 
@@ -23,6 +27,39 @@ function Add-Check {
     }
 }
 
+function Resolve-PickPicoSigningKeystore {
+    if (-not [string]::IsNullOrWhiteSpace($env:PICKPICO_SIGNING_KEYSTORE)) {
+        return $env:PICKPICO_SIGNING_KEYSTORE
+    }
+    return Join-Path $env:USERPROFILE '.android\debug.keystore'
+}
+
+function Get-KeystoreCertificateSha256 {
+    param([string]$KeystorePath)
+    $temporaryCertificate = Join-Path ([System.IO.Path]::GetTempPath()) ("pickpico-readiness-cert-" + [Guid]::NewGuid().ToString('N') + '.der')
+    try {
+        & $keytool -exportcert -alias androiddebugkey -keystore $KeystorePath -storepass android -file $temporaryCertificate | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to export signing certificate' }
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return ([BitConverter]::ToString($sha.ComputeHash([System.IO.File]::ReadAllBytes($temporaryCertificate)))).Replace('-', '').ToLowerInvariant()
+        } finally {
+            $sha.Dispose()
+        }
+    } finally {
+        Remove-Item -LiteralPath $temporaryCertificate -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-ApkCertificateSha256 {
+    param([string]$ApkPath)
+    $lines = & $apksigner verify --print-certs $ApkPath
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to verify APK signature' }
+    $match = [regex]::Match(($lines -join "`n"), 'Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]{64})')
+    if (-not $match.Success) { throw 'Unable to read APK certificate digest' }
+    return $match.Groups[1].Value.ToLowerInvariant()
+}
+
 try {
     if (-not $SkipBuild) {
         & (Join-Path $PSScriptRoot 'build-debug.ps1')
@@ -31,6 +68,12 @@ try {
 
     $apk = Join-Path $root 'app\build\outputs\apk\debug\app-debug.apk'
     Add-Check 'Debug APK' (Test-Path -LiteralPath $apk) $apk
+
+    $signingKeystore = Resolve-PickPicoSigningKeystore
+    Add-Check 'Signing keystore' (Test-Path -LiteralPath $signingKeystore) $signingKeystore
+    $expectedCertificate = Get-KeystoreCertificateSha256 $signingKeystore
+    $apkCertificate = Get-ApkCertificateSha256 $apk
+    Add-Check 'APK signing certificate' ($apkCertificate -eq $expectedCertificate) $apkCertificate
 
     $healthUrl = $RelayBaseUrl.TrimEnd('/') + '/health'
     try {

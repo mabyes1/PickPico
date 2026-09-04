@@ -9,6 +9,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
@@ -82,12 +84,16 @@ public final class McpNodeService extends Service implements McpToolActions {
     private static final int NOTIFICATION_ID = 8765;
     private static final String CHANNEL_ID = "mcpocket_node";
     private static final int MAX_PROCESS_SESSIONS = 20;
+    private static final long AUTO_UPDATE_INITIAL_DELAY_MS = 10_000L;
+    private static final long AUTO_UPDATE_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5L);
     private static volatile boolean nodeActive;
 
     private McpHttpServer server;
     private String endpoint = "";
     private long startedElapsed;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final AtomicBoolean autoUpdateCheckRunning = new AtomicBoolean(false);
+    private final Runnable autoUpdateCheckRunnable = this::runAutoUpdateCheck;
     private final LinkedHashMap<String, ProcessSession> processSessions = new LinkedHashMap<>();
     private Ringtone activeRing;
     private int previousAlarmVolume = -1;
@@ -159,6 +165,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 buttonBridge.start();
             }
             updateNotification("Listening on " + endpoint);
+            scheduleAutoUpdateCheck(AUTO_UPDATE_INITIAL_DELAY_MS);
         } catch (Exception error) {
             nodeActive = false;
             if (server != null) {
@@ -175,6 +182,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public void onDestroy() {
         nodeActive = false;
+        mainHandler.removeCallbacks(autoUpdateCheckRunnable);
         stopAlertSound();
         stopAllProcessSessions();
         if (buttonBridge != null) {
@@ -192,6 +200,59 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_RUNNING, false).apply();
         super.onDestroy();
+    }
+
+    private void scheduleAutoUpdateCheck(long delayMs) {
+        mainHandler.removeCallbacks(autoUpdateCheckRunnable);
+        if (nodeActive && server != null) {
+            mainHandler.postDelayed(autoUpdateCheckRunnable, Math.max(0L, delayMs));
+        }
+    }
+
+    private void runAutoUpdateCheck() {
+        if (!nodeActive || server == null) {
+            return;
+        }
+        if (!autoUpdateCheckRunning.compareAndSet(false, true)) {
+            scheduleAutoUpdateCheck(AUTO_UPDATE_INTERVAL_MS);
+            return;
+        }
+
+        Context appContext = getApplicationContext();
+        new Thread(() -> {
+            try {
+                JSONObject status = SelfUpdateManager.status(appContext, 0L);
+                if (status.optBoolean("active", false) || status.optBoolean("running", false)) {
+                    return;
+                }
+
+                JSONObject latest = SelfUpdateManager.checkLatest(appContext, new JSONObject(), 0L);
+                if (!latest.optBoolean("updateAvailable", false)) {
+                    return;
+                }
+
+                long latestVersionCode = latest.optLong("latestVersionCode", -1L);
+                long stagedVersionCode = status.optLong("candidateVersionCode", -1L);
+                boolean hasCandidate = SelfUpdateManager.hasInstallableCandidate(appContext);
+
+                // Unknown-app install setup must still be initiated by the human from the UI.
+                // Once setup exists, future updates are downloaded and staged automatically.
+                if (!status.optBoolean("canRequestPackageInstalls", false)) {
+                    return;
+                }
+
+                if (!hasCandidate || stagedVersionCode < latestVersionCode) {
+                    SelfUpdateManager.startLatest(appContext, new JSONObject(), 0L);
+                }
+            } catch (Throwable ignored) {
+                // Auto-check is best effort. Manual update/check surfaces detailed errors.
+            } finally {
+                autoUpdateCheckRunning.set(false);
+                if (nodeActive) {
+                    mainHandler.postDelayed(autoUpdateCheckRunnable, AUTO_UPDATE_INTERVAL_MS);
+                }
+            }
+        }, "pickpico-auto-update-check").start();
     }
 
     @Override
@@ -1317,13 +1378,15 @@ public final class McpNodeService extends Service implements McpToolActions {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE;
             }
-            if (mediaForegroundRequested
-                    && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
-            }
-            if (mediaForegroundRequested
-                    && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (mediaForegroundRequested
+                        && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
+                }
+                if (mediaForegroundRequested
+                        && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+                }
             }
             if (mediaForegroundRequested
                     && (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

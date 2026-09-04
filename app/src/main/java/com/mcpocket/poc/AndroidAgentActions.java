@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 final class AndroidAgentActions {
-    private static final String ACTION_CHANNEL_ID = "mcpocket_agent_actions";
+    private static final String ACTION_CHANNEL_ID = "mcpocket_agent_actions_v2";
     private static final AtomicInteger ACTION_NOTIFICATION_IDS = new AtomicInteger(9400);
 
     private AndroidAgentActions() {
@@ -416,6 +416,7 @@ final class AndroidAgentActions {
                 ACTION_CHANNEL_ID,
                 "PickPico actions",
                 NotificationManager.IMPORTANCE_HIGH);
+        AgentAttention.configureUrgentChannel(channel);
         manager.createNotificationChannel(channel);
 
         int notificationId = ACTION_NOTIFICATION_IDS.incrementAndGet();
@@ -424,16 +425,18 @@ final class AndroidAgentActions {
                 notificationId,
                 target,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, ACTION_CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(context, ACTION_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_view)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
-                .setCategory(Notification.CATEGORY_RECOMMENDATION)
-                .build();
+                .setCategory(Notification.CATEGORY_RECOMMENDATION);
+        AgentAttention.applyUrgentBehavior(context, builder, notificationId);
+        Notification notification = builder.build();
         manager.notify(notificationId, notification);
+        AgentAttention.alert(context);
         return notificationId;
     }
 

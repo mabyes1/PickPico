@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
 
 // HUMAN_HELP uses a renewable human-idle lease, so its total wall-clock wait
 // can legitimately exceed one 360-second lease. This is only a transport
@@ -208,9 +209,14 @@ export class NodeRelay extends DurableObject {
 
   async forwardMcp(request) {
     const sockets = this.nodeSockets();
-    // Heartbeat is advisory health telemetry. Delivery ACK is the authoritative
-    // end-to-end proof that the phone actually received this MCP request.
-    const socket = sockets[0];
+    // Never route through a socket that has already stopped heartbeating. Among
+    // healthy sockets, prefer the freshest connection and let delivery ACK be
+    // the final end-to-end proof that the phone received this MCP request.
+    const socket = selectHealthiestSocket(
+      sockets,
+      (candidate) => this.socketHeartbeatAgeMs(candidate),
+      HEARTBEAT_STALE_MS,
+    );
     if (!socket) {
       return json({ error: "node_offline" }, 503, corsHeaders());
     }
@@ -347,11 +353,11 @@ export class NodeRelay extends DurableObject {
   }
 
   webSocketClose(ws, code, reason) {
-    this.failPending("node_disconnected");
+    this.failPendingForSocket(ws, "node_disconnected");
   }
 
   webSocketError(ws, error) {
-    this.failPending("node_disconnected");
+    this.failPendingForSocket(ws, "node_disconnected");
   }
 
   nodeSockets() {
@@ -369,8 +375,8 @@ export class NodeRelay extends DurableObject {
     return this.socketHeartbeatAgeMs(socket) <= HEARTBEAT_STALE_MS;
   }
 
-  failPending(error) {
-    for (const [requestId, pending] of this.pending.entries()) {
+  failPendingForSocket(socket, error) {
+    for (const [requestId, pending] of pendingEntriesForSocket(this.pending, socket)) {
       clearTimeout(pending.timeout);
       if (pending.ackTimer) clearTimeout(pending.ackTimer);
       pending.resolve({

@@ -39,7 +39,7 @@ final class PickerRequestStore {
     static final String EXTRA_REQUEST_ID = "pickerRequestId";
     private static final String PREFS = "pickpico_picker_requests";
     private static final String KEY_PREFIX = "request:";
-    private static final String CHANNEL_ID = "pickpico_picker";
+    private static final String CHANNEL_ID = "pickpico_picker_v2";
     private static final long MAX_NATIVE_MEDIA_TOTAL_BYTES = 8L * 1024L * 1024L;
     private static final long MAX_NATIVE_MEDIA_ITEM_BYTES = 5L * 1024L * 1024L;
     private static final AtomicInteger NOTIFICATION_IDS = new AtomicInteger(9800);
@@ -364,23 +364,27 @@ final class PickerRequestStore {
         if (manager == null) {
             return;
         }
-        manager.createNotificationChannel(new NotificationChannel(
+        NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "PickPico picker requests",
-                NotificationManager.IMPORTANCE_HIGH));
+                NotificationManager.IMPORTANCE_HIGH);
+        AgentAttention.configureUrgentChannel(channel);
+        manager.createNotificationChannel(channel);
         int notificationId = NOTIFICATION_IDS.incrementAndGet();
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
                 notificationId,
                 target,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_upload)
                 .setContentTitle(media ? "PickPico needs media" : "PickPico needs a file")
                 .setContentText("Tap to choose from Android")
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .build();
+                .setAutoCancel(true);
+        AgentAttention.applyUrgentBehavior(context, builder, notificationId);
+        Notification notification = builder.build();
         manager.notify(notificationId, notification);
+        AgentAttention.alert(context);
     }
 }

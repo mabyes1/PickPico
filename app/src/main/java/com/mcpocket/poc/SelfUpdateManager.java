@@ -4,6 +4,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -37,7 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class SelfUpdateManager {
     private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;
     private static final long MAX_MANIFEST_BYTES = 256L * 1024L;
-    private static final String DEFAULT_UPDATE_RELAY = RelayClient.DEFAULT_RELAY_BASE_URL;
+    private static final String OFFICIAL_UPDATE_MANIFEST_URL =
+            RelayClient.DEFAULT_RELAY_BASE_URL + "/v1/update/latest";
     private static final String UPDATE_CHANNEL_ID = "mcpocket_self_update";
     private static final int UPDATE_NOTIFICATION_ID = 8768;
     private static final AtomicBoolean ACTIVE = new AtomicBoolean(false);
@@ -48,10 +50,24 @@ final class SelfUpdateManager {
 
     static JSONObject status(Context context, long callCount) {
         JSONObject state = SelfUpdateState.read(context);
+        if (state.optBoolean("running", false)
+                && !ACTIVE.get()
+                && isInFlightState(state)) {
+            SelfUpdateState.put(state, "status", "failed");
+            SelfUpdateState.put(state, "running", false);
+            SelfUpdateState.put(state, "interrupted", true);
+            SelfUpdateState.put(state, "error", "The previous update was interrupted. PickPico will retry automatically.");
+            SelfUpdateState.put(state, "completedAt", Instant.now().toString());
+            File interruptedCandidate = SelfUpdateState.candidateFile(context);
+            if (interruptedCandidate.isFile()) {
+                interruptedCandidate.delete();
+            }
+            SelfUpdateState.write(context, state);
+        }
         PackageInfo current = currentPackage(context);
         long currentVersionCode = current == null ? -1L : versionCode(current);
         long candidateVersionCode = state.optLong("candidateVersionCode", -1L);
-        if (candidateVersionCode > 0L && currentVersionCode >= candidateVersionCode) {
+        if (shouldMarkInstalled(state, currentVersionCode, candidateVersionCode)) {
             SelfUpdateState.put(state, "status", "installed");
             SelfUpdateState.put(state, "running", false);
             SelfUpdateState.put(state, "completedAt", Instant.now().toString());
@@ -120,6 +136,10 @@ final class SelfUpdateManager {
         SelfUpdateState.put(state, "expectedSha256", expectedSha256);
         SelfUpdateState.put(state, "bytesDownloaded", 0L);
         SelfUpdateState.put(state, "startedAt", Instant.now().toString());
+        copyIfPresent(arguments, state, "channel");
+        copyIfPresent(arguments, state, "manifestUrl");
+        copyIfPresent(arguments, state, "latestVersionName");
+        copyIfPresent(arguments, state, "latestVersionCode");
         SelfUpdateState.write(context, state);
 
         Context appContext = context.getApplicationContext();
@@ -164,6 +184,10 @@ final class SelfUpdateManager {
 
     static JSONObject startLatest(Context context, JSONObject arguments, long callCount) {
         JSONObject latest = checkLatest(context, arguments, callCount);
+        return startResolvedLatest(context, latest, callCount);
+    }
+
+    static JSONObject startResolvedLatest(Context context, JSONObject latest, long callCount) {
         if (!latest.optBoolean("updateAvailable", false)) {
             SelfUpdateState.put(latest, "started", false);
             SelfUpdateState.put(latest, "status", "up_to_date");
@@ -174,13 +198,11 @@ final class SelfUpdateManager {
         SelfUpdateState.put(direct, "url", latest.optString("apkUrl", ""));
         SelfUpdateState.put(direct, "sha256", latest.optString("sha256", ""));
         SelfUpdateState.put(direct, "allowSameVersion", false);
-        JSONObject state = start(context, direct, callCount);
-        SelfUpdateState.put(state, "channel", latest.optString("channel", "stable"));
-        SelfUpdateState.put(state, "manifestUrl", latest.optString("manifestUrl", ""));
-        SelfUpdateState.put(state, "latestVersionName", latest.optString("latestVersionName", ""));
-        SelfUpdateState.put(state, "latestVersionCode", latest.optLong("latestVersionCode", -1L));
-        SelfUpdateState.write(context, state);
-        return state;
+        SelfUpdateState.put(direct, "channel", latest.optString("channel", "stable"));
+        SelfUpdateState.put(direct, "manifestUrl", latest.optString("manifestUrl", ""));
+        SelfUpdateState.put(direct, "latestVersionName", latest.optString("latestVersionName", ""));
+        SelfUpdateState.put(direct, "latestVersionCode", latest.optLong("latestVersionCode", -1L));
+        return start(context, direct, callCount);
     }
 
     static void markFinished() {
@@ -362,7 +384,7 @@ final class SelfUpdateManager {
         return toHex(digest.digest());
     }
 
-    private static String resolveManifestUrl(Context context, JSONObject arguments) {
+    static String resolveManifestUrl(Context context, JSONObject arguments) {
         String explicit = arguments == null ? "" : arguments.optString("manifestUrl", "").trim();
         if (!explicit.isEmpty()) {
             if (!isAllowedUrl(explicit)) {
@@ -370,20 +392,7 @@ final class SelfUpdateManager {
             }
             return explicit;
         }
-
-        String relay = context.getSharedPreferences(McpNodeService.PREFS, Context.MODE_PRIVATE)
-                .getString(McpNodeService.KEY_RELAY_BASE_URL, "");
-        if (relay == null || relay.trim().isEmpty()) {
-            relay = DEFAULT_UPDATE_RELAY;
-        }
-        relay = relay.trim();
-        while (relay.endsWith("/")) {
-            relay = relay.substring(0, relay.length() - 1);
-        }
-        if (!isAllowedUrl(relay)) {
-            throw new CommandRuntime.CommandInputException("Configured relay URL must use http:// or https://");
-        }
-        return relay + "/v1/update/latest";
+        return OFFICIAL_UPDATE_MANIFEST_URL;
     }
 
     private static JSONObject fetchManifest(String manifestUrl) throws Exception {
@@ -495,9 +504,11 @@ final class SelfUpdateManager {
                 context,
                 context.getPackageName() + ".files",
                 candidate);
-        return new Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
+        Intent install = new Intent(Intent.ACTION_INSTALL_PACKAGE)
+                .setData(uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        install.setClipData(ClipData.newRawUri(candidate.getName(), uri));
+        return install;
     }
 
     private static void showInstallNotification(Context context, Intent installIntent) {
@@ -585,6 +596,23 @@ final class SelfUpdateManager {
 
     private static boolean isAllowedUrl(String url) {
         return url.startsWith("https://") || url.startsWith("http://");
+    }
+
+    static boolean isInFlightState(JSONObject state) {
+        String status = state == null ? "" : state.optString("status", "");
+        return "downloading".equals(status) || "staging".equals(status);
+    }
+
+    static boolean shouldMarkInstalled(JSONObject state, long currentVersionCode, long candidateVersionCode) {
+        return candidateVersionCode > 0L
+                && currentVersionCode >= candidateVersionCode
+                && !"installed".equals(state == null ? "" : state.optString("status", ""));
+    }
+
+    private static void copyIfPresent(JSONObject source, JSONObject target, String key) {
+        if (source.has(key)) {
+            SelfUpdateState.put(target, key, source.opt(key));
+        }
     }
 
     private static String toHex(byte[] bytes) {

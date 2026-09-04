@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Android implementations for personal-context Core capabilities. */
 final class AndroidPersonalDataActions {
-    private static final String ACTION_CHANNEL_ID = "pickpico_core_actions";
+    private static final String ACTION_CHANNEL_ID = "pickpico_core_actions_v2";
     private static final AtomicInteger ACTION_NOTIFICATION_IDS = new AtomicInteger(9700);
 
     private AndroidPersonalDataActions() {
@@ -541,24 +541,28 @@ final class AndroidPersonalDataActions {
         if (manager == null) {
             return -1;
         }
-        manager.createNotificationChannel(new NotificationChannel(
+        NotificationChannel channel = new NotificationChannel(
                 ACTION_CHANNEL_ID,
                 "PickPico core actions",
-                NotificationManager.IMPORTANCE_HIGH));
+                NotificationManager.IMPORTANCE_HIGH);
+        AgentAttention.configureUrgentChannel(channel);
+        manager.createNotificationChannel(channel);
         int notificationId = ACTION_NOTIFICATION_IDS.incrementAndGet();
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
                 notificationId,
                 target,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, ACTION_CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(context, ACTION_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_share)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .build();
+                .setAutoCancel(true);
+        AgentAttention.applyUrgentBehavior(context, builder, notificationId);
+        Notification notification = builder.build();
         manager.notify(notificationId, notification);
+        AgentAttention.alert(context);
         return notificationId;
     }
 

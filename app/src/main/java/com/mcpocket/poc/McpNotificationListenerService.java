@@ -383,10 +383,13 @@ public final class McpNotificationListenerService extends NotificationListenerSe
                             .put("choices", choices));
                 }
             }
+            int semanticAction = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P
+                    ? action.getSemanticAction()
+                    : Notification.Action.SEMANTIC_ACTION_NONE;
             result.put(new JSONObject()
                     .put("index", index)
                     .put("title", chars(action.title))
-                    .put("semanticAction", action.getSemanticAction())
+                    .put("semanticAction", semanticAction)
                     .put("allowsGeneratedReplies", action.getAllowGeneratedReplies())
                     .put("hasIntent", action.actionIntent != null)
                     .put("supportsReply", inputs.length() > 0)

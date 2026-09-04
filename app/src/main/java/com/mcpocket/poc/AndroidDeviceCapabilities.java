@@ -51,7 +51,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** Native Android sensing and interaction capabilities for the Mobile Agent Node. */
 final class AndroidDeviceCapabilities {
-    private static final String AGENT_CHANNEL_ID = "mcpocket_agent_messages";
+    // Android notification-channel importance is immutable after first creation. The original
+    // channel shipped at DEFAULT, so v2 gives existing installs a genuinely HIGH channel.
+    private static final String AGENT_CHANNEL_ID = "mcpocket_agent_messages_v3";
     private static final int CAMERA_TIMEOUT_SECONDS = 8;
     private static final int TTS_INIT_TIMEOUT_SECONDS = 5;
     private static final int AUDIO_SAMPLE_RATE = 16000;
@@ -292,26 +294,31 @@ final class AndroidDeviceCapabilities {
                 notificationId,
                 openIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(service, AGENT_CHANNEL_ID)
+        Notification.Builder builder = new Notification.Builder(service, AGENT_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
-                .setCategory(Notification.CATEGORY_MESSAGE)
-                .build();
+                .setCategory(Notification.CATEGORY_MESSAGE);
+        boolean hyperUnlockArmed = AgentAttention.applyUrgentBehavior(service, builder, notificationId);
+        Notification notification = builder.build();
         NotificationManager manager = (NotificationManager) service.getSystemService(Service.NOTIFICATION_SERVICE);
         if (manager == null) {
             return failure("notification_unavailable", "NotificationManager is unavailable", callCount);
         }
         manager.notify(notificationId, notification);
+        AgentAttention.alert(service);
         return new JSONObject()
                 .put("notified", true)
                 .put("notificationId", notificationId)
                 .put("inboxId", inboxId)
                 .put("title", title)
                 .put("body", body)
+                .put("screenWakeRequested", true)
+                .put("lockscreenVisibility", "public")
+                .put("hyperUnlockArmed", hyperUnlockArmed)
                 .put("timestamp", Instant.now().toString())
                 .put("toolCallCount", callCount);
     }
@@ -495,8 +502,9 @@ final class AndroidDeviceCapabilities {
         NotificationChannel channel = new NotificationChannel(
                 AGENT_CHANNEL_ID,
                 "Agent messages",
-                NotificationManager.IMPORTANCE_DEFAULT);
-        channel.setDescription("Notifications explicitly sent by an Agent through PickPico");
+                NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("Urgent Agent messages shown on the lock screen and allowed to wake the display");
+        AgentAttention.configureUrgentChannel(channel);
         manager.createNotificationChannel(channel);
     }
 
@@ -529,10 +537,25 @@ final class AndroidDeviceCapabilities {
     }
 
     private boolean foregroundTypeActive(int type) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (!requiresForegroundTypeOnSdk(Build.VERSION.SDK_INT, type)) {
             return true;
         }
+        return foregroundTypeActiveFromQ(type);
+    }
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.Q)
+    private boolean foregroundTypeActiveFromQ(int type) {
         return (service.getForegroundServiceType() & type) != 0;
+    }
+
+    static boolean requiresForegroundTypeOnSdk(int sdkInt, int type) {
+        if (sdkInt < Build.VERSION_CODES.Q) return false;
+        if (sdkInt < Build.VERSION_CODES.R
+                && (type == ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                || type == ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)) {
+            return false;
+        }
+        return true;
     }
 
     private CameraSelection selectCamera(CameraManager manager, String requestedLens, int maxWidth, int maxHeight)

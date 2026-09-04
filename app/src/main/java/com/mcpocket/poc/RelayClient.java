@@ -223,7 +223,7 @@ final class RelayClient {
     private void startHeartbeatLoop(WebSocket socket) {
         clearHeartbeatState();
         sendHeartbeat(socket);
-        heartbeatFuture = heartbeatExecutor.scheduleAtFixedRate(
+        heartbeatFuture = heartbeatExecutor.scheduleWithFixedDelay(
                 () -> sendHeartbeat(socket),
                 HEARTBEAT_INTERVAL_MS,
                 HEARTBEAT_INTERVAL_MS,
