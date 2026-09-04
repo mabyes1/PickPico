@@ -11,3 +11,6 @@ relay/.dev.vars
 .env.*
 *.jks
 *.keystore
+
+# Private deployment configuration
+relay/wrangler.local.jsonc

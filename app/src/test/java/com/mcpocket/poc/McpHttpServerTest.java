@@ -393,10 +393,9 @@ public final class McpHttpServerTest {
     }
 
     @Test
-    public void relayMigrationRecognizesBothHistoricalProjectEndpoints() {
-        assertTrue(RelayClient.isProjectLegacyRelayBaseUrl("https://relay.mcpocket.workers.dev"));
-        assertTrue(RelayClient.isProjectLegacyRelayBaseUrl("https://pickpico-relay.mcpocket.workers.dev/"));
-        assertTrue(!RelayClient.isProjectLegacyRelayBaseUrl("https://relay.pickpico.workers.dev"));
+    public void configuredRelayIsNotRedirected() {
+        assertEquals("https://relay.example.test",
+                RelayClient.migrateLegacyRelayIfNeeded(null, "https://relay.example.test/"));
     }
 
     @Test

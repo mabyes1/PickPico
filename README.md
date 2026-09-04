@@ -96,7 +96,9 @@ PickPico 使用 Android 提供的權限與服務。你可以在 App 裡選擇開
 
 ## 在同一個網路，或隔著網路使用
 
-PickPico 支援區域網路直連，也能透過 Relay 讓遠端 Agent 使用手機。
+PickPico 支援區域網路直連，也能透過自行部署的 Relay 讓遠端 Agent 使用手機。
+
+**本專案不提供公共 Relay。** 遠端使用前請先依 [Relay 部署說明](relay/README.md) 準備自己的服務。
 
 ```text
 區域網路：Agent ─────────────→ PickPico

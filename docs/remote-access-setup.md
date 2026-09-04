@@ -2,6 +2,8 @@
 
 本文依 Android 0.16.34 的程式與介面整理（2026-09-04）。說明目前可操作的設定流程；介面改版後，按鈕位置可能調整。
 
+**PickPico 不提供公共 Relay。遠端使用前，請先部署自己的 Relay；下列網址都只是範例。**
+
 ## 選擇連線方式
 
 | 方式 | 適用情況 | 需要準備 |
@@ -14,10 +16,10 @@
 ## 設定遠端連線
 
 1. 打開 PickPico，從首頁的 **REMOTE ACCESS** 或 **SETTINGS → Remote Access** 進入設定。
-2. 在 Relay 欄位填入 Relay 的基底網址。專案目前使用：
+2. 在 Relay 欄位填入 Relay 的基底網址。請使用自己部署後取得的網址，例如：
 
    ```text
-   https://relay.pickpico.workers.dev
+   https://your-relay.example.com
    ```
 
    這裡不要填手機的 `/v3/nodes/.../mcp` 完整網址，也不要填區域網路 IP。
@@ -30,7 +32,7 @@
 
 ```json
 {
-  "url": "https://relay.pickpico.workers.dev/v3/nodes/<你的裝置識別碼>/mcp",
+  "url": "https://your-relay.example.com/v3/nodes/<你的裝置識別碼>/mcp",
   "authentication": "none"
 }
 ```
@@ -102,6 +104,6 @@ Wi-Fi 與行動網路切換後，PickPico 會嘗試重新連線；不要把重�
 
 目前配套是儲存庫內的 Cloudflare Worker + Durable Object。不是任意網址或一般 HTTP 代理都能使用。
 
-部署設定含專案帳號與 KV 綁定，需要先換成自己帳號的資源，不能直接把現有設定當通用的一鍵安裝指令。維護細節見 [遠端傳輸與安全設計](remote-transport.md)。
+公開部署設定的 KV 綁定需要填入自己帳號的資源，不能把佔位值當成可直接部署的設定。維護細節見 [遠端傳輸與安全設計](remote-transport.md)。
 
 [回到 README](../README.md)

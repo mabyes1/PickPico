@@ -62,7 +62,7 @@ Remote MCP 網址是持有即可使用的存取方式，**不是 OAuth，也沒�
 
 ## 加密與資料經過哪裡
 
-- 專案 Relay 基底網址為 `https://relay.pickpico.workers.dev`，Agent 到 Relay 使用 HTTPS，手機到 Relay 使用 WSS。
+- 使用 HTTPS Relay 時，例如 `https://your-relay.example.com`，Agent 到 Relay 使用 HTTPS，手機到 Relay 使用 WSS。
 - Relay 會處理請求及回應內容；這不是 Agent 到手機、連 Relay 都無法讀取的端到端加密。
 - Local 與 loopback 使用 HTTP。Local token 和內容可能被可觀察該網路流量的人讀到，因此直連應使用可信任網路。
 - App 目前接受 HTTP 或 HTTPS Relay 基底網址。設定 HTTP 時不具有 HTTPS/WSS 的保護；文件不把程式描述成強制 HTTPS。
@@ -111,7 +111,7 @@ Relay 程式目前沒有自行實作每位呼叫者的速率限制、請求 body
 - KV 綁定：`UPDATE_KV`，供更新資訊與 APK 分塊使用。
 - Durable Object migration 已列在配置中。
 
-現有 `account_id`、KV namespace ID 屬於專案配置。部署到另一個 Cloudflare 帳號前，必須改用該帳號的資源並保留相應綁定與 migration；只執行部署命令不會替你完成這些設定。
+公開設定不含專案帳號，KV namespace ID 是待填的佔位值。部署到另一個 Cloudflare 帳號前，必須改用該帳號的資源並保留相應綁定與 migration；只執行部署命令不會替你完成這些設定。
 
 `relay/package.json` 提供 `dev`、`deploy`、`test` 指令。自架者還要設定 Android 的 Relay 基底網址、重新啟動服務，再從新環境測試完整的手機請求。
 

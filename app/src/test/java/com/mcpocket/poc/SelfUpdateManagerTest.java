@@ -20,15 +20,20 @@ public final class SelfUpdateManagerTest {
     }
 
     @Test
-    public void officialUpdateChannelDoesNotFollowCustomRelaySettings() throws Exception {
+    public void updateChannelUsesConfiguredRelayOrExplicitManifest() throws Exception {
         assertEquals(
-                "https://relay.pickpico.workers.dev/v1/update/latest",
-                SelfUpdateManager.resolveManifestUrl(null, new JSONObject()));
+                "https://relay.example.test/v1/update/latest",
+                SelfUpdateManager.updateManifestForRelay("https://relay.example.test/"));
         assertEquals(
                 "https://updates.example.test/latest.json",
                 SelfUpdateManager.resolveManifestUrl(
                         null,
                         new JSONObject().put("manifestUrl", "https://updates.example.test/latest.json")));
+    }
+
+    @Test(expected = CommandRuntime.CommandInputException.class)
+    public void missingUpdateSourceDoesNotUseProjectInfrastructure() {
+        SelfUpdateManager.updateManifestForRelay("");
     }
 
     @Test
