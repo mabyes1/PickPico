@@ -12,7 +12,7 @@ PickPico 想解一個很直接的問題：
 
 FUTUREMODE × SITCON Hackathon 2026 · AI Agents & Automation
 
-## 30 秒看懂
+##簡介
 
 AI Agent 已經很會用瀏覽器、程式碼和 Cloud API，卻很難碰到身邊的世界。
 
