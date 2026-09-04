@@ -22,7 +22,7 @@ PickPico 透過 MCP 把這支手機接進 Agent 的工作流程，讓 Agent 可�
 
 ## 為什麼是 PickPico
 
-多數 Agent 工具替 AI 增加更多可以呼叫的能力。PickPico 把 Agent 的執行邊界延伸到一支真實世界裡的 Android 手機。
+多數 Agent 工具替 AI 增加更多可以呼叫的能力。PickPico 把 Agent 的執行邊界延伸到一支真實世界裡的 Android 手機，並搭配手機架與實體按紐達成不需要PC也能運行的小型開發環境，同時手機有任何問題，需要請AGENT協助時，不須ROOT/ADB開發者模式，不須擔心無法使用銀行轉帳等問題。
 
 > **Most Agent tools extend what an AI can call. PickPico extends where an AI can exist.**
 
@@ -51,8 +51,8 @@ PickPico
 | **Run** | App sandbox 內 shell、背景程序、內嵌 Node.js runtime |
 | **Human** | HUMAN HELP：文字、選項、相簿選圖、現場拍照、可續時等待 |
 | **Long tasks** | 建立、更新與追蹤跨多個 command / human handoff 的 Agent task |
-| **Remote** | 手機主動連線 Cloudflare Relay，可跨 Wi-Fi / 行動網路使用 |
-| **Update** | 遠端檢查新版、下載 APK、驗證後交給 Android installer |
+| **Remote** | 跨 Wi-Fi / 行動網路使用 |
+| **self Update** | 遠端檢查新版、下載 APK、驗證後交給 Android installer |
 
 ### Core Mode / Hyper Mode
 
@@ -98,7 +98,7 @@ PickPico 的 **HUMAN HELP** 是 Agent 面對真實世界阻礙時的標準出口
 
 Agent 可以在 PickPico 私有 workspace 寫檔、執行 shell，或啟動一個長駐 Node.js entry point。
 
-一支插著電、連著網路的 Android 手機，就能承載小型 automation、bot 或 utility，直接成為實際執行節點。
+承載小型 automation、bot 或 utility，直接成為實際執行節點。
 
 ```text
 Agent → workspace.write → node.start → Android phone keeps the workload alive
@@ -222,7 +222,7 @@ PickPico 的能力受 Android 原生權限與明確的 owner policy 約束。
 
 ## Build
 
-目前 Android build：**0.16.27** (`versionCode 64`)
+
 
 需求：
 
@@ -290,4 +290,3 @@ MCPocket/
 
 ## License
 
-PickPico 原始碼採用 [MIT License](LICENSE)。
