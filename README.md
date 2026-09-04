@@ -21,11 +21,6 @@ Most Agent tools extend what an AI can call. PickPico extends where an AI can ex
   必要時 HUMAN HELP → 真人回答／拍照／按實體按鈕
 
 
-
-
-
-## 系統架構
-
 ```mermaid
 flowchart LR
     AGENT[AI Agent / MCP Client]
