@@ -158,12 +158,21 @@ final class CommandRuntime {
 
         register(
                 "phone.wake",
-                "Turn on the phone display without dismissing the lock screen.",
+                "Turn on the phone display only. This does not dismiss keyguard, navigate Home, keep the screen awake for background work, or keep PickPico running.",
                 "phone",
                 "physical_action",
                 true,
                 noArgumentsSchema(),
                 (arguments, callCount) -> actions.phoneWake(callCount));
+
+        register(
+                "phone.home",
+                "Bring the phone toward an interactive Home state. Wakes the display, asks Android to dismiss keyguard through OS-owned authentication when needed, then navigates Home. Secure authentication is never bypassed.",
+                "phone",
+                "ui_action",
+                true,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.phoneHome(callCount));
 
         register(
                 "camera.capture",

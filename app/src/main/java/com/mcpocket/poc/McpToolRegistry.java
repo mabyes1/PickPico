@@ -331,7 +331,7 @@ final class McpToolRegistry {
 
         register(
                 "phone_wake",
-                "Turn on the Android phone display without dismissing the lock screen.",
+                "Turn on the Android phone display only. Does not dismiss keyguard, navigate Home, or keep the screen awake for background work.",
                 CommandRuntime.noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("phone.wake", arguments, callCount));
     }

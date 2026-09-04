@@ -183,6 +183,18 @@ public final class McpHttpServerTest {
             }
 
             @Override
+            public JSONObject phoneHome(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("woke", true)
+                        .put("interactive", true)
+                        .put("keyguardLocked", false)
+                        .put("homeRequested", true)
+                        .put("atHome", true)
+                        .put("requiresUserAction", false)
+                        .put("toolCallCount", callCount);
+            }
+
+            @Override
             public JSONObject cameraCapture(JSONObject arguments, long callCount) throws org.json.JSONException {
                 return new JSONObject()
                         .put("captured", true)
@@ -465,13 +477,14 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(58, listed.getInt("count"));
+        assertEquals(59, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.wake"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("phone.home"));
         assertTrue(listed.getJSONArray("commands").toString().contains("camera.capture"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.notify"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.speak"));
@@ -564,7 +577,8 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(58, capabilityList.getInt("count"));
+        assertEquals(59, capabilityList.getInt("count"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("phone.home"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.status"));
@@ -621,6 +635,22 @@ public final class McpHttpServerTest {
         assertEquals("phone.wake", execution.getString("commandId"));
         assertEquals("completed", execution.getString("status"));
         assertTrue(execution.getJSONObject("result").getBoolean("woke"));
+    }
+
+    @Test
+    public void commandRuntimeCanInvokeHomeCapabilityThroughDynamicCommandId() throws Exception {
+        HttpResult home = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":232,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"phone.home\",\"arguments\":{}}}}",
+                authorizedHeaders());
+        assertEquals(200, home.status);
+        JSONObject execution = new JSONObject(home.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals("phone.home", execution.getString("commandId"));
+        assertEquals("completed", execution.getString("status"));
+        assertTrue(execution.getJSONObject("result").getBoolean("atHome"));
     }
 
     @Test

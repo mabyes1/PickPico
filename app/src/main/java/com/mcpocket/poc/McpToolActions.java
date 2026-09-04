@@ -107,6 +107,13 @@ interface McpToolActions {
 
     JSONObject phoneWake(long callCount) throws JSONException;
 
+    default JSONObject phoneHome(long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "phone.home")
+                .put("toolCallCount", callCount);
+    }
+
     default JSONObject cameraCapture(JSONObject arguments, long callCount) throws JSONException {
         return new JSONObject()
                 .put("supported", false)

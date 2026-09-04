@@ -2,6 +2,7 @@ package com.mcpocket.poc;
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -230,6 +231,9 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public synchronized void onAgentCommandStarted(String commandId) {
+        if ("phone.wake".equals(commandId)) {
+            return;
+        }
         activeAgentCommandCount++;
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
         refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
@@ -248,6 +252,9 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public synchronized void onAgentCommandFinished(String commandId) {
+        if ("phone.wake".equals(commandId)) {
+            return;
+        }
         if (activeAgentCommandCount > 0) {
             activeAgentCommandCount--;
         }
@@ -1138,13 +1145,98 @@ public final class McpNodeService extends Service implements McpToolActions {
 
         long observationMs = android.os.SystemClock.elapsedRealtime() - observationStartedAt;
         boolean woke = !wasInteractive && interactive;
+        KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        boolean keyguardLocked = keyguard != null && keyguard.isKeyguardLocked();
         return new JSONObject()
                 .put("woke", woke)
                 .put("wasInteractive", wasInteractive)
                 .put("interactive", interactive)
                 .put("observationMs", observationMs)
-                .put("unlocked", false)
+                .put("keyguardLocked", keyguardLocked)
+                .put("unlocked", !keyguardLocked)
+                .put("keepsScreenAwake", false)
+                .put("backgroundKeepAlive", false)
                 .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
+    public JSONObject phoneHome(long callCount) throws JSONException {
+        JSONObject wake = phoneWake(callCount);
+        boolean interactive = wake.optBoolean("interactive", false);
+        KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        boolean keyguardLocked = keyguard != null && keyguard.isKeyguardLocked();
+        boolean secureKeyguard = keyguard != null && keyguard.isDeviceSecure();
+
+        Intent home = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        if (keyguardLocked) {
+            Intent unlock = new Intent(this, HyperUnlockActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            | Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    .putExtra(AgentAttention.EXTRA_FORWARD_INTENT, home);
+            try {
+                startActivity(unlock);
+                return new JSONObject()
+                        .put("woke", wake.optBoolean("woke", false))
+                        .put("interactive", interactive)
+                        .put("keyguardLocked", true)
+                        .put("secureKeyguard", secureKeyguard)
+                        .put("dismissRequested", true)
+                        .put("homeRequested", true)
+                        .put("atHome", false)
+                        .put("requiresUserAction", secureKeyguard)
+                        .put("transition", "keyguard_dismiss_requested")
+                        .put("toolCallCount", callCount);
+            } catch (RuntimeException error) {
+                return new JSONObject()
+                        .put("woke", wake.optBoolean("woke", false))
+                        .put("interactive", interactive)
+                        .put("keyguardLocked", true)
+                        .put("secureKeyguard", secureKeyguard)
+                        .put("dismissRequested", false)
+                        .put("homeRequested", false)
+                        .put("atHome", false)
+                        .put("requiresUserAction", true)
+                        .put("reason", "keyguard_transition_blocked")
+                        .put("toolCallCount", callCount);
+            }
+        }
+
+        boolean homeRequested = false;
+        String method = "launcher_intent";
+        if (McpAccessibilityService.hasAccess(this)) {
+            try {
+                JSONObject result = McpAccessibilityService.action(
+                        new JSONObject().put("action", "home"),
+                        callCount);
+                homeRequested = result.optBoolean("performed", false);
+                method = "accessibility_home";
+            } catch (RuntimeException ignored) {
+            }
+        }
+        if (!homeRequested) {
+            try {
+                startActivity(home);
+                homeRequested = true;
+                method = "launcher_intent";
+            } catch (RuntimeException ignored) {
+            }
+        }
+
+        return new JSONObject()
+                .put("woke", wake.optBoolean("woke", false))
+                .put("interactive", interactive)
+                .put("keyguardLocked", false)
+                .put("secureKeyguard", secureKeyguard)
+                .put("dismissRequested", false)
+                .put("homeRequested", homeRequested)
+                .put("atHome", homeRequested)
+                .put("requiresUserAction", !homeRequested)
+                .put("method", method)
                 .put("toolCallCount", callCount);
     }
 
