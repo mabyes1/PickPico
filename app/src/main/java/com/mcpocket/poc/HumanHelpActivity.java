@@ -5,12 +5,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.ImageDecoder;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,6 +26,7 @@ import android.text.style.RelativeSizeSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -57,16 +55,10 @@ public final class HumanHelpActivity extends Activity {
     private static final int REQUEST_CAMERA_PERMISSION = 203;
     private static final int REQUEST_VOICE_REPLY = 204;
     private static final int MAX_IMAGE_EDGE = 1600;
-    private static final int SCREEN_BG = Color.rgb(67, 80, 89);
-    private static final int CARD_BG = Color.rgb(86, 101, 111);
-    private static final int CARD_BG_ALT = Color.rgb(102, 119, 130);
-    private static final int CARD_STROKE = Color.rgb(190, 207, 218);
-    private static final int TEXT_PRIMARY = Color.rgb(248, 250, 252);
-    private static final int TEXT_SECONDARY = Color.rgb(200, 210, 217);
-    private static final int ACCENT_BLUE = Color.rgb(174, 230, 255);
-
     private String requestId;
     private JSONObject request;
+    private PickPicoTheme.State theme;
+    private PickPicoTheme.BackgroundView themeBackgroundView;
     private EditText replyInput;
     private TextView countdownStatus;
     private TextView lifecycleStatus;
@@ -101,9 +93,8 @@ public final class HumanHelpActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(SCREEN_BG);
-        getWindow().setNavigationBarColor(SCREEN_BG);
-        getWindow().getDecorView().setSystemUiVisibility(0);
+        theme = PickPicoTheme.load(this);
+        applyWindowTheme();
         requestId = getIntent().getStringExtra(HumanHelpStore.EXTRA_REQUEST_ID);
         detailsExpanded = getIntent().getBooleanExtra(EXTRA_OPEN_DETAILS, false);
         if (TextUtils.isEmpty(requestId)) {
@@ -127,6 +118,20 @@ public final class HumanHelpActivity extends Activity {
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_PATH),
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_TRANSCRIPT),
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_STT_STATUS));
+        }
+    }
+
+    private void applyWindowTheme() {
+        boolean light = PickPicoTheme.isLightBackground(theme);
+        int barColor = theme != null && !theme.gradient ? theme.colorA : PickPicoTheme.BASE_BG;
+        getWindow().setStatusBarColor(barColor);
+        getWindow().setNavigationBarColor(barColor);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int flags = light ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && light) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            getWindow().getDecorView().setSystemUiVisibility(flags);
         }
     }
 
@@ -157,9 +162,18 @@ public final class HumanHelpActivity extends Activity {
     }
 
     private View buildContent() {
+        FrameLayout stage = new FrameLayout(this);
+        stage.setBackgroundColor(PickPicoTheme.BASE_BG);
+        themeBackgroundView = new PickPicoTheme.BackgroundView(this, theme);
+        stage.addView(themeBackgroundView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(LinearLayout.VERTICAL);
-        shell.setBackground(screenBackground());
+        stage.addView(shell, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -183,17 +197,18 @@ public final class HumanHelpActivity extends Activity {
         pauseCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
         TextView pauseIcon = text("Ⅱ", 16, Typeface.BOLD);
-        pauseIcon.setTextColor(TEXT_PRIMARY);
+        pauseIcon.setTextColor(primaryTextColor());
         pauseIcon.setGravity(android.view.Gravity.CENTER);
-        pauseIcon.setBackground(roundedBackground(Color.rgb(88, 110, 121), 0, 24));
+        pauseIcon.setBackground(PickPicoTheme.control(
+                theme, dp(18), PickPicoTheme.accentA(theme), true));
         pauseCard.addView(pauseIcon, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
         LinearLayout pauseCopy = new LinearLayout(this);
         pauseCopy.setOrientation(LinearLayout.VERTICAL);
         TextView pauseTitle = text(approvalRequest ? "AI needs approval" : "AI paused", 15, Typeface.BOLD);
-        pauseTitle.setTextColor(TEXT_PRIMARY);
+        pauseTitle.setTextColor(primaryTextColor());
         TextView pauseSubtitle = text("Your input is required.", 11, Typeface.NORMAL);
-        pauseSubtitle.setTextColor(TEXT_SECONDARY);
+        pauseSubtitle.setTextColor(secondaryTextColor());
         pauseCopy.addView(pauseTitle);
         pauseCopy.addView(pauseSubtitle);
         LinearLayout.LayoutParams pauseCopyParams = new LinearLayout.LayoutParams(0,
@@ -202,7 +217,7 @@ public final class HumanHelpActivity extends Activity {
         pauseCard.addView(pauseCopy, pauseCopyParams);
 
         countdownStatus = text("", 13, Typeface.BOLD);
-        countdownStatus.setTextColor(TEXT_PRIMARY);
+        countdownStatus.setTextColor(primaryTextColor());
         countdownStatus.setGravity(android.view.Gravity.END);
         pauseCard.addView(countdownStatus);
         root.addView(pauseCard, cardParams(10));
@@ -214,12 +229,13 @@ public final class HumanHelpActivity extends Activity {
         requestTitleRow.setOrientation(LinearLayout.HORIZONTAL);
         requestTitleRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
         TextView taskIcon = text("AI", 12, Typeface.BOLD);
-        taskIcon.setTextColor(Color.WHITE);
+        taskIcon.setTextColor(primaryTextColor());
         taskIcon.setGravity(android.view.Gravity.CENTER);
-        taskIcon.setBackground(roundedBackground(Color.rgb(92, 116, 128), CARD_STROKE, 10));
+        taskIcon.setBackground(PickPicoTheme.control(
+                theme, dp(10), PickPicoTheme.accentB(theme), true));
         requestTitleRow.addView(taskIcon, new LinearLayout.LayoutParams(dp(42), dp(42)));
         TextView title = text(request.optString("title", "AI needs your help"), 23, Typeface.BOLD);
-        title.setTextColor(TEXT_PRIMARY);
+        title.setTextColor(primaryTextColor());
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         titleParams.setMarginStart(dp(12));
@@ -227,7 +243,7 @@ public final class HumanHelpActivity extends Activity {
         requestCard.addView(requestTitleRow);
 
         TextView instruction = text(request.optString("instruction", ""), 17, Typeface.NORMAL);
-        instruction.setTextColor(TEXT_PRIMARY);
+        instruction.setTextColor(primaryTextColor());
         instruction.setLineSpacing(0f, 1.12f);
         instruction.setPadding(0, dp(15), 0, 0);
         requestCard.addView(instruction);
@@ -235,13 +251,14 @@ public final class HumanHelpActivity extends Activity {
         String additionalNotes = request.optString("additionalNotes", "").trim();
         if (!additionalNotes.isEmpty()) {
             TextView notesLabel = text("Additional notes from AI", 13, Typeface.NORMAL);
-            notesLabel.setTextColor(TEXT_SECONDARY);
+            notesLabel.setTextColor(secondaryTextColor());
             notesLabel.setPadding(0, dp(16), 0, dp(7));
             requestCard.addView(notesLabel);
             TextView notes = text(additionalNotes, 15, Typeface.NORMAL);
-            notes.setTextColor(TEXT_PRIMARY);
+            notes.setTextColor(primaryTextColor());
             notes.setPadding(dp(12), dp(11), dp(12), dp(11));
-            notes.setBackground(roundedBackground(Color.argb(62, 255, 255, 255), CARD_STROKE, 10));
+            notes.setBackground(PickPicoTheme.control(
+                    theme, dp(10), PickPicoTheme.accentB(theme), false));
             requestCard.addView(notes);
         }
         root.addView(requestCard, cardParams(14));
@@ -255,12 +272,12 @@ public final class HumanHelpActivity extends Activity {
         detailsContainer.setOrientation(LinearLayout.VERTICAL);
         detailsContainer.setVisibility(detailsExpanded ? View.VISIBLE : View.GONE);
         TextView detailsHeading = text("DETAILS", 11, Typeface.BOLD);
-        detailsHeading.setTextColor(ACCENT_BLUE);
+        detailsHeading.setTextColor(PickPicoTheme.accentB(theme));
         detailsHeading.setLetterSpacing(.12f);
         detailsHeading.setPadding(dp(2), dp(12), 0, dp(8));
         detailsContainer.addView(detailsHeading);
         TextView detailsIntro = text("Add context, a note, or an image when the Agent needs more information.", 12, Typeface.NORMAL);
-        detailsIntro.setTextColor(TEXT_SECONDARY);
+        detailsIntro.setTextColor(secondaryTextColor());
         detailsIntro.setPadding(dp(2), 0, dp(2), dp(10));
         detailsContainer.addView(detailsIntro);
         root.addView(detailsContainer);
@@ -275,12 +292,13 @@ public final class HumanHelpActivity extends Activity {
                     ? "Optional note for the Agent…"
                     : "Type a message to AI…");
             replyInput.setTextSize(16);
-            replyInput.setTextColor(TEXT_PRIMARY);
-            replyInput.setHintTextColor(Color.rgb(170, 184, 194));
+            replyInput.setTextColor(primaryTextColor());
+            replyInput.setHintTextColor(PickPicoTheme.dim(theme));
             replyInput.setMinLines(2);
             replyInput.setMaxLines(6);
             replyInput.setPadding(dp(14), dp(12), dp(14), dp(12));
-            replyInput.setBackground(roundedBackground(Color.argb(38, 255, 255, 255), Color.rgb(180, 202, 215), 12));
+            replyInput.setBackground(PickPicoTheme.control(
+                    theme, dp(12), PickPicoTheme.accentA(theme), false));
             replyInput.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
             JSONObject existingResponse = request.optJSONObject("response");
             if (existingResponse != null) {
@@ -306,10 +324,10 @@ public final class HumanHelpActivity extends Activity {
             attachmentCard.setPadding(dp(12), dp(9), dp(12), dp(10));
             attachmentCard.setOrientation(LinearLayout.VERTICAL);
             TextView attachmentTitle = text("Add an image · optional", 13, Typeface.NORMAL);
-            attachmentTitle.setTextColor(TEXT_SECONDARY);
+            attachmentTitle.setTextColor(secondaryTextColor());
             attachmentCard.addView(attachmentTitle);
             attachmentStatus = text("No images attached", 11, Typeface.NORMAL);
-            attachmentStatus.setTextColor(TEXT_SECONDARY);
+            attachmentStatus.setTextColor(secondaryTextColor());
             attachmentStatus.setPadding(0, dp(3), 0, dp(7));
             attachmentCard.addView(attachmentStatus);
 
@@ -336,12 +354,12 @@ public final class HumanHelpActivity extends Activity {
         actionContainer = new LinearLayout(this);
         actionContainer.setOrientation(LinearLayout.VERTICAL);
         actionContainer.setPadding(dp(18), dp(8), dp(18), dp(10));
-        actionContainer.setBackground(roundedBackground(Color.argb(235, 55, 67, 74), CARD_STROKE, 22));
+        actionContainer.setBackground(PickPicoTheme.strongGlass(theme, dp(22)));
         shell.addView(actionContainer, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         rebuildActions();
         refreshState();
-        return shell;
+        return stage;
     }
 
     private void rebuildActions() {
@@ -364,11 +382,11 @@ public final class HumanHelpActivity extends Activity {
         dockActionsContainer.setOrientation(LinearLayout.VERTICAL);
         dockActionsContainer.setPadding(dp(10), dp(7), dp(10), dp(7));
         TextView dockTitle = text("●  DUCK CONNECTED", 12, Typeface.BOLD);
-        dockTitle.setTextColor(Color.rgb(169, 231, 205));
+        dockTitle.setTextColor(PickPicoTheme.GREEN);
         dockTitle.setGravity(android.view.Gravity.CENTER);
         dockActionsContainer.addView(dockTitle);
         TextView dockMapping = text("Approve   ·   Reject   ·   Voice   ·   Details", 12, Typeface.NORMAL);
-        dockMapping.setTextColor(TEXT_SECONDARY);
+        dockMapping.setTextColor(secondaryTextColor());
         dockMapping.setGravity(android.view.Gravity.CENTER);
         dockMapping.setPadding(0, dp(5), 0, dp(7));
         dockActionsContainer.addView(dockMapping);
@@ -397,10 +415,10 @@ public final class HumanHelpActivity extends Activity {
         button.setAllCaps(false);
         button.setTextSize(12);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setTextColor(TEXT_PRIMARY);
+        button.setTextColor(primaryTextColor());
         button.setGravity(android.view.Gravity.CENTER);
         button.setPadding(dp(4), dp(3), dp(4), dp(3));
-        button.setBackgroundTintList(ColorStateList.valueOf(actionColor(index)));
+        button.setBackground(PickPicoTheme.control(theme, dp(14), actionColor(index), true));
         button.setOnClickListener(v -> action.run());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(68), 1f);
         if (row.getChildCount() > 0) params.setMarginStart(dp(7));
@@ -455,10 +473,10 @@ public final class HumanHelpActivity extends Activity {
         button.setAllCaps(false);
         button.setTextSize(14);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setTextColor(TEXT_PRIMARY);
+        button.setTextColor(primaryTextColor());
         button.setGravity(android.view.Gravity.CENTER);
         button.setPadding(dp(8), dp(5), dp(8), dp(5));
-        button.setBackgroundTintList(ColorStateList.valueOf(actionColor(index)));
+        button.setBackground(PickPicoTheme.control(theme, dp(14), actionColor(index), true));
         button.setOnClickListener(v -> action.run());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
@@ -474,7 +492,7 @@ public final class HumanHelpActivity extends Activity {
         SpannableString label = new SpannableString(value);
         int secondaryStart = value.lastIndexOf('\n') + 1;
         label.setSpan(new RelativeSizeSpan(0.72f), secondaryStart, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        label.setSpan(new ForegroundColorSpan(TEXT_SECONDARY), secondaryStart, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        label.setSpan(new ForegroundColorSpan(secondaryTextColor()), secondaryStart, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return label;
     }
 
@@ -695,15 +713,15 @@ public final class HumanHelpActivity extends Activity {
                 long seconds = remainingSeconds % 60L;
                 countdownStatus.setText((approvalRequest ? "等待核准" : "等待回覆")
                         + " · " + String.format(java.util.Locale.US, "%d:%02d", minutes, seconds));
-                countdownStatus.setTextColor(Color.rgb(45, 85, 145));
+                countdownStatus.setTextColor(PickPicoTheme.accentB(theme));
                 countdownStatus.setVisibility(View.VISIBLE);
             } else if ("timed_out".equals(status)) {
                 countdownStatus.setText("等待已結束 · 已逾時");
-                countdownStatus.setTextColor(Color.rgb(145, 70, 35));
+                countdownStatus.setTextColor(PickPicoTheme.AMBER);
                 countdownStatus.setVisibility(View.VISIBLE);
             } else if ("completed".equals(status)) {
                 countdownStatus.setText("等待已結束 · 已完成");
-                countdownStatus.setTextColor(Color.rgb(35, 105, 55));
+                countdownStatus.setTextColor(PickPicoTheme.GREEN);
                 countdownStatus.setVisibility(View.VISIBLE);
             } else {
                 countdownStatus.setVisibility(View.GONE);
@@ -714,15 +732,17 @@ public final class HumanHelpActivity extends Activity {
                 lifecycleStatus.setText(approvalRequest
                         ? "此核准請求已逾時 · 操作不會執行。"
                         : "此請求已逾時 · AI 已停止等待，將自行決定下一步。");
-                lifecycleStatus.setTextColor(Color.rgb(145, 70, 35));
-                lifecycleStatus.setBackgroundColor(Color.rgb(255, 238, 226));
+                lifecycleStatus.setTextColor(primaryTextColor());
+                lifecycleStatus.setBackground(PickPicoTheme.control(
+                        theme, dp(12), PickPicoTheme.AMBER, true));
                 lifecycleStatus.setVisibility(View.VISIBLE);
             } else if ("completed".equals(status)) {
                 lifecycleStatus.setText(approvalRequest
                         ? "已完成 · Agent 已收到你的核准決定。"
                         : "已完成 · AI 已收到你的回覆。");
-                lifecycleStatus.setTextColor(Color.rgb(35, 105, 55));
-                lifecycleStatus.setBackgroundColor(Color.rgb(230, 246, 234));
+                lifecycleStatus.setTextColor(primaryTextColor());
+                lifecycleStatus.setBackground(PickPicoTheme.control(
+                        theme, dp(12), PickPicoTheme.GREEN, true));
                 lifecycleStatus.setVisibility(View.VISIBLE);
             } else if (!waiting) {
                 lifecycleStatus.setText("此請求已結束，無法再提交回覆。");
@@ -789,14 +809,14 @@ public final class HumanHelpActivity extends Activity {
         header.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
         TextView back = text("‹", 38, Typeface.NORMAL);
-        back.setTextColor(TEXT_PRIMARY);
+        back.setTextColor(primaryTextColor());
         back.setGravity(android.view.Gravity.CENTER);
         back.setContentDescription("Back");
         back.setOnClickListener(v -> finish());
         header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(44)));
 
         TextView heading = text(approvalRequest ? "APPROVAL" : "H U M A N   H E L P", 17, Typeface.BOLD);
-        heading.setTextColor(TEXT_PRIMARY);
+        heading.setTextColor(primaryTextColor());
         heading.setGravity(android.view.Gravity.CENTER);
         header.addView(heading, new LinearLayout.LayoutParams(0, dp(44), 1f));
 
@@ -805,7 +825,7 @@ public final class HumanHelpActivity extends Activity {
         wrapper.addView(header);
 
         TextView subtitle = text("AI is paused · waiting for you", 13, Typeface.NORMAL);
-        subtitle.setTextColor(TEXT_SECONDARY);
+        subtitle.setTextColor(secondaryTextColor());
         subtitle.setGravity(android.view.Gravity.CENTER);
         wrapper.addView(subtitle);
         return wrapper;
@@ -814,7 +834,7 @@ public final class HumanHelpActivity extends Activity {
     private LinearLayout glassCard() {
         LinearLayout card = new LinearLayout(this);
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
-        card.setBackground(glassBackground());
+        card.setBackground(PickPicoTheme.card(theme, dp(20), false));
         return card;
     }
 
@@ -828,7 +848,7 @@ public final class HumanHelpActivity extends Activity {
 
     private TextView cardTitle(String value) {
         TextView view = text(value, 16, Typeface.NORMAL);
-        view.setTextColor(TEXT_PRIMARY);
+        view.setTextColor(primaryTextColor());
         return view;
     }
 
@@ -836,18 +856,22 @@ public final class HumanHelpActivity extends Activity {
         button.setAllCaps(false);
         button.setTextSize(14);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setTextColor(TEXT_PRIMARY);
-        button.setBackgroundTintList(ColorStateList.valueOf(Color.rgb(79, 96, 106)));
+        button.setTextColor(primaryTextColor());
+        button.setBackground(PickPicoTheme.control(
+                theme, dp(12), PickPicoTheme.accentA(theme), false));
     }
 
     private int actionColor(int index) {
         if (index == 0) {
-            return Color.rgb(66, 128, 108);
+            return PickPicoTheme.GREEN;
         }
         if (index == 1) {
-            return Color.rgb(128, 70, 76);
+            return PickPicoTheme.RED;
         }
-        return Color.rgb(74, 90, 101);
+        if (index == 2) {
+            return PickPicoTheme.BLUE;
+        }
+        return PickPicoTheme.accentA(theme);
     }
 
     private void setActionButtonsEnabled(View view, boolean enabled) {
@@ -880,29 +904,12 @@ public final class HumanHelpActivity extends Activity {
         startActivityForResult(intent, REQUEST_VOICE_REPLY);
     }
 
-    private GradientDrawable screenBackground() {
-        return new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.rgb(94, 109, 119), Color.rgb(67, 80, 89)});
+    private int primaryTextColor() {
+        return PickPicoTheme.text(theme);
     }
 
-    private GradientDrawable glassBackground() {
-        GradientDrawable background = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.argb(66, 255, 255, 255), Color.argb(28, 255, 255, 255)});
-        background.setCornerRadius(dp(20));
-        background.setStroke(dp(1), Color.argb(150, 220, 235, 244));
-        return background;
-    }
-
-    private GradientDrawable roundedBackground(int fillColor, int strokeColor, int radiusDp) {
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(fillColor);
-        background.setCornerRadius(dp(radiusDp));
-        if (strokeColor != 0) {
-            background.setStroke(dp(1), strokeColor);
-        }
-        return background;
+    private int secondaryTextColor() {
+        return PickPicoTheme.muted(theme);
     }
 
     private TextView text(String value, int sp, int style) {

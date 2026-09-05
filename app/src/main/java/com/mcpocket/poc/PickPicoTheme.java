@@ -22,6 +22,17 @@ import java.util.Locale;
 final class PickPicoTheme {
     static final String PREFS = "pickpico_appearance";
 
+    // Shared product UI tokens. Keep product-facing screens on this palette
+    // instead of letting individual Activities grow their own parallel theme.
+    static final int BASE_BG = Color.rgb(18, 21, 24);
+    static final int TEXT = Color.rgb(244, 247, 249);
+    static final int MUTED = Color.rgb(184, 195, 203);
+    static final int DIM = Color.rgb(125, 136, 153);
+    static final int GREEN = Color.rgb(116, 199, 165);
+    static final int AMBER = Color.rgb(230, 182, 106);
+    static final int RED = Color.rgb(240, 113, 120);
+    static final int BLUE = Color.rgb(174, 230, 255);
+
     static final String DEFAULT_A = "#5E6D77";
     static final String DEFAULT_B = "#435059";
     private static final String LEGACY_DEFAULT_A = "#4b1f66";
@@ -132,6 +143,18 @@ final class PickPicoTheme {
 
     static int accentB(State state) {
         return mix(state.colorB, isLightBackground(state) ? Color.BLACK : Color.WHITE, 0.44f);
+    }
+
+    static int text(State state) {
+        return isLightBackground(state) ? Color.rgb(22, 26, 29) : TEXT;
+    }
+
+    static int muted(State state) {
+        return isLightBackground(state) ? Color.rgb(73, 82, 90) : MUTED;
+    }
+
+    static int dim(State state) {
+        return isLightBackground(state) ? Color.rgb(94, 104, 113) : DIM;
     }
 
     static boolean isLightBackground(State state) {

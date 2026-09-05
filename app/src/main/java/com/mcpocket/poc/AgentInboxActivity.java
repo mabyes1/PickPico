@@ -28,13 +28,13 @@ import org.json.JSONObject;
 public final class AgentInboxActivity extends Activity {
     static final String EXTRA_ENTRY_ID = "entryId";
 
-    private static final int BG = Color.rgb(18, 21, 24);
-    private static final int TEXT = Color.rgb(244, 247, 249);
-    private static final int MUTED = Color.rgb(184, 195, 203);
-    private static final int DIM = Color.rgb(125, 136, 153);
-    private static final int GREEN = Color.rgb(116, 199, 165);
-    private static final int BLUE = Color.rgb(174, 230, 255);
-    private static final int RED = Color.rgb(240, 113, 120);
+    private static final int BG = PickPicoTheme.BASE_BG;
+    private static final int TEXT = PickPicoTheme.TEXT;
+    private static final int MUTED = PickPicoTheme.MUTED;
+    private static final int DIM = PickPicoTheme.DIM;
+    private static final int GREEN = PickPicoTheme.GREEN;
+    private static final int BLUE = PickPicoTheme.BLUE;
+    private static final int RED = PickPicoTheme.RED;
 
     private LinearLayout itemsContainer;
     private LinearLayout pendingContainer;

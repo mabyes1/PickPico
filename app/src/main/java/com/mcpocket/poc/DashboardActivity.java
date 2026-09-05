@@ -80,14 +80,14 @@ public final class DashboardActivity extends Activity {
     private static final int PAGE_DEVELOPER = 4;
     private static final int PAGE_APPEARANCE = 5;
 
-    private static final int BG = Color.rgb(18, 21, 24);
-    private static final int TEXT = Color.rgb(244, 247, 249);
-    private static final int MUTED = Color.rgb(184, 195, 203);
-    private static final int DIM = Color.rgb(125, 136, 153);
-    private static final int GREEN = Color.rgb(116, 199, 165);
-    private static final int AMBER = Color.rgb(230, 182, 106);
-    private static final int RED = Color.rgb(240, 113, 120);
-    private static final int BLUE = Color.rgb(174, 230, 255);
+    private static final int BG = PickPicoTheme.BASE_BG;
+    private static final int TEXT = PickPicoTheme.TEXT;
+    private static final int MUTED = PickPicoTheme.MUTED;
+    private static final int DIM = PickPicoTheme.DIM;
+    private static final int GREEN = PickPicoTheme.GREEN;
+    private static final int AMBER = PickPicoTheme.AMBER;
+    private static final int RED = PickPicoTheme.RED;
+    private static final int BLUE = PickPicoTheme.BLUE;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable refreshTask = new Runnable() {
