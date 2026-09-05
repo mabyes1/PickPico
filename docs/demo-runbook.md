@@ -54,7 +54,7 @@ command_run("screen.capture")
   "arguments": {
     "title": "幫我確認現場狀態",
     "instruction": "請看一下我面前的物品或面板。如果 AI 自己判斷不可靠，請直接拍一張照片並告訴我你看到什麼。",
-    "actions": ["確認正常", "有問題", "看不確定"],
+    "actions": ["確認正常", "有問題"],
     "allowTextReply": true,
     "allowImages": true,
     "maxImages": 3,

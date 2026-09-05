@@ -24,19 +24,20 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** Product-facing Agent Inbox using the same glass language as DashboardActivity. */
+/** Product-facing Agent Activity history using the same glass language as DashboardActivity. */
 public final class AgentInboxActivity extends Activity {
     static final String EXTRA_ENTRY_ID = "entryId";
 
-    private static final int BG = Color.rgb(6, 8, 10);
-    private static final int TEXT = Color.rgb(242, 246, 248);
-    private static final int MUTED = Color.rgb(165, 176, 187);
-    private static final int DIM = Color.rgb(105, 116, 128);
-    private static final int GREEN = Color.rgb(61, 214, 129);
-    private static final int BLUE = Color.rgb(92, 177, 255);
-    private static final int RED = Color.rgb(255, 91, 99);
+    private static final int BG = Color.rgb(18, 21, 24);
+    private static final int TEXT = Color.rgb(244, 247, 249);
+    private static final int MUTED = Color.rgb(184, 195, 203);
+    private static final int DIM = Color.rgb(125, 136, 153);
+    private static final int GREEN = Color.rgb(116, 199, 165);
+    private static final int BLUE = Color.rgb(174, 230, 255);
+    private static final int RED = Color.rgb(240, 113, 120);
 
     private LinearLayout itemsContainer;
+    private LinearLayout pendingContainer;
     private TextView inboxCount;
     private TextView clearAction;
     private TextView topStatusDot;
@@ -85,7 +86,7 @@ public final class AgentInboxActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         shell.addView(buildTopBar(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(88)));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -95,51 +96,53 @@ public final class AgentInboxActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(10), dp(16), dp(28));
+        root.setPadding(dp(24), dp(14), dp(24), dp(28));
         scroll.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout intro = glassCard(true);
-        LinearLayout introHeader = new LinearLayout(this);
-        introHeader.setOrientation(LinearLayout.HORIZONTAL);
-        introHeader.setGravity(Gravity.CENTER_VERTICAL);
-        intro.addView(introHeader);
+        LinearLayout summary = glassCard(false);
+        summary.setOrientation(LinearLayout.HORIZONTAL);
+        summary.setGravity(Gravity.CENTER_VERTICAL);
 
-        LinearLayout introCopy = new LinearLayout(this);
-        introCopy.setOrientation(LinearLayout.VERTICAL);
-        introHeader.addView(introCopy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView kicker = text("AGENT INBOX", 10, Typeface.BOLD, PickPicoTheme.accentB(theme));
-        kicker.setLetterSpacing(.08f);
-        introCopy.addView(kicker);
-        TextView subtitle = text("Agent messages stay here after their Android notification disappears.", 13, Typeface.NORMAL, MUTED);
-        subtitle.setPadding(0, dp(6), dp(12), 0);
-        introCopy.addView(subtitle);
+        TextView summaryIcon = text("∿", 26, Typeface.NORMAL, GREEN);
+        summaryIcon.setGravity(Gravity.CENTER);
+        summaryIcon.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
+        summary.addView(summaryIcon, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        inboxCount = text("0", 24, Typeface.BOLD, TEXT);
-        inboxCount.setGravity(Gravity.CENTER);
-        inboxCount.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), true));
-        introHeader.addView(inboxCount, new LinearLayout.LayoutParams(dp(56), dp(44)));
-        root.addView(intro);
+        inboxCount = text("0 EVENTS", 18, Typeface.BOLD, TEXT);
+        inboxCount.setLetterSpacing(.035f);
+        inboxCount.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        countParams.leftMargin = dp(14);
+        summary.addView(inboxCount, countParams);
 
-        clearAction = actionButton("CLEAR INBOX", RED);
+        clearAction = actionButton("CLEAR", RED);
         clearAction.setOnClickListener(v -> confirmClearInbox());
-        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        clearParams.topMargin = dp(12);
-        root.addView(clearAction, clearParams);
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dp(78), dp(36));
+        clearParams.leftMargin = dp(8);
+        summary.addView(clearAction, clearParams);
+        root.addView(summary);
 
-        TextView section = text("MESSAGES", 10, Typeface.BOLD, MUTED);
-        section.setLetterSpacing(.08f);
-        section.setPadding(dp(2), dp(22), 0, dp(8));
+        pendingContainer = new LinearLayout(this);
+        pendingContainer.setOrientation(LinearLayout.VERTICAL);
+        pendingContainer.setVisibility(View.GONE);
+        root.addView(pendingContainer);
+
+        TextView section = text("RECENT", 10, Typeface.BOLD, DIM);
+        section.setLetterSpacing(.12f);
+        section.setPadding(dp(2), dp(20), 0, dp(10));
         root.addView(section);
 
         itemsContainer = new LinearLayout(this);
         itemsContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(itemsContainer);
 
-        shell.addView(buildBottomNav(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
+        View nav = buildBottomNav();
+        LinearLayout.LayoutParams navLayout = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(76));
+        navLayout.setMargins(dp(18), 0, dp(18), dp(8));
+        shell.addView(nav, navLayout);
         return stage;
     }
 
@@ -147,13 +150,13 @@ public final class AgentInboxActivity extends Activity {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER_VERTICAL);
-        nav.setPadding(dp(10), dp(7), dp(10), dp(8));
-        nav.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
-        nav.setElevation(dp(16));
-        nav.addView(navItem("HOME", false, DashboardActivity.PAGE_HOME), navParams());
-        nav.addView(navItem("INBOX", true, -1), navParams());
-        nav.addView(navItem("CAPABILITIES", false, DashboardActivity.PAGE_CAPABILITIES), navParams());
-        nav.addView(navItem("SETTINGS", false, DashboardActivity.PAGE_SETTINGS), navParams());
+        nav.setPadding(dp(8), dp(7), dp(8), dp(7));
+        nav.setBackground(PickPicoTheme.strongGlass(theme, dp(26)));
+        nav.setElevation(dp(8));
+        nav.addView(navItem("⌂", "HOME", false, DashboardActivity.PAGE_HOME), navParams());
+        nav.addView(navItem("◷", "ACTIVITY", true, -1), navParams());
+        nav.addView(navItem("▦", "CAPABILITIES", false, DashboardActivity.PAGE_CAPABILITIES), navParams());
+        nav.addView(navItem("⚙", "SETTINGS", false, DashboardActivity.PAGE_SETTINGS), navParams());
         return nav;
     }
 
@@ -161,12 +164,13 @@ public final class AgentInboxActivity extends Activity {
         return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
     }
 
-    private TextView navItem(String label, boolean active, int page) {
-        TextView item = text(label, 10, Typeface.BOLD, active ? GREEN : MUTED);
+    private TextView navItem(String icon, String label, boolean active, int page) {
+        TextView item = text(icon + "\n" + label, 10, Typeface.BOLD, active ? GREEN : MUTED);
         item.setGravity(Gravity.CENTER);
-        item.setLetterSpacing(.04f);
+        item.setLetterSpacing(.055f);
+        item.setLineSpacing(0f, 1.18f);
         if (active) {
-            item.setBackground(PickPicoTheme.control(theme, dp(12), GREEN, true));
+            item.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, true));
         } else {
             item.setOnClickListener(v -> openDashboard(page));
         }
@@ -184,13 +188,13 @@ public final class AgentInboxActivity extends Activity {
     private void confirmClearInbox() {
         if (AgentInboxStore.count(this) == 0) return;
         new AlertDialog.Builder(this)
-                .setTitle("Clear Agent Inbox?")
-                .setMessage("This removes every saved Agent message from this phone.")
+                .setTitle("Clear Agent Activity?")
+                .setMessage("This removes every saved request and message from this phone.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Clear", (dialog, which) -> {
                     AgentInboxStore.clear(this);
                     renderItems();
-                    Toast.makeText(this, "Agent Inbox cleared", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Agent Activity cleared", Toast.LENGTH_SHORT).show();
                 })
                 .show();
     }
@@ -199,27 +203,23 @@ public final class AgentInboxActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(14), dp(8), dp(16), 0);
-        bar.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
-        bar.setElevation(dp(16));
-
-        TextView back = text("‹", 34, Typeface.NORMAL, TEXT);
-        back.setGravity(Gravity.CENTER);
-        back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(40), dp(48)));
+        bar.setPadding(dp(24), dp(14), dp(24), dp(4));
 
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         titles.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-        titles.addView(text("Agent Inbox", 22, Typeface.BOLD, TEXT));
-        TextView meta = text("HUMAN ↔ AGENT HANDOFF", 9, Typeface.BOLD, DIM);
-        meta.setLetterSpacing(.08f);
+        titles.addView(text("Activity", 27, Typeface.BOLD, TEXT));
+        TextView meta = text("AGENT ↔ HUMAN HISTORY", 10, Typeface.BOLD, BLUE);
+        meta.setLetterSpacing(.10f);
+        meta.setPadding(0, dp(4), 0, 0);
         titles.addView(meta);
 
-        topStatusDot = text("●", 13, Typeface.BOLD, DIM);
+        topStatusDot = text("● ACTIVE", 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
-        bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(28), dp(48)));
+        topStatusDot.setLetterSpacing(.035f);
+        topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
+        bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(84), dp(34)));
         return bar;
     }
 
@@ -232,7 +232,9 @@ public final class AgentInboxActivity extends Activity {
         boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
         boolean relayConnected = "connected".equals(relayStatus);
         int color = !running ? RED : relayConfigured && !relayConnected ? Color.rgb(246, 169, 69) : GREEN;
+        topStatusDot.setText(running ? "● ACTIVE" : "● STOPPED");
         topStatusDot.setTextColor(resolveThemeTextColor(color));
+        topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), color, false));
         topStatusDot.setContentDescription(!running
                 ? "Node stopped"
                 : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready");
@@ -240,9 +242,10 @@ public final class AgentInboxActivity extends Activity {
 
     private void renderItems() {
         if (itemsContainer == null) return;
+        renderPending();
         itemsContainer.removeAllViews();
         JSONArray items = AgentInboxStore.list(this);
-        if (inboxCount != null) inboxCount.setText(String.valueOf(items.length()));
+        if (inboxCount != null) inboxCount.setText(items.length() + (items.length() == 1 ? " EVENT" : " EVENTS"));
         if (clearAction != null) {
             clearAction.setEnabled(items.length() > 0);
             clearAction.setAlpha(items.length() > 0 ? 1f : 0.35f);
@@ -251,8 +254,8 @@ public final class AgentInboxActivity extends Activity {
         String highlightedId = getIntent() == null ? "" : getIntent().getStringExtra(EXTRA_ENTRY_ID);
         if (items.length() == 0) {
             LinearLayout empty = glassCard(false);
-            empty.addView(text("No Agent messages yet", 15, Typeface.BOLD, TEXT));
-            TextView detail = text("Notifications and human-help messages retained by PickPico will appear here.", 12, Typeface.NORMAL, MUTED);
+            empty.addView(text("No activity yet", 15, Typeface.BOLD, TEXT));
+            TextView detail = text("Agent requests, notifications, and human-help handoffs will appear here.", 12, Typeface.NORMAL, MUTED);
             detail.setPadding(0, dp(6), 0, 0);
             empty.addView(detail);
             itemsContainer.addView(empty);
@@ -267,7 +270,7 @@ public final class AgentInboxActivity extends Activity {
             LinearLayout card = glassCard(highlighted);
 
             String source = item.optString("source", "agent");
-            String createdAt = item.optString("createdAt", "");
+            String createdAt = compactTimestamp(item.optString("createdAt", ""));
             TextView meta = text(
                     source.toUpperCase() + (createdAt.isEmpty() ? "" : "  ·  " + createdAt),
                     10,
@@ -284,27 +287,27 @@ public final class AgentInboxActivity extends Activity {
             }
 
             String body = item.optString("body", "");
-            TextView bodyView = text(body, 14, Typeface.NORMAL, TEXT);
+            TextView bodyView = text(body, 14, Typeface.NORMAL, MUTED);
             bodyView.setTextIsSelectable(true);
             bodyView.setLineSpacing(0f, 1.08f);
             bodyView.setOnLongClickListener(v -> {
                 copyText(body);
                 return true;
             });
-            bodyView.setPadding(0, dp(7), 0, dp(11));
+            bodyView.setPadding(0, dp(6), 0, dp(8));
             card.addView(bodyView);
 
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
             TextView copy = actionButton("COPY", BLUE);
             copy.setOnClickListener(v -> copyText(body));
-            actions.addView(copy, new LinearLayout.LayoutParams(0, dp(40), 1f));
+            actions.addView(copy, new LinearLayout.LayoutParams(dp(72), dp(34)));
 
             String openableUrl = extractUrl(body);
             if (openableUrl != null) {
                 TextView open = actionButton("OPEN", GREEN);
                 open.setOnClickListener(v -> openUrl(openableUrl));
-                LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(0, dp(40), 1f);
+                LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(dp(72), dp(34));
                 openParams.leftMargin = dp(8);
                 actions.addView(open, openParams);
             }
@@ -313,17 +316,57 @@ public final class AgentInboxActivity extends Activity {
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT);
-            if (index > 0) params.topMargin = dp(12);
+            if (index > 0) params.topMargin = dp(10);
             itemsContainer.addView(card, params);
+        }
+    }
+
+    private void renderPending() {
+        if (pendingContainer == null) return;
+        pendingContainer.removeAllViews();
+        try {
+            JSONObject pending = HumanHelpStore.latestWaiting(this);
+            if (pending == null) {
+                pendingContainer.setVisibility(View.GONE);
+                return;
+            }
+            pendingContainer.setVisibility(View.VISIBLE);
+            TextView label = text("NEEDS RESPONSE", 10, Typeface.BOLD, DIM);
+            label.setLetterSpacing(.12f);
+            label.setPadding(dp(2), dp(20), 0, dp(10));
+            pendingContainer.addView(label);
+
+            LinearLayout card = glassCard(true);
+            card.setOnClickListener(v -> {
+                String requestId = pending.optString("requestId", "");
+                if (TextUtils.isEmpty(requestId)) return;
+                startActivity(new Intent(this, HumanHelpActivity.class)
+                        .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId));
+            });
+            TextView state = text(
+                    "approval".equals(pending.optString("requestType", "help")) ? "APPROVAL NEEDED" : "HUMAN HELP",
+                    11,
+                    Typeface.BOLD,
+                    BLUE);
+            state.setLetterSpacing(.08f);
+            card.addView(state);
+            TextView title = text(pending.optString("title", "Agent is waiting for you"), 16, Typeface.BOLD, TEXT);
+            title.setPadding(0, dp(8), 0, dp(4));
+            card.addView(title);
+            TextView detail = text("Open to respond and let the Agent continue.", 12, Typeface.NORMAL, MUTED);
+            card.addView(detail);
+            pendingContainer.addView(card);
+        } catch (Exception ignored) {
+            pendingContainer.setVisibility(View.GONE);
         }
     }
 
     private LinearLayout glassCard(boolean accented) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(15), dp(14), dp(15), dp(14));
-        card.setBackground(PickPicoTheme.card(theme, dp(18), accented));
-        card.setElevation(dp(14));
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        card.setBackground(PickPicoTheme.card(theme, dp(22), accented));
+        card.setElevation(dp(6));
         return card;
     }
 
@@ -331,7 +374,7 @@ public final class AgentInboxActivity extends Activity {
         TextView button = text(label, 10, Typeface.BOLD, accent == RED ? RED : TEXT);
         button.setGravity(Gravity.CENTER);
         button.setLetterSpacing(.05f);
-        button.setBackground(PickPicoTheme.control(theme, dp(12), accent, true));
+        button.setBackground(PickPicoTheme.control(theme, dp(11), accent, accent != RED));
         return button;
     }
 
@@ -341,6 +384,15 @@ public final class AgentInboxActivity extends Activity {
             clipboard.setPrimaryClip(ClipData.newPlainText("PickPico Agent message", value));
             Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private static String compactTimestamp(String value) {
+        if (value == null || value.isEmpty()) return "";
+        int t = value.indexOf('T');
+        if (t >= 0 && value.length() >= t + 6) {
+            return value.substring(t + 1, t + 6);
+        }
+        return value;
     }
 
     private void openUrl(String value) {

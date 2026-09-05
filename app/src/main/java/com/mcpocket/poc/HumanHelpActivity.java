@@ -5,10 +5,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.ImageDecoder;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -16,9 +18,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.speech.RecognizerIntent;
 import android.text.Editable;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -36,16 +43,27 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Locale;
 
 public final class HumanHelpActivity extends Activity {
     static final String EXTRA_CONFIRM_BLE_VOICE = "confirm_ble_voice";
     static final String EXTRA_BLE_VOICE_PATH = "ble_voice_path";
     static final String EXTRA_BLE_VOICE_TRANSCRIPT = "ble_voice_transcript";
     static final String EXTRA_BLE_VOICE_STT_STATUS = "ble_voice_stt_status";
+    static final String EXTRA_OPEN_DETAILS = "open_details";
     private static final int REQUEST_PICK_IMAGE = 201;
     private static final int REQUEST_CAMERA = 202;
     private static final int REQUEST_CAMERA_PERMISSION = 203;
+    private static final int REQUEST_VOICE_REPLY = 204;
     private static final int MAX_IMAGE_EDGE = 1600;
+    private static final int SCREEN_BG = Color.rgb(67, 80, 89);
+    private static final int CARD_BG = Color.rgb(86, 101, 111);
+    private static final int CARD_BG_ALT = Color.rgb(102, 119, 130);
+    private static final int CARD_STROKE = Color.rgb(190, 207, 218);
+    private static final int TEXT_PRIMARY = Color.rgb(248, 250, 252);
+    private static final int TEXT_SECONDARY = Color.rgb(200, 210, 217);
+    private static final int ACCENT_BLUE = Color.rgb(174, 230, 255);
 
     private String requestId;
     private JSONObject request;
@@ -54,6 +72,12 @@ public final class HumanHelpActivity extends Activity {
     private TextView lifecycleStatus;
     private TextView attachmentStatus;
     private LinearLayout actionContainer;
+    private LinearLayout detailsContainer;
+    private LinearLayout phoneActionsContainer;
+    private LinearLayout dockActionsContainer;
+    private Button detailsButton;
+    private boolean detailsExpanded;
+    private boolean phoneControlsOverride;
     private Button uploadButton;
     private Button cameraButton;
     private File pendingCameraFile;
@@ -77,7 +101,11 @@ public final class HumanHelpActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().setStatusBarColor(SCREEN_BG);
+        getWindow().setNavigationBarColor(SCREEN_BG);
+        getWindow().getDecorView().setSystemUiVisibility(0);
         requestId = getIntent().getStringExtra(HumanHelpStore.EXTRA_REQUEST_ID);
+        detailsExpanded = getIntent().getBooleanExtra(EXTRA_OPEN_DETAILS, false);
         if (TextUtils.isEmpty(requestId)) {
             finish();
             return;
@@ -103,6 +131,15 @@ public final class HumanHelpActivity extends Activity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_DETAILS, false)) {
+            setDetailsExpanded(true);
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         if (requestId != null && actionContainer != null) {
@@ -120,49 +157,130 @@ public final class HumanHelpActivity extends Activity {
     }
 
     private View buildContent() {
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackground(screenBackground());
+
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        shell.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(28), dp(22), dp(28));
+        root.setPadding(dp(24), dp(18), dp(24), dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
 
         boolean approvalRequest = "approval".equals(request.optString("requestType", "help"));
-        TextView eyebrow = text(approvalRequest ? "APPROVAL REQUEST" : "HUMAN HELP", 12, Typeface.BOLD);
-        eyebrow.setTextColor(Color.rgb(90, 90, 90));
-        root.addView(eyebrow);
+        root.addView(buildHeader(approvalRequest));
 
-        countdownStatus = text("", 15, Typeface.BOLD);
-        countdownStatus.setTextColor(Color.rgb(45, 85, 145));
-        countdownStatus.setPadding(0, dp(8), 0, dp(2));
-        root.addView(countdownStatus);
+        LinearLayout pauseCard = glassCard();
+        pauseCard.setPadding(dp(12), dp(8), dp(12), dp(8));
+        pauseCard.setOrientation(LinearLayout.HORIZONTAL);
+        pauseCard.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        TextView title = text(request.optString("title", "AI needs your help"), 27, Typeface.BOLD);
-        title.setPadding(0, dp(8), 0, dp(12));
-        root.addView(title);
+        TextView pauseIcon = text("Ⅱ", 16, Typeface.BOLD);
+        pauseIcon.setTextColor(TEXT_PRIMARY);
+        pauseIcon.setGravity(android.view.Gravity.CENTER);
+        pauseIcon.setBackground(roundedBackground(Color.rgb(88, 110, 121), 0, 24));
+        pauseCard.addView(pauseIcon, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
-        TextView instruction = text(request.optString("instruction", ""), 18, Typeface.NORMAL);
-        instruction.setTextColor(Color.rgb(35, 35, 35));
-        instruction.setPadding(dp(14), dp(14), dp(14), dp(14));
-        instruction.setBackgroundColor(Color.rgb(241, 243, 246));
-        root.addView(instruction);
+        LinearLayout pauseCopy = new LinearLayout(this);
+        pauseCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView pauseTitle = text(approvalRequest ? "AI needs approval" : "AI paused", 15, Typeface.BOLD);
+        pauseTitle.setTextColor(TEXT_PRIMARY);
+        TextView pauseSubtitle = text("Your input is required.", 11, Typeface.NORMAL);
+        pauseSubtitle.setTextColor(TEXT_SECONDARY);
+        pauseCopy.addView(pauseTitle);
+        pauseCopy.addView(pauseSubtitle);
+        LinearLayout.LayoutParams pauseCopyParams = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        pauseCopyParams.setMarginStart(dp(9));
+        pauseCard.addView(pauseCopy, pauseCopyParams);
+
+        countdownStatus = text("", 13, Typeface.BOLD);
+        countdownStatus.setTextColor(TEXT_PRIMARY);
+        countdownStatus.setGravity(android.view.Gravity.END);
+        pauseCard.addView(countdownStatus);
+        root.addView(pauseCard, cardParams(10));
+
+        LinearLayout requestCard = glassCard();
+        requestCard.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout requestTitleRow = new LinearLayout(this);
+        requestTitleRow.setOrientation(LinearLayout.HORIZONTAL);
+        requestTitleRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView taskIcon = text("AI", 12, Typeface.BOLD);
+        taskIcon.setTextColor(Color.WHITE);
+        taskIcon.setGravity(android.view.Gravity.CENTER);
+        taskIcon.setBackground(roundedBackground(Color.rgb(92, 116, 128), CARD_STROKE, 10));
+        requestTitleRow.addView(taskIcon, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        TextView title = text(request.optString("title", "AI needs your help"), 23, Typeface.BOLD);
+        title.setTextColor(TEXT_PRIMARY);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        titleParams.setMarginStart(dp(12));
+        requestTitleRow.addView(title, titleParams);
+        requestCard.addView(requestTitleRow);
+
+        TextView instruction = text(request.optString("instruction", ""), 17, Typeface.NORMAL);
+        instruction.setTextColor(TEXT_PRIMARY);
+        instruction.setLineSpacing(0f, 1.12f);
+        instruction.setPadding(0, dp(15), 0, 0);
+        requestCard.addView(instruction);
+
+        String additionalNotes = request.optString("additionalNotes", "").trim();
+        if (!additionalNotes.isEmpty()) {
+            TextView notesLabel = text("Additional notes from AI", 13, Typeface.NORMAL);
+            notesLabel.setTextColor(TEXT_SECONDARY);
+            notesLabel.setPadding(0, dp(16), 0, dp(7));
+            requestCard.addView(notesLabel);
+            TextView notes = text(additionalNotes, 15, Typeface.NORMAL);
+            notes.setTextColor(TEXT_PRIMARY);
+            notes.setPadding(dp(12), dp(11), dp(12), dp(11));
+            notes.setBackground(roundedBackground(Color.argb(62, 255, 255, 255), CARD_STROKE, 10));
+            requestCard.addView(notes);
+        }
+        root.addView(requestCard, cardParams(14));
 
         lifecycleStatus = text("", 15, Typeface.BOLD);
-        lifecycleStatus.setPadding(dp(14), dp(10), dp(14), dp(10));
+        lifecycleStatus.setPadding(dp(14), dp(12), dp(14), dp(12));
         lifecycleStatus.setVisibility(View.GONE);
         root.addView(lifecycleStatus);
 
+        detailsContainer = new LinearLayout(this);
+        detailsContainer.setOrientation(LinearLayout.VERTICAL);
+        detailsContainer.setVisibility(detailsExpanded ? View.VISIBLE : View.GONE);
+        TextView detailsHeading = text("DETAILS", 11, Typeface.BOLD);
+        detailsHeading.setTextColor(ACCENT_BLUE);
+        detailsHeading.setLetterSpacing(.12f);
+        detailsHeading.setPadding(dp(2), dp(12), 0, dp(8));
+        detailsContainer.addView(detailsHeading);
+        TextView detailsIntro = text("Add context, a note, or an image when the Agent needs more information.", 12, Typeface.NORMAL);
+        detailsIntro.setTextColor(TEXT_SECONDARY);
+        detailsIntro.setPadding(dp(2), 0, dp(2), dp(10));
+        detailsContainer.addView(detailsIntro);
+        root.addView(detailsContainer);
+
         if (request.optBoolean("allowTextReply", true)) {
-            TextView replyLabel = label("REPLY");
-            replyLabel.setPadding(0, dp(22), 0, dp(6));
-            root.addView(replyLabel);
+            LinearLayout replyCard = glassCard();
+            replyCard.setOrientation(LinearLayout.VERTICAL);
+            TextView replyLabel = cardTitle("Add a note (optional)");
+            replyCard.addView(replyLabel);
             replyInput = new EditText(this);
             replyInput.setHint(approvalRequest
                     ? "Optional note for the Agent…"
-                    : "Type anything the Agent should know…");
-            replyInput.setMinLines(3);
-            replyInput.setMaxLines(8);
+                    : "Type a message to AI…");
+            replyInput.setTextSize(16);
+            replyInput.setTextColor(TEXT_PRIMARY);
+            replyInput.setHintTextColor(Color.rgb(170, 184, 194));
+            replyInput.setMinLines(2);
+            replyInput.setMaxLines(6);
+            replyInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+            replyInput.setBackground(roundedBackground(Color.argb(38, 255, 255, 255), Color.rgb(180, 202, 215), 12));
             replyInput.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
             JSONObject existingResponse = request.optJSONObject("response");
             if (existingResponse != null) {
@@ -175,69 +293,197 @@ public final class HumanHelpActivity extends Activity {
                     renewActivity("typing");
                 }
             });
-            root.addView(replyInput, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams replyParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            replyParams.topMargin = dp(10);
+            replyCard.addView(replyInput, replyParams);
+            detailsContainer.addView(replyCard, cardParams(14));
         }
 
         if (request.optBoolean("allowImages", true) && request.optInt("maxImages", 3) > 0) {
-            root.addView(label("IMAGES"));
-            attachmentStatus = text("No images attached", 14, Typeface.NORMAL);
-            attachmentStatus.setTextColor(Color.DKGRAY);
-            attachmentStatus.setPadding(0, 0, 0, dp(8));
-            root.addView(attachmentStatus);
+            LinearLayout attachmentCard = glassCard();
+            attachmentCard.setPadding(dp(12), dp(9), dp(12), dp(10));
+            attachmentCard.setOrientation(LinearLayout.VERTICAL);
+            TextView attachmentTitle = text("Add an image · optional", 13, Typeface.NORMAL);
+            attachmentTitle.setTextColor(TEXT_SECONDARY);
+            attachmentCard.addView(attachmentTitle);
+            attachmentStatus = text("No images attached", 11, Typeface.NORMAL);
+            attachmentStatus.setTextColor(TEXT_SECONDARY);
+            attachmentStatus.setPadding(0, dp(3), 0, dp(7));
+            attachmentCard.addView(attachmentStatus);
 
             LinearLayout imageButtons = new LinearLayout(this);
             imageButtons.setOrientation(LinearLayout.HORIZONTAL);
 
             uploadButton = new Button(this);
-            uploadButton.setText("UPLOAD IMAGE");
+            uploadButton.setText("Upload image");
+            styleUtilityButton(uploadButton);
             uploadButton.setOnClickListener(v -> pickImage());
-            imageButtons.addView(uploadButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
+            imageButtons.addView(uploadButton, new LinearLayout.LayoutParams(0, dp(42), 1f));
 
             cameraButton = new Button(this);
-            cameraButton.setText("TAKE PHOTO");
+            cameraButton.setText("Take photo");
+            styleUtilityButton(cameraButton);
             cameraButton.setOnClickListener(v -> requestCamera());
-            LinearLayout.LayoutParams cameraParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+            LinearLayout.LayoutParams cameraParams = new LinearLayout.LayoutParams(0, dp(42), 1f);
             cameraParams.setMarginStart(dp(8));
             imageButtons.addView(cameraButton, cameraParams);
-            root.addView(imageButtons);
+            attachmentCard.addView(imageButtons);
+            detailsContainer.addView(attachmentCard, cardParams(10));
         }
 
-        root.addView(label("RESPONSE"));
         actionContainer = new LinearLayout(this);
         actionContainer.setOrientation(LinearLayout.VERTICAL);
-        root.addView(actionContainer);
+        actionContainer.setPadding(dp(18), dp(8), dp(18), dp(10));
+        actionContainer.setBackground(roundedBackground(Color.argb(235, 55, 67, 74), CARD_STROKE, 22));
+        shell.addView(actionContainer, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         rebuildActions();
         refreshState();
-        return scroll;
+        return shell;
     }
 
     private void rebuildActions() {
         actionContainer.removeAllViews();
-        JSONArray actions = request.optJSONArray("actions");
-        if (actions == null) {
-            return;
+        String approveAction = HumanHelpStore.approveAction(request);
+        String rejectAction = HumanHelpStore.rejectAction(request);
+
+        phoneActionsContainer = actionRow();
+        addCompactActionButton(phoneActionsContainer, "✓", "Approve", 0,
+                () -> submit(approveAction));
+        addCompactActionButton(phoneActionsContainer, "×", "Reject", 1,
+                () -> submit(rejectAction));
+        addCompactActionButton(phoneActionsContainer, "🎙", "Voice", 2,
+                this::startVoiceReply);
+        detailsButton = addCompactActionButton(phoneActionsContainer, "≡", "Details", 3,
+                () -> setDetailsExpanded(!detailsExpanded));
+        actionContainer.addView(phoneActionsContainer, actionRowParams());
+
+        dockActionsContainer = new LinearLayout(this);
+        dockActionsContainer.setOrientation(LinearLayout.VERTICAL);
+        dockActionsContainer.setPadding(dp(10), dp(7), dp(10), dp(7));
+        TextView dockTitle = text("●  DUCK CONNECTED", 12, Typeface.BOLD);
+        dockTitle.setTextColor(Color.rgb(169, 231, 205));
+        dockTitle.setGravity(android.view.Gravity.CENTER);
+        dockActionsContainer.addView(dockTitle);
+        TextView dockMapping = text("Approve   ·   Reject   ·   Voice   ·   Details", 12, Typeface.NORMAL);
+        dockMapping.setTextColor(TEXT_SECONDARY);
+        dockMapping.setGravity(android.view.Gravity.CENTER);
+        dockMapping.setPadding(0, dp(5), 0, dp(7));
+        dockActionsContainer.addView(dockMapping);
+        Button usePhone = new Button(this);
+        usePhone.setText("Use phone controls");
+        styleUtilityButton(usePhone);
+        usePhone.setOnClickListener(v -> {
+            phoneControlsOverride = true;
+            refreshActionMode();
+        });
+        dockActionsContainer.addView(usePhone, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(40)));
+        actionContainer.addView(dockActionsContainer);
+        setDetailsExpanded(detailsExpanded);
+        refreshActionMode();
+    }
+
+    private Button addCompactActionButton(
+            LinearLayout row,
+            String icon,
+            String label,
+            int index,
+            Runnable action) {
+        Button button = new Button(this);
+        button.setText(icon + "\n" + label);
+        button.setAllCaps(false);
+        button.setTextSize(12);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(TEXT_PRIMARY);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setPadding(dp(4), dp(3), dp(4), dp(3));
+        button.setBackgroundTintList(ColorStateList.valueOf(actionColor(index)));
+        button.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(68), 1f);
+        if (row.getChildCount() > 0) params.setMarginStart(dp(7));
+        row.addView(button, params);
+        return button;
+    }
+
+    private void setDetailsExpanded(boolean expanded) {
+        detailsExpanded = expanded;
+        if (detailsContainer != null) {
+            detailsContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
         }
-        for (int index = 0; index < actions.length(); index++) {
-            String action = actions.optString(index, "");
-            if (action.isEmpty()) {
-                continue;
-            }
-            Button button = new Button(this);
-            button.setText(action);
-            button.setOnClickListener(v -> submit(action));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(54));
-            params.setMargins(0, 0, 0, dp(8));
-            actionContainer.addView(button, params);
+        if (detailsButton != null) {
+            detailsButton.setText((expanded ? "⌃" : "≡") + "\nDetails");
+        }
+        if (expanded) renewActivity("details");
+    }
+
+    private void refreshActionMode() {
+        boolean dockConnected = BleButtonBridge.isConnected();
+        boolean showDock = dockConnected && !phoneControlsOverride;
+        if (phoneActionsContainer != null) {
+            phoneActionsContainer.setVisibility(showDock ? View.GONE : View.VISIBLE);
+        }
+        if (dockActionsContainer != null) {
+            dockActionsContainer.setVisibility(showDock ? View.VISIBLE : View.GONE);
         }
     }
 
+    private LinearLayout actionRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        return row;
+    }
+
+    private LinearLayout.LayoutParams actionRowParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(78));
+        params.bottomMargin = dp(9);
+        return params;
+    }
+
+    private Button addActionButton(
+            LinearLayout row,
+            String icon,
+            String primary,
+            String secondary,
+            int index,
+            Runnable action) {
+        Button button = new Button(this);
+        button.setText(actionLabel(icon, primary, secondary));
+        button.setAllCaps(false);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(TEXT_PRIMARY);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setPadding(dp(8), dp(5), dp(8), dp(5));
+        button.setBackgroundTintList(ColorStateList.valueOf(actionColor(index)));
+        button.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        if (row.getChildCount() > 0) {
+            params.setMarginStart(dp(9));
+        }
+        row.addView(button, params);
+        return button;
+    }
+
+    private CharSequence actionLabel(String icon, String primary, String secondary) {
+        String value = icon + "  " + primary + "\n" + secondary;
+        SpannableString label = new SpannableString(value);
+        int secondaryStart = value.lastIndexOf('\n') + 1;
+        label.setSpan(new RelativeSizeSpan(0.72f), secondaryStart, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        label.setSpan(new ForegroundColorSpan(TEXT_SECONDARY), secondaryStart, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return label;
+    }
+
     private void submit(String action) {
+        submit(action, replyInput == null ? "" : replyInput.getText().toString());
+    }
+
+    private void submit(String action, String text) {
         try {
-            String text = replyInput == null ? "" : replyInput.getText().toString();
             HumanHelpStore.complete(this, requestId, action, text);
             Toast.makeText(this, "Sent to Agent", Toast.LENGTH_SHORT).show();
             finish();
@@ -340,6 +586,15 @@ public final class HumanHelpActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_VOICE_REPLY) {
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (results != null && !results.isEmpty() && !TextUtils.isEmpty(results.get(0))) {
+                    submit("語音回覆", results.get(0).trim());
+                }
+            }
+            return;
+        }
         if (resultCode != RESULT_OK) {
             return;
         }
@@ -436,8 +691,10 @@ public final class HumanHelpActivity extends Activity {
                 long remainingMs = Math.max(0L,
                         request.optLong("expiresAtEpochMs", 0L) - System.currentTimeMillis());
                 long remainingSeconds = (remainingMs + 999L) / 1000L;
-                countdownStatus.setText((approvalRequest ? "等待核准" : "AI 等待中")
-                        + " · 剩餘 " + remainingSeconds + " 秒（操作會重置）");
+                long minutes = remainingSeconds / 60L;
+                long seconds = remainingSeconds % 60L;
+                countdownStatus.setText((approvalRequest ? "等待核准" : "等待回覆")
+                        + " · " + String.format(java.util.Locale.US, "%d:%02d", minutes, seconds));
                 countdownStatus.setTextColor(Color.rgb(45, 85, 145));
                 countdownStatus.setVisibility(View.VISIBLE);
             } else if ("timed_out".equals(status)) {
@@ -499,9 +756,12 @@ public final class HumanHelpActivity extends Activity {
         if (replyInput != null) {
             replyInput.setEnabled(waiting);
         }
-        for (int index = 0; actionContainer != null && index < actionContainer.getChildCount(); index++) {
-            actionContainer.getChildAt(index).setEnabled(waiting);
+        setActionButtonsEnabled(phoneActionsContainer, waiting);
+        if (detailsButton != null) {
+            detailsButton.setEnabled(true);
+            detailsButton.setAlpha(1f);
         }
+        refreshActionMode();
     }
 
     private void renewActivity(String activity) {
@@ -519,11 +779,130 @@ public final class HumanHelpActivity extends Activity {
         }
     }
 
-    private TextView label(String value) {
-        TextView view = text(value, 12, Typeface.BOLD);
-        view.setTextColor(Color.GRAY);
-        view.setPadding(0, dp(20), 0, dp(6));
+    private View buildHeader(boolean approvalRequest) {
+        LinearLayout wrapper = new LinearLayout(this);
+        wrapper.setOrientation(LinearLayout.VERTICAL);
+        wrapper.setPadding(0, dp(4), 0, dp(15));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        TextView back = text("‹", 38, Typeface.NORMAL);
+        back.setTextColor(TEXT_PRIMARY);
+        back.setGravity(android.view.Gravity.CENTER);
+        back.setContentDescription("Back");
+        back.setOnClickListener(v -> finish());
+        header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(44)));
+
+        TextView heading = text(approvalRequest ? "APPROVAL" : "H U M A N   H E L P", 17, Typeface.BOLD);
+        heading.setTextColor(TEXT_PRIMARY);
+        heading.setGravity(android.view.Gravity.CENTER);
+        header.addView(heading, new LinearLayout.LayoutParams(0, dp(44), 1f));
+
+        View balance = new View(this);
+        header.addView(balance, new LinearLayout.LayoutParams(dp(42), dp(44)));
+        wrapper.addView(header);
+
+        TextView subtitle = text("AI is paused · waiting for you", 13, Typeface.NORMAL);
+        subtitle.setTextColor(TEXT_SECONDARY);
+        subtitle.setGravity(android.view.Gravity.CENTER);
+        wrapper.addView(subtitle);
+        return wrapper;
+    }
+
+    private LinearLayout glassCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        card.setBackground(glassBackground());
+        return card;
+    }
+
+    private LinearLayout.LayoutParams cardParams(int bottomMarginDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(bottomMarginDp);
+        return params;
+    }
+
+    private TextView cardTitle(String value) {
+        TextView view = text(value, 16, Typeface.NORMAL);
+        view.setTextColor(TEXT_PRIMARY);
         return view;
+    }
+
+    private void styleUtilityButton(Button button) {
+        button.setAllCaps(false);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(TEXT_PRIMARY);
+        button.setBackgroundTintList(ColorStateList.valueOf(Color.rgb(79, 96, 106)));
+    }
+
+    private int actionColor(int index) {
+        if (index == 0) {
+            return Color.rgb(66, 128, 108);
+        }
+        if (index == 1) {
+            return Color.rgb(128, 70, 76);
+        }
+        return Color.rgb(74, 90, 101);
+    }
+
+    private void setActionButtonsEnabled(View view, boolean enabled) {
+        if (view == null) {
+            return;
+        }
+        if (view instanceof Button) {
+            view.setEnabled(enabled);
+            return;
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                setActionButtonsEnabled(group.getChildAt(index), enabled);
+            }
+        }
+    }
+
+    private void startVoiceReply() {
+        renewActivity("voice_reply");
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your reply to the Agent")
+                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(this, "Voice input is not available on this phone", Toast.LENGTH_LONG).show();
+            return;
+        }
+        startActivityForResult(intent, REQUEST_VOICE_REPLY);
+    }
+
+    private GradientDrawable screenBackground() {
+        return new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.rgb(94, 109, 119), Color.rgb(67, 80, 89)});
+    }
+
+    private GradientDrawable glassBackground() {
+        GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.argb(66, 255, 255, 255), Color.argb(28, 255, 255, 255)});
+        background.setCornerRadius(dp(20));
+        background.setStroke(dp(1), Color.argb(150, 220, 235, 244));
+        return background;
+    }
+
+    private GradientDrawable roundedBackground(int fillColor, int strokeColor, int radiusDp) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(fillColor);
+        background.setCornerRadius(dp(radiusDp));
+        if (strokeColor != 0) {
+            background.setStroke(dp(1), strokeColor);
+        }
+        return background;
     }
 
     private TextView text(String value, int sp, int style) {

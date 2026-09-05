@@ -63,6 +63,8 @@ final class BleButtonBridge {
     private static final long SCAN_WINDOW_MS = 12_000L;
     private static final long MAX_VOICE_MS = 45_000L;
 
+    private static volatile boolean connected;
+
     private final McpNodeService service;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -94,10 +96,15 @@ final class BleButtonBridge {
 
     void stop() {
         active = false;
+        connected = false;
         mainHandler.removeCallbacksAndMessages(null);
         stopScan();
         closeGatt();
         cancelVoice();
+    }
+
+    static boolean isConnected() {
+        return connected;
     }
 
     private void scanOrRetry() {
@@ -217,6 +224,7 @@ final class BleButtonBridge {
                     disconnectAndRetry("Button pad notification setup failed");
                     return;
                 }
+                connected = true;
                 recordRecent("Button pad connected");
             } catch (SecurityException error) {
                 disconnectAndRetry("Button pad setup blocked: " + safeMessage(error));
@@ -262,7 +270,7 @@ final class BleButtonBridge {
                 handlePreset(false);
                 break;
             case EVENT_DETAIL:
-                handleDetail();
+                handleDetails();
                 break;
             case EVENT_VOICE_DOWN:
                 handleVoiceDown();
@@ -284,7 +292,9 @@ final class BleButtonBridge {
             }
             cancelVoice();
             String requestId = request.optString("requestId", "");
-            String action = presetAction(request, approve);
+            String action = approve
+                    ? HumanHelpStore.approveAction(request)
+                    : HumanHelpStore.rejectAction(request);
             HumanHelpStore.complete(service, requestId, action, "");
             recordRecent("Button pad: " + (approve ? "approved" : "rejected") + " " + requestId);
         } catch (Exception error) {
@@ -292,31 +302,32 @@ final class BleButtonBridge {
         }
     }
 
-    private void handleDetail() {
+    private void handleDetails() {
         try {
             JSONObject request = HumanHelpStore.latestWaiting(service);
             if (request == null) {
-                recordRecent("Button pad: no pending detail");
+                recordRecent("Button pad: no pending request for details");
                 return;
             }
             String requestId = request.optString("requestId", "");
-            HumanHelpStore.renewHumanActivity(service, requestId, "ble_detail", false);
             Intent intent = new Intent(service, HumanHelpActivity.class)
                     .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId)
+                    .putExtra(HumanHelpActivity.EXTRA_OPEN_DETAILS, true)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             if (AgentAttention.canStartActivityNow(service)) {
                 service.startActivity(intent);
-                recordRecent("Button pad: opened human-help detail");
+                recordRecent("Button pad: opened details for " + requestId);
             } else {
                 // Android 10+ can silently block Activity launches from a
                 // background Service. Repost the request instead: in Hyper Mode
                 // its full-screen trampoline can surface over a locked screen;
                 // otherwise Android presents the normal user-tappable alert.
                 HumanHelpStore.postRequestNotification(service, request, intent);
-                recordRecent("Button pad: surfaced human-help detail notification");
+                recordRecent("Button pad: surfaced details notification for " + requestId);
             }
+            HumanHelpStore.renewHumanActivity(service, requestId, "ble_details", false);
         } catch (Exception error) {
-            recordRecent("Button pad detail failed: " + safeMessage(error));
+            recordRecent("Button pad details failed: " + safeMessage(error));
         }
     }
 
@@ -566,27 +577,6 @@ final class BleButtonBridge {
         });
     }
 
-    private String presetAction(JSONObject request, boolean approve) {
-        JSONArray actions = request.optJSONArray("actions");
-        if (actions == null || actions.length() == 0) {
-            return approve ? "允許" : "拒絕";
-        }
-        String[] approveWords = {"允許", "核准", "同意", "完成", "allow", "approve", "yes", "ok"};
-        String[] rejectWords = {"拒絕", "否決", "做不到", "deny", "reject", "no", "cancel"};
-        String[] words = approve ? approveWords : rejectWords;
-        for (int index = 0; index < actions.length(); index++) {
-            String action = actions.optString(index, "");
-            String normalized = action.toLowerCase(Locale.ROOT);
-            for (String word : words) {
-                if (normalized.contains(word.toLowerCase(Locale.ROOT))) {
-                    return action;
-                }
-            }
-        }
-        int fallback = approve ? 0 : Math.min(1, actions.length() - 1);
-        return actions.optString(fallback, approve ? "允許" : "拒絕");
-    }
-
     private boolean hasBluetoothPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             return service.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
@@ -615,6 +605,7 @@ final class BleButtonBridge {
     }
 
     private void closeGatt() {
+        connected = false;
         BluetoothGatt current = gatt;
         gatt = null;
         if (current == null) {

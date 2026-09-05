@@ -22,8 +22,10 @@ import java.util.Locale;
 final class PickPicoTheme {
     static final String PREFS = "pickpico_appearance";
 
-    static final String DEFAULT_A = "#4b1f66";
-    static final String DEFAULT_B = "#17344d";
+    static final String DEFAULT_A = "#5E6D77";
+    static final String DEFAULT_B = "#435059";
+    private static final String LEGACY_DEFAULT_A = "#4b1f66";
+    private static final String LEGACY_DEFAULT_B = "#17344d";
     static final int DEFAULT_GLASS_OPACITY = 4;
     static final int DEFAULT_HIGHLIGHT = 28;
     static final int DEFAULT_BACKGROUND_INTENSITY = 88;
@@ -55,10 +57,20 @@ final class PickPicoTheme {
 
     static State load(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String colorA = prefs.getString("color_a", DEFAULT_A);
+        String colorB = prefs.getString("color_b", DEFAULT_B);
+        if (LEGACY_DEFAULT_A.equalsIgnoreCase(colorA) && LEGACY_DEFAULT_B.equalsIgnoreCase(colorB)) {
+            colorA = DEFAULT_A;
+            colorB = DEFAULT_B;
+            prefs.edit()
+                    .putString("color_a", DEFAULT_A)
+                    .putString("color_b", DEFAULT_B)
+                    .apply();
+        }
         return new State(
                 prefs.getBoolean("gradient", true),
-                parseHex(prefs.getString("color_a", DEFAULT_A), Color.rgb(75, 31, 102)),
-                parseHex(prefs.getString("color_b", DEFAULT_B), Color.rgb(23, 52, 77)),
+                parseHex(colorA, Color.rgb(94, 109, 119)),
+                parseHex(colorB, Color.rgb(67, 80, 89)),
                 prefs.getInt("glass_opacity", DEFAULT_GLASS_OPACITY),
                 prefs.getInt("highlight", DEFAULT_HIGHLIGHT),
                 prefs.getInt("background_intensity", DEFAULT_BACKGROUND_INTENSITY));
@@ -77,8 +89,8 @@ final class PickPicoTheme {
             int glassOpacity,
             int highlight,
             int backgroundIntensity) {
-        int a = parseHex(colorA, Color.rgb(75, 31, 102));
-        int b = parseHex(colorB, Color.rgb(23, 52, 77));
+        int a = parseHex(colorA, Color.rgb(94, 109, 119));
+        int b = parseHex(colorB, Color.rgb(67, 80, 89));
         State state = new State(gradient, a, b, glassOpacity, highlight, backgroundIntensity);
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit()
@@ -169,38 +181,26 @@ final class PickPicoTheme {
                 return;
             }
 
+            // V14 reference: calm slate from #5E6D77 to #435059. Keep the
+            // material readable instead of burying it under a near-black base.
             float intensity = state.backgroundIntensity / 100f;
-
+            int top = mix(state.colorA, Color.rgb(30, 39, 46), (1f - intensity) * .28f);
+            int bottom = mix(state.colorB, Color.rgb(24, 31, 38), (1f - intensity) * .34f);
             paint.setShader(new LinearGradient(
-                    0f, 0f, w, h,
-                    new int[]{Color.rgb(8, 9, 13), Color.rgb(8, 12, 18), Color.rgb(7, 13, 20)},
-                    new float[]{0f, .54f, 1f},
+                    0f, 0f, 0f, h,
+                    new int[]{top, mix(top, bottom, .46f), bottom},
+                    new float[]{0f, .52f, 1f},
                     Shader.TileMode.CLAMP));
             canvas.drawRect(0f, 0f, w, h, paint);
 
+            // Very soft optical atmosphere only; the UI should stay slate,
+            // not drift back toward purple/black developer-tool styling.
             paint.setShader(new RadialGradient(
-                    -w * .08f,
-                    -h * .10f,
-                    Math.max(w, h) * .68f,
-                    new int[]{withAlpha(state.colorA, .30f + .48f * intensity), withAlpha(state.colorA, .10f + .24f * intensity), Color.TRANSPARENT},
-                    new float[]{0f, .44f, 1f},
-                    Shader.TileMode.CLAMP));
-            canvas.drawRect(0f, 0f, w, h, paint);
-
-            paint.setShader(new RadialGradient(
-                    w * 1.08f,
-                    h * 1.10f,
-                    Math.max(w, h) * .72f,
-                    new int[]{withAlpha(state.colorB, .28f + .46f * intensity), withAlpha(state.colorB, .09f + .22f * intensity), Color.TRANSPARENT},
-                    new float[]{0f, .46f, 1f},
-                    Shader.TileMode.CLAMP));
-            canvas.drawRect(0f, 0f, w, h, paint);
-
-            paint.setShader(new LinearGradient(
-                    0f, h,
-                    w, 0f,
-                    new int[]{withAlpha(state.colorA, .08f + .18f * intensity), Color.TRANSPARENT, withAlpha(state.colorB, .07f + .17f * intensity)},
-                    new float[]{0f, .46f, 1f},
+                    w * .06f,
+                    h * .08f,
+                    Math.max(w, h) * .62f,
+                    new int[]{withAlpha(Color.WHITE, .055f), Color.TRANSPARENT},
+                    new float[]{0f, 1f},
                     Shader.TileMode.CLAMP));
             canvas.drawRect(0f, 0f, w, h, paint);
             paint.setShader(null);
