@@ -59,6 +59,23 @@ final class AgentAttention {
             Notification.Builder builder,
             int requestCode,
             Intent forwardIntent) {
+        return applyUrgentBehavior(context, builder, requestCode, forwardIntent, false);
+    }
+
+    static boolean applyHumanHelpBehavior(
+            Context context,
+            Notification.Builder builder,
+            int requestCode,
+            Intent forwardIntent) {
+        return applyUrgentBehavior(context, builder, requestCode, forwardIntent, true);
+    }
+
+    private static boolean applyUrgentBehavior(
+            Context context,
+            Notification.Builder builder,
+            int requestCode,
+            Intent forwardIntent,
+            boolean allowAlwaysOnAndroid16) {
         builder.setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setPriority(Notification.PRIORITY_HIGH);
         if (!McpocketPolicySettings.isHyperModeEnabled(context)) return false;
@@ -75,9 +92,11 @@ final class AgentAttention {
         int pendingRequestCode = 15000 + Math.abs(requestCode % 10000);
         PendingIntent fullScreen;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ActivityOptions options = ActivityOptions.makeBasic()
-                    .setPendingIntentCreatorBackgroundActivityStartMode(
-                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+            ActivityOptions options = ActivityOptions.makeBasic();
+            options.setPendingIntentCreatorBackgroundActivityStartMode(
+                    Build.VERSION.SDK_INT >= 36 && allowAlwaysOnAndroid16
+                            ? 3 // MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS (API 36)
+                            : ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
             fullScreen = PendingIntent.getActivity(
                     context,
                     pendingRequestCode,

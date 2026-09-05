@@ -678,7 +678,7 @@ final class HumanHelpStore {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(false)
                 .setContentIntent(pending);
-        AgentAttention.applyUrgentBehavior(context, builder, requestId.hashCode(), open);
+        AgentAttention.applyHumanHelpBehavior(context, builder, requestId.hashCode(), open);
         Notification notification = builder.build();
         manager.notify(requestId.hashCode(), notification);
         AgentAttention.alert(context);

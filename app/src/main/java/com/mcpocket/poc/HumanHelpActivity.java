@@ -98,6 +98,17 @@ public final class HumanHelpActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (McpocketPolicySettings.isHyperModeEnabled(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true);
+                setTurnScreenOn(true);
+            } else {
+                getWindow().addFlags(
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            }
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
         theme = PickPicoTheme.load(this);
         applyWindowTheme();
         requestId = getIntent().getStringExtra(HumanHelpStore.EXTRA_REQUEST_ID);
