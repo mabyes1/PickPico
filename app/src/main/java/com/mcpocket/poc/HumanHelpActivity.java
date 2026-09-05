@@ -25,6 +25,7 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -421,6 +422,13 @@ public final class HumanHelpActivity extends Activity {
         button.setText(icon + "\n" + label);
         button.setAllCaps(false);
         button.setTextSize(12);
+        button.setLines(2);
+        button.setEllipsize(TextUtils.TruncateAt.END);
+        button.setAutoSizeTextTypeUniformWithConfiguration(
+                9,
+                12,
+                1,
+                TypedValue.COMPLEX_UNIT_SP);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         button.setTextColor(primaryTextColor());
         button.setGravity(android.view.Gravity.CENTER);
