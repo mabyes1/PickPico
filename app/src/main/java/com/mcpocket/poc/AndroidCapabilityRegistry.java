@@ -1,10 +1,12 @@
 package com.mcpocket.poc;
 
 import android.Manifest;
+import android.app.Service;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 
 import org.json.JSONException;
@@ -34,10 +36,20 @@ final class AndroidCapabilityRegistry {
         }
 
         if ("camera.capture".equals(commandId)) {
-            return permissionState(context, result, Manifest.permission.CAMERA, "runtime_permission");
+            return mediaCapabilityState(
+                    context,
+                    result,
+                    Manifest.permission.CAMERA,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
+                    "camera");
         }
         if ("microphone.record".equals(commandId)) {
-            return permissionState(context, result, Manifest.permission.RECORD_AUDIO, "runtime_permission");
+            return mediaCapabilityState(
+                    context,
+                    result,
+                    Manifest.permission.RECORD_AUDIO,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+                    "microphone");
         }
         if ("location.get".equals(commandId)) {
             boolean granted = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -147,6 +159,68 @@ final class AndroidCapabilityRegistry {
                 hasPermission(context, permission),
                 setupType,
                 permission + " is not granted");
+    }
+
+    static JSONObject mediaCapabilityState(
+            Context context,
+            JSONObject result,
+            String permission,
+            int foregroundType,
+            String capability) throws JSONException {
+        return mediaReadiness(result, hasPermission(context, permission),
+                foregroundTypeActive(context, foregroundType), capability);
+    }
+
+    static JSONObject mediaReadiness(JSONObject result, boolean permissionGranted,
+            boolean foregroundActive, String capability) throws JSONException {
+        if (!permissionGranted) {
+            return setupState(
+                    result,
+                    false,
+                    "runtime_permission",
+                    capability + " permission is not granted; ask the user to grant it in PickPico")
+                    .put("setupAction", "grant_" + capability + "_permission")
+                    .put("message", "Ask the user to grant " + capability + " permission in PickPico");
+        }
+        if (!foregroundActive) {
+            return setupState(
+                    result,
+                    false,
+                    "foreground_service_type",
+                    "PickPico media foreground service is not active for " + capability
+                            + "; ask the user to open PickPico to refresh media access")
+                    .put("setupAction", "open_app_to_refresh_media_access")
+                    .put("message", "Ask the user to open PickPico to refresh " + capability
+                            + " access. Do not stop or restart the node.");
+        }
+        return result
+                .put("available", true)
+                .put("state", "available");
+    }
+
+    private static boolean foregroundTypeActive(Context context, int foregroundType) {
+        if (!AndroidDeviceCapabilities.requiresForegroundTypeOnSdk(Build.VERSION.SDK_INT, foregroundType)) {
+            return true;
+        }
+        if (!(context instanceof Service)) {
+            return false;
+        }
+        return foregroundTypeActiveFromQ((Service) context, foregroundType);
+    }
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.Q)
+    private static boolean foregroundTypeActiveFromQ(Service service, int foregroundType) {
+        return foregroundTypeReady(
+                Build.VERSION.SDK_INT,
+                service.getForegroundServiceType(),
+                foregroundType);
+    }
+
+    static boolean foregroundTypeReady(int sdkInt, int activeTypes, int foregroundType) {
+        if (!AndroidDeviceCapabilities.requiresForegroundTypeOnSdk(sdkInt, foregroundType)) {
+            return true;
+        }
+        return (activeTypes & foregroundType) != 0;
     }
 
     private static JSONObject setupState(

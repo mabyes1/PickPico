@@ -743,21 +743,9 @@ final class AndroidDeviceCapabilities {
 
     private JSONObject requireMediaCapability(String permission, int foregroundType, String capability)
             throws JSONException {
-        if (!hasPermission(permission)) {
-            return new JSONObject()
-                    .put("available", false)
-                    .put("requiresSetup", true)
-                    .put("setupAction", "grant_" + capability + "_permission")
-                    .put("message", "Grant " + capability + " permission in PickPico and restart the node");
-        }
-        if (!foregroundTypeActive(foregroundType)) {
-            return new JSONObject()
-                    .put("available", false)
-                    .put("requiresSetup", true)
-                    .put("setupAction", "restart_node_from_app")
-                    .put("message", "Restart PickPico from its UI so the " + capability + " foreground-service type is active");
-        }
-        return null;
+        JSONObject readiness = AndroidCapabilityRegistry.mediaCapabilityState(
+                service, new JSONObject(), permission, foregroundType, capability);
+        return readiness.optBoolean("available", false) ? null : readiness;
     }
 
     private boolean hasPermission(String permission) {
@@ -778,7 +766,8 @@ final class AndroidDeviceCapabilities {
 
     @android.annotation.TargetApi(Build.VERSION_CODES.Q)
     private boolean foregroundTypeActiveFromQ(int type) {
-        return (service.getForegroundServiceType() & type) != 0;
+        return AndroidCapabilityRegistry.foregroundTypeReady(
+                Build.VERSION.SDK_INT, service.getForegroundServiceType(), type);
     }
 
     static boolean requiresForegroundTypeOnSdk(int sdkInt, int type) {

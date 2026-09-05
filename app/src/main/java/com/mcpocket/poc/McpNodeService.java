@@ -157,7 +157,14 @@ public final class McpNodeService extends Service implements McpToolActions {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                         .putBoolean(KEY_MEDIA_FOREGROUND_REQUESTED, true)
                         .apply();
-                startAsForeground("Listening on " + endpoint);
+                try {
+                    startAsForeground("Listening on " + endpoint);
+                } catch (RuntimeException error) {
+                    // Android can reject while-in-use access during an activity transition.
+                    // Keep the existing node alive; discovery reads the actual service types
+                    // and will continue reporting setup_required until a later refresh succeeds.
+                    android.util.Log.w("PickPico", "Media foreground refresh was declined", error);
+                }
             }
             return START_NOT_STICKY;
         }

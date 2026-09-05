@@ -202,6 +202,7 @@ public final class DashboardActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        refreshMediaForegroundTypesIfRunning();
         handler.post(refreshTask);
     }
 
@@ -2087,6 +2088,19 @@ public final class DashboardActivity extends Activity {
         startForegroundService(intent);
         Toast.makeText(this, "Starting PickPico…", Toast.LENGTH_SHORT).show();
         handler.postDelayed(this::refreshStatus, 400L);
+    }
+
+    private void refreshMediaForegroundTypesIfRunning() {
+        if (!McpNodeService.isNodeRunning()) {
+            return;
+        }
+        Intent intent = new Intent(this, McpNodeService.class)
+                .setAction(McpNodeService.ACTION_REFRESH_MEDIA_FOREGROUND);
+        try {
+            startService(intent);
+        } catch (Throwable ignored) {
+            // Keep the base node alive if Android declines a foreground-type refresh.
+        }
     }
 
     private void stopNode() {

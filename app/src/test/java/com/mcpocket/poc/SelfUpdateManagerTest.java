@@ -61,4 +61,24 @@ public final class SelfUpdateManagerTest {
         assertTrue(AndroidDeviceCapabilities.requiresForegroundTypeOnSdk(
                 30, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE));
     }
+
+    @Test
+    public void capabilityRegistryRequiresTheActualMediaForegroundType() {
+        assertTrue(AndroidCapabilityRegistry.foregroundTypeReady(
+                29,
+                0,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA));
+        assertFalse(AndroidCapabilityRegistry.foregroundTypeReady(
+                30,
+                0,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA));
+        assertTrue(AndroidCapabilityRegistry.foregroundTypeReady(
+                30,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA));
+        assertFalse(AndroidCapabilityRegistry.foregroundTypeReady(
+                30,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA));
+    }
 }
