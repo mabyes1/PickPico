@@ -402,14 +402,6 @@ npx wrangler deploy --config wrangler.local.jsonc
 - 完整展示流程：[docs/demo-runbook.md](docs/demo-runbook.md)
 - 評選影片：**待補上 YouTube 連結**
 
-### Demo 建議情境
-
-1. Agent 動態搜尋 PickPico 能力，不事先知道所有手機工具。
-2. 透過手機取得真實世界資訊或操作 App。
-3. 任務遇到適合人類完成的步驟時，自主呼叫 HUMAN HELP。
-4. 人類在手機上回覆後，Agent 從原本 task 繼續。
-5. 展示手機不只是遙控終端，也能直接執行 Agent 寫入的小型 Node.js 程式。
-
 ## 限制與未來工作
 
 ### 目前限制
@@ -465,10 +457,10 @@ PickPico Logo、產品文案與本專案自製介面素材由團隊製作。若�
 
 | 姓名 | 分工 |
 | --- | --- |
-| Ken Huang (`@mabyes1`) | Product design、Android / MCP / Relay integration、Agent workflow、testing |
-| Kate Li（凱特李）<br>`kateli02022024@gmail.com` | Frontend UI/UX design、PICO 實體手機架設計 |
+| Ken Huang (`Ken`) | Product design、Android / MCP / Relay integration、Agent workflow、testing |
+| Kate Li（`Kate`）<br>`kateli02022024@gmail.com` | Frontend UI/UX design、PICO 實體手機架設計 |
 
-本專案使用 AI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
+本專案使用 OPEN AI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
 
 ## Repository 結構
 
