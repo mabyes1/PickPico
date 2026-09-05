@@ -125,7 +125,9 @@ public final class DashboardActivity extends Activity {
     private TextView homeCapabilitiesState;
     private TextView homeNodeState;
     private TextView homeNodeAction;
+    private TextView homeConnectionToggle;
     private TextView homeCopyAction;
+    private boolean homeConnectionExpanded;
     private LinearLayout homeAttentionBlock;
     private TextView homeAttentionTitle;
     private TextView homeAttentionDetail;
@@ -418,6 +420,7 @@ public final class DashboardActivity extends Activity {
         homeCapabilitiesState = null;
         homeNodeState = null;
         homeNodeAction = null;
+        homeConnectionToggle = null;
         homeCopyAction = null;
         homeAttentionBlock = null;
         homeAttentionTitle = null;
@@ -476,6 +479,16 @@ public final class DashboardActivity extends Activity {
         homeReadyDetail = text("Local connection available · PickPico is ready for agents.", 13, Typeface.NORMAL, MUTED);
         homeReadyDetail.setPadding(0, dp(7), 0, dp(12));
         readyCard.addView(homeReadyDetail);
+
+        homeConnectionToggle = text("CONNECTION ▸", 11, Typeface.BOLD, MUTED);
+        homeConnectionToggle.setGravity(Gravity.CENTER_VERTICAL);
+        homeConnectionToggle.setPadding(dp(4), 0, dp(4), dp(6));
+        homeConnectionToggle.setOnClickListener(v -> {
+            homeConnectionExpanded = !homeConnectionExpanded;
+            refreshStatus();
+        });
+        readyCard.addView(homeConnectionToggle, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(30)));
 
         LinearLayout nodeActions = new LinearLayout(this);
         nodeActions.setOrientation(LinearLayout.HORIZONTAL);
@@ -1704,7 +1717,18 @@ public final class DashboardActivity extends Activity {
                 applyTextColor(homeReadyTitle, GREEN);
                 homeReadyDetail.setText("Available to agents on this network.");
             }
-            homeCopyAction.setVisibility(running ? View.VISIBLE : View.GONE);
+            if (!running) {
+                homeConnectionToggle.setVisibility(View.GONE);
+                homeCopyAction.setVisibility(View.GONE);
+            } else if (relayConnected) {
+                homeConnectionToggle.setVisibility(View.VISIBLE);
+                homeConnectionToggle.setText(homeConnectionExpanded ? "CONNECTION ▾" : "CONNECTION ▸");
+                homeCopyAction.setVisibility(homeConnectionExpanded ? View.VISIBLE : View.GONE);
+            } else {
+                homeConnectionExpanded = false;
+                homeConnectionToggle.setVisibility(View.GONE);
+                homeCopyAction.setVisibility(View.VISIBLE);
+            }
         }
 
         if (homeAttentionBlock != null) {
