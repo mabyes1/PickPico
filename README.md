@@ -188,7 +188,7 @@ PickPico 不把所有手機工具一次暴露給 Agent，而是提供穩定的�
 | 遠端連線 | 手機主動連線、固定能力網址、Wi-Fi／行動網路切換重連 |
 | 更新 | APK 下載、雜湊與簽章驗證、Android 安裝確認 |
 
-目前 Android source 版本：**0.16.1**（`versionCode 38`），支援 Android 8.0 以上的 `arm64-v8a` 裝置。0.16.1 將 reference Worker 品牌遷移為 `pickpico-relay`；裝置首次從 legacy relay 遷移時只旋轉 relay Node ID / relay secret，產生新的 `/v3/nodes/<new-id>/mcp` capability URL，其他 PickPico 設定與 local MCP bearer 不受影響。
+目前 Android source 版本：**0.16.46**（`versionCode 83`），支援 Android 8.0 以上的 `arm64-v8a` 裝置。
 
 ## HUMAN HELP
 
@@ -220,7 +220,7 @@ PickPico 遵守 Android 原生權限與安全機制：
 | 相機、麥克風、位置 | 由使用者授權；未授權時回報所需設定 |
 | 通知存取 | 必須由使用者在 Android 設定中開啟 |
 | Hyper UI | 必須由使用者親自在系統設定中啟用 Accessibility Service |
-| 鎖定手機 | 必須先啟用 Device Admin；不能解鎖手機 |
+| 鎖定／回桌面 | 鎖定需先啟用 Device Admin；`phone.home` 不能繞過 Android PIN、圖形、指紋或其他 secure keyguard 驗證 |
 | Shell | 僅在 PickPico App sandbox 內執行，不具備 root 或 ADB 權限 |
 | HUMAN HELP | 回覆與圖片保存在 App 私有儲存空間 |
 | 本地連線 | 每次啟動產生 Bearer token |
@@ -228,6 +228,8 @@ PickPico 遵守 Android 原生權限與安全機制：
 | App 更新 | 驗證 SHA-256、套件名稱、簽章與版本後交給 Android 安裝 |
 
 遠端能力網址等同憑證，不應公開分享。
+
+`phone.wake` 只負責喚醒顯示，不解鎖手機，也不代表背景保活或永久常亮；`phone.home` 會嘗試把裝置帶到可操作的 Home 狀態，若 Android 要求安全驗證則回報需要使用者操作。
 
 ## 建置
 
@@ -257,10 +259,10 @@ app\build\outputs\apk\debug\app-debug.apk
 2. 啟動 Node，等待 `RELAY STATUS = CONNECTED`。
 3. 複製 Connection JSON；手機之後可在 Wi-Fi 與行動網路間切換。
 
-目前展示 Relay：
+本次 Hackathon 展示使用的 Relay（僅供專案展示，不代表公共服務）：
 
 ```text
-https://pickpico-relay.mcpocket.workers.dev
+https://relay.pickpico.workers.dev
 ```
 
 通訊、安全設計與自架說明位於 [`docs/remote-transport.md`](docs/remote-transport.md)。
@@ -283,7 +285,7 @@ pwsh scripts/hackathon-readiness.ps1 -Device -HumanHelp
 ## 專案結構
 
 ```text
-MCPocket/
+PickPico/
 ├─ app/                         Android PickPico
 ├─ relay/                       Cloudflare Worker + Durable Object
 ├─ docs/

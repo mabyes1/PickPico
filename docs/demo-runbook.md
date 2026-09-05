@@ -122,5 +122,5 @@ payment request
 → continue workflow
 ```
 
-禁止為了 Demo 把私鑰、seed phrase 或 custody 塞進 MCPocket。這個延伸的價值是 human-in-the-loop authorization，不是重新造一個 wallet。
+禁止為了 Demo 把私鑰、seed phrase 或 custody 塞進 PickPico。這個延伸的價值是 human-in-the-loop authorization，不是重新造一個 wallet。
 
