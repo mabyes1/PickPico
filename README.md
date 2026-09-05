@@ -72,6 +72,27 @@ PickPico 內建 Node.js Mobile runtime。Agent 可以在 App 私有工作空間�
 
 例如人在外面、沒有筆電，卻臨時需要一個小型自動化工具時，Agent 可以直接把程式放到手機上執行。手機既是操作入口，也可以是實際工作的裝置。
 
+### 手機開發自迭代：讓手機成為開發節點
+
+PickPico 也可以把手機接回 AI coding agent 的開發迴圈。當 Agent 修改手機 App、行動版網頁或其他需要真機驗證的功能後，不必只停在模擬器、console log，或等待人類逐步描述畫面；它可以透過 PickPico 直接觀察與操作真實手機，再根據結果繼續修正。
+
+```text
+Agent 修改程式
+      ↓
+部署 / 更新到手機
+      ↓
+PickPico 在真機上觀察、點擊、滑動、驗證
+      ↓
+Agent 取得結果並繼續修正
+      ↺
+```
+
+這讓「寫程式 → 真機測試 → 發現問題 → 再修改」形成更完整的 Agent 自迭代迴圈，尤其適合 UI、通知、鎖定畫面、相機、麥克風與其他只有真實手機環境才能完整驗證的行為。
+
+PickPico 並不是要宣稱手機開發從此不需要電腦，而是嘗試把原本高度 **PC-centric** 的開發流程往 **PC-optional** 推進：讓手機不再只是「被開發、被測試的裝置」，而是能直接參與 Agent 工作流程的開發節點。
+
+> **Give your agent a phone, so it can build for phones.**
+
 ### 不需要 Root，也不用開 ADB
 
 PickPico 使用 Android 正式提供的權限與服務，不要求 Root，也不需要開啟 ADB／USB 偵錯。
