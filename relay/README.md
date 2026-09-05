@@ -44,7 +44,7 @@ npx wrangler deploy --config wrangler.local.jsonc
 
 `UPDATE_KV` 存放更新資訊與 APK 分塊，並提供 `/v1/update/latest` 與 `/v1/update/files/...`。未發布資料時，相關更新端點可能回 404，不影響它作為手機指令 Relay 的用途。
 
-維護者發布更新時必須明確提供自己的網址：
+維護者在專案根目錄發布更新時，必須明確提供自己的網址：
 
 ```powershell
 pwsh scripts/publish-update.ps1 -RelayBaseUrl 'https://your-relay.example.com'

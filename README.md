@@ -109,7 +109,7 @@ PickPico 也能搭配手機架與 BLE 實體按鈕，讓手機成為隨手可用
 
 四顆按鈕為：**允許／拒絕／細節／語音輸入**。
 
-**按住說話、放開確認，把需求交給 Agent。**
+有等待中的 HUMAN HELP 任務時，**按住語音鍵錄音、放開送出語音回覆**。
 
 手機架與實體按鈕為選配，不影響 PickPico 的 MCP 核心功能。
 
@@ -188,7 +188,7 @@ PickPico 不把所有手機工具一次暴露給 Agent，而是提供穩定的�
 | 遠端連線 | 手機主動連線、固定能力網址、Wi-Fi／行動網路切換重連 |
 | 更新 | APK 下載、雜湊與簽章驗證、Android 安裝確認 |
 
-目前 Android source 版本：**0.16.46**（`versionCode 83`），支援 Android 8.0 以上的 `arm64-v8a` 裝置。
+目前 Android source 版本：**0.16.47**（`versionCode 84`），支援 Android 8.0 以上的 `arm64-v8a` 裝置。
 
 ## HUMAN HELP
 
@@ -217,13 +217,13 @@ PickPico 遵守 Android 原生權限與安全機制：
 
 | 能力 | 邊界 |
 | --- | --- |
-| 相機、麥克風、位置 | 由使用者授權；未授權時回報所需設定 |
+| 相機、麥克風、位置 | 由使用者授權；相機與麥克風另檢查當下媒體服務，未就緒回報 `setup_required`，請使用者開啟 App 完成授權或刷新 |
 | 通知存取 | 必須由使用者在 Android 設定中開啟 |
 | Hyper UI | 必須由使用者親自在系統設定中啟用 Accessibility Service |
 | 鎖定／回桌面 | 鎖定需先啟用 Device Admin；`phone.home` 不能繞過 Android PIN、圖形、指紋或其他 secure keyguard 驗證 |
 | Shell | 僅在 PickPico App sandbox 內執行，不具備 root 或 ADB 權限 |
 | HUMAN HELP | 回覆與圖片保存在 App 私有儲存空間 |
-| 本地連線 | 每次啟動產生 Bearer token |
+| 本地連線 | 使用 App 顯示的 Bearer token 驗證 |
 | 遠端連線 | 高熵能力網址、Relay secret 與本地 Bearer 分別管理 |
 | App 更新 | 驗證 SHA-256、套件名稱、簽章與版本後交給 Android 安裝 |
 
@@ -251,11 +251,11 @@ app\build\outputs\apk\debug\app-debug.apk
 
 1. 讓手機與 MCP Client 位於相同的可信任網路。
 2. 開啟 PickPico 並按下 **Start node**。
-3. 將 App 顯示的 Connection JSON 加入 MCP Client。
+3. 到 **SETTINGS → Developer / Diagnostics** 取得 Local MCP 網址與 Local bearer，將網址及 `Authorization: Bearer <token>` 加入 MCP Client。
 
 ### 遠端 Relay
 
-1. 在 PickPico 輸入 Relay URL。
+1. 先部署自己的 Relay，再在 PickPico 輸入其 HTTPS 基底網址。
 2. 啟動 Node，等待 `RELAY STATUS = CONNECTED`。
 3. 複製 Connection JSON；手機之後可在 Wi-Fi 與行動網路間切換。
 
@@ -269,15 +269,17 @@ https://relay.pickpico.workers.dev
 
 ## 驗證
 
+請將範例網址換成自己的 Relay；Windows 腳本內的 SDK／JDK 路徑須符合本機環境。`-Device` 是開發驗證選項，一般 MCP 操作不需要 ADB。
+
 ```powershell
 # 建置、單元測試、APK 與 Relay 健康檢查
-pwsh scripts/hackathon-readiness.ps1
+pwsh scripts/hackathon-readiness.ps1 -RelayBaseUrl 'https://your-relay.example.com'
 
 # 連接 Android debug 裝置後驗證真實 MCP Node
-pwsh scripts/hackathon-readiness.ps1 -Device
+pwsh scripts/hackathon-readiness.ps1 -RelayBaseUrl 'https://your-relay.example.com' -Device
 
 # 加上 HUMAN HELP 完整往返
-pwsh scripts/hackathon-readiness.ps1 -Device -HumanHelp
+pwsh scripts/hackathon-readiness.ps1 -RelayBaseUrl 'https://your-relay.example.com' -Device -HumanHelp
 ```
 
 完整展示流程請見 [`docs/demo-runbook.md`](docs/demo-runbook.md)。
@@ -327,7 +329,7 @@ PickPico/
 
 1. 安裝 PickPico APK 並開啟 App。
 2. 在首頁啟動 Node service。
-3. 依任務需求開放相機、位置等 Android 權限。
+3. 依任務需求開放相機、位置等 Android 權限，完成後回到 App 刷新媒體服務。
 4. 需要操作手機 UI、讀取通知或擷取螢幕時，再啟用 **Hyper Mode** 並依畫面完成系統授權。
 5. 選擇 Local 或 Remote 連線方式。
 6. 將 App 顯示的 MCP 連線資訊加入 Agent。
@@ -353,7 +355,7 @@ PickPico/
 
 目前 repository 未內含 Gradle Wrapper；請使用本機 Gradle 8.7 或 Android Studio 對應環境。
 
-Debug build 需要 Android debug keystore：
+以下指令需已有 Android debug keystore；首次建置可省略 `-PpickpicoDebugKeystore`，使用自動建立的預設除錯金鑰。更新既有安裝時，必須沿用相同簽章：
 
 ```powershell
 gradle "-PpickpicoDebugKeystore=$env:USERPROFILE\.android\debug.keystore" `
