@@ -58,8 +58,8 @@ android {
         applicationId 'com.mcpocket.poc'
         minSdk 26
         targetSdk 35
-        versionCode 76
-        versionName '0.16.39'
+        versionCode 80
+        versionName '0.16.43'
 
         ndk {
             abiFilters 'arm64-v8a'

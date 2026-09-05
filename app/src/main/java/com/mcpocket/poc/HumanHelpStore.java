@@ -406,6 +406,7 @@ final class HumanHelpStore {
         return matchingAction(
                 request,
                 new String[]{"允許", "核准", "同意", "完成", "繼續", "allow", "approve", "yes", "ok"},
+                new String[]{"不同意", "不允許", "不核准", "拒絕", "否決", "做不到", "取消", "deny", "reject", "no", "not", "cancel"},
                 0,
                 "確認繼續");
     }
@@ -413,12 +414,18 @@ final class HumanHelpStore {
     static String rejectAction(JSONObject request) {
         return matchingAction(
                 request,
-                new String[]{"拒絕", "否決", "做不到", "deny", "reject", "no", "cancel"},
+                new String[]{"不同意", "不允許", "不核准", "拒絕", "否決", "做不到", "取消", "deny", "reject", "no", "not", "cancel"},
+                null,
                 1,
                 "拒絕");
     }
 
-    private static String matchingAction(JSONObject request, String[] words, int fallbackIndex, String fallbackValue) {
+    private static String matchingAction(
+            JSONObject request,
+            String[] words,
+            String[] excludedWords,
+            int fallbackIndex,
+            String fallbackValue) {
         JSONArray actions = request == null ? null : request.optJSONArray("actions");
         if (actions == null || actions.length() == 0) {
             return fallbackValue;
@@ -426,13 +433,31 @@ final class HumanHelpStore {
         for (int index = 0; index < actions.length(); index++) {
             String action = sanitizedAction(actions.optString(index, ""));
             String normalized = action.toLowerCase(Locale.ROOT);
-            for (String word : words) {
-                if (normalized.contains(word.toLowerCase(Locale.ROOT))) {
-                    return action;
-                }
+            if (excludedWords != null && matchesAnyActionWord(normalized, excludedWords)) {
+                continue;
+            }
+            if (matchesAnyActionWord(normalized, words)) {
+                return action;
             }
         }
         return sanitizedAction(actions.optString(Math.min(fallbackIndex, actions.length() - 1), fallbackValue));
+    }
+
+    private static boolean matchesAnyActionWord(String normalizedAction, String[] words) {
+        for (String word : words) {
+            String normalizedWord = word.toLowerCase(Locale.ROOT);
+            if (normalizedWord.matches("[a-z0-9]+")) {
+                String[] tokens = normalizedAction.split("[^a-z0-9]+");
+                for (String token : tokens) {
+                    if (token.equals(normalizedWord)) {
+                        return true;
+                    }
+                }
+            } else if (normalizedAction.contains(normalizedWord)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String sanitizedAction(String action) {

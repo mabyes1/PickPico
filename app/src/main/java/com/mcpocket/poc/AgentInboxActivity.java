@@ -215,7 +215,7 @@ public final class AgentInboxActivity extends Activity {
         meta.setPadding(0, dp(4), 0, 0);
         titles.addView(meta);
 
-        topStatusDot = text("● ACTIVE", 10, Typeface.BOLD, GREEN);
+        topStatusDot = text("● READY", 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
         topStatusDot.setLetterSpacing(.035f);
         topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
@@ -232,7 +232,7 @@ public final class AgentInboxActivity extends Activity {
         boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
         boolean relayConnected = "connected".equals(relayStatus);
         int color = !running ? RED : relayConfigured && !relayConnected ? Color.rgb(246, 169, 69) : GREEN;
-        topStatusDot.setText(running ? "● ACTIVE" : "● STOPPED");
+        topStatusDot.setText(running ? "● READY" : "● OFF");
         topStatusDot.setTextColor(resolveThemeTextColor(color));
         topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), color, false));
         topStatusDot.setContentDescription(!running

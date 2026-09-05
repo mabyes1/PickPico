@@ -33,6 +33,8 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.transition.AutoTransition;
+import android.transition.TransitionManager;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -104,6 +106,7 @@ public final class DashboardActivity extends Activity {
     private TextView topTitle;
     private TextView topMeta;
     private TextView topStatusDot;
+    private TextView topNodeAction;
     private LinearLayout bottomNav;
     private TextView navHome;
     private TextView navCapabilities;
@@ -118,15 +121,14 @@ public final class DashboardActivity extends Activity {
     // Home
     private TextView homeReadyTitle;
     private TextView homeReadyDetail;
-    private TextView homeRemoteState;
-    private TextView homeRemoteDetail;
     private TextView homeApprovalState;
     private TextView homeInboxState;
     private TextView homeCapabilitiesState;
     private TextView homeNodeState;
-    private TextView homeNodeAction;
     private TextView homeConnectionToggle;
     private TextView homeCopyAction;
+    private LinearLayout homeReadyCard;
+    private LinearLayout homeConnectionPanel;
     private boolean homeConnectionExpanded;
     private LinearLayout homeAttentionBlock;
     private TextView homeAttentionTitle;
@@ -305,11 +307,17 @@ public final class DashboardActivity extends Activity {
         topMeta.setPadding(0, dp(4), 0, 0);
         titles.addView(topMeta);
 
-        topStatusDot = text("● ACTIVE", 10, Typeface.BOLD, GREEN);
+        topStatusDot = text("● READY", 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
         topStatusDot.setLetterSpacing(.035f);
         topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
         bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(84), dp(34)));
+
+        topNodeAction = actionButton("STOP", true, true);
+        topNodeAction.setOnClickListener(v -> toggleNodeFromHome());
+        LinearLayout.LayoutParams topNodeParams = new LinearLayout.LayoutParams(dp(58), dp(34));
+        topNodeParams.leftMargin = dp(8);
+        bar.addView(topNodeAction, topNodeParams);
         return bar;
     }
 
@@ -393,6 +401,7 @@ public final class DashboardActivity extends Activity {
         topMeta.setText(meta);
         topMeta.setVisibility(TextUtils.isEmpty(meta) ? View.GONE : View.VISIBLE);
         topBack.setVisibility(back ? View.VISIBLE : View.GONE);
+        topNodeAction.setVisibility(currentPage == PAGE_HOME && !back ? View.VISIBLE : View.GONE);
     }
 
     private void updateBottomNav() {
@@ -413,15 +422,14 @@ public final class DashboardActivity extends Activity {
     private void clearPageReferences() {
         homeReadyTitle = null;
         homeReadyDetail = null;
-        homeRemoteState = null;
-        homeRemoteDetail = null;
         homeApprovalState = null;
         homeInboxState = null;
         homeCapabilitiesState = null;
         homeNodeState = null;
-        homeNodeAction = null;
         homeConnectionToggle = null;
         homeCopyAction = null;
+        homeReadyCard = null;
+        homeConnectionPanel = null;
         homeAttentionBlock = null;
         homeAttentionTitle = null;
         homeAttentionDetail = null;
@@ -466,6 +474,7 @@ public final class DashboardActivity extends Activity {
         root.addView(nodeHeading);
 
         LinearLayout readyCard = glassCard(true);
+        homeReadyCard = readyCard;
         LinearLayout readyHeading = new LinearLayout(this);
         readyHeading.setOrientation(LinearLayout.HORIZONTAL);
         readyHeading.setGravity(Gravity.CENTER_VERTICAL);
@@ -480,29 +489,28 @@ public final class DashboardActivity extends Activity {
         homeReadyDetail.setPadding(0, dp(7), 0, dp(12));
         readyCard.addView(homeReadyDetail);
 
-        homeConnectionToggle = text("CONNECTION ▸", 11, Typeface.BOLD, MUTED);
+        homeConnectionToggle = text("COPY CONNECTION ▾", 11, Typeface.BOLD, MUTED);
         homeConnectionToggle.setGravity(Gravity.CENTER_VERTICAL);
         homeConnectionToggle.setPadding(dp(4), 0, dp(4), dp(6));
+        homeConnectionToggle.setVisibility(View.GONE);
         homeConnectionToggle.setOnClickListener(v -> {
             homeConnectionExpanded = !homeConnectionExpanded;
-            refreshStatus();
+            updateHomeConnectionPanel(true);
         });
         readyCard.addView(homeConnectionToggle, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(30)));
 
-        LinearLayout nodeActions = new LinearLayout(this);
-        nodeActions.setOrientation(LinearLayout.HORIZONTAL);
-        readyCard.addView(nodeActions);
+        homeConnectionPanel = new LinearLayout(this);
+        homeConnectionPanel.setOrientation(LinearLayout.VERTICAL);
+        homeConnectionPanel.setVisibility(View.GONE);
+        readyCard.addView(homeConnectionPanel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         homeCopyAction = actionButton("COPY", false, false);
         homeCopyAction.setOnClickListener(v -> copyConnection());
-        nodeActions.addView(homeCopyAction, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        homeConnectionPanel.addView(homeCopyAction, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
 
-        homeNodeAction = actionButton("STOP", true, true);
-        homeNodeAction.setOnClickListener(v -> toggleNodeFromHome());
-        LinearLayout.LayoutParams nodeActionParams = new LinearLayout.LayoutParams(dp(92), dp(42));
-        nodeActionParams.leftMargin = dp(8);
-        nodeActions.addView(homeNodeAction, nodeActionParams);
         root.addView(readyCard, cardParams(0));
 
         homeAttentionBlock = new LinearLayout(this);
@@ -526,15 +534,6 @@ public final class DashboardActivity extends Activity {
         TextView setupHeading = sectionLabel("YOUR SETUP");
         setupHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(setupHeading);
-
-        LinearLayout remote = homeRowCard(
-                "⌁",
-                "CONNECTION",
-                "Local access is ready. Remote access is optional.",
-                () -> showPage(PAGE_REMOTE));
-        homeRemoteState = rowState(remote, "NOT CONFIGURED", AMBER);
-        homeRemoteDetail = findDetail(remote);
-        root.addView(remote, cardParams(12));
 
         LinearLayout approval = homeRowCard(
                 "✓",
@@ -1544,6 +1543,28 @@ public final class DashboardActivity extends Activity {
         return root;
     }
 
+    private void updateHomeConnectionPanel(boolean animate) {
+        if (homeConnectionToggle != null) {
+            homeConnectionToggle.setText(homeConnectionExpanded ? "COPY CONNECTION ▴" : "COPY CONNECTION ▾");
+            homeConnectionToggle.setContentDescription(homeConnectionExpanded
+                    ? "Collapse connection actions"
+                    : "Expand connection actions");
+        }
+        if (homeConnectionPanel == null) {
+            return;
+        }
+        int visibility = homeConnectionExpanded ? View.VISIBLE : View.GONE;
+        if (homeConnectionPanel.getVisibility() == visibility) {
+            return;
+        }
+        if (animate && homeReadyCard != null && homeReadyCard.isLaidOut()) {
+            AutoTransition transition = new AutoTransition();
+            transition.setDuration(180L);
+            TransitionManager.beginDelayedTransition(homeReadyCard, transition);
+        }
+        homeConnectionPanel.setVisibility(visibility);
+    }
+
     private ScrollView pageScroll(LinearLayout root) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -1697,7 +1718,7 @@ public final class DashboardActivity extends Activity {
             String dotState = !running
                     ? "Node stopped"
                     : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready";
-            topStatusDot.setText(running ? "● ACTIVE" : "● STOPPED");
+            topStatusDot.setText(running ? "● READY" : "● OFF");
             applyTextColor(topStatusDot, dotColor);
             topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), dotColor, false));
             topStatusDot.setContentDescription(dotState);
@@ -1707,27 +1728,27 @@ public final class DashboardActivity extends Activity {
             if (!running) {
                 homeReadyTitle.setText("OFFLINE");
                 applyTextColor(homeReadyTitle, RED);
-                homeReadyDetail.setText("PickPico is not available to agents.");
+                homeReadyDetail.setText("Node is stopped.");
             } else if (relayConnected) {
-                homeReadyTitle.setText("READY · LOCAL + RELAY");
+                homeReadyTitle.setText("READY");
                 applyTextColor(homeReadyTitle, GREEN);
-                homeReadyDetail.setText("Available on this network and remotely.");
+                homeReadyDetail.setText("LOCAL + RELAY");
             } else {
-                homeReadyTitle.setText("READY · LOCAL");
+                homeReadyTitle.setText("READY");
                 applyTextColor(homeReadyTitle, GREEN);
-                homeReadyDetail.setText("Available to agents on this network.");
+                homeReadyDetail.setText("LOCAL ONLY");
             }
             if (!running) {
                 homeConnectionToggle.setVisibility(View.GONE);
-                homeCopyAction.setVisibility(View.GONE);
+                homeConnectionExpanded = false;
+                updateHomeConnectionPanel(true);
             } else if (relayConnected) {
                 homeConnectionToggle.setVisibility(View.VISIBLE);
-                homeConnectionToggle.setText(homeConnectionExpanded ? "CONNECTION ▾" : "CONNECTION ▸");
-                homeCopyAction.setVisibility(homeConnectionExpanded ? View.VISIBLE : View.GONE);
+                updateHomeConnectionPanel(true);
             } else {
                 homeConnectionExpanded = false;
                 homeConnectionToggle.setVisibility(View.GONE);
-                homeCopyAction.setVisibility(View.VISIBLE);
+                homeConnectionPanel.setVisibility(View.VISIBLE);
             }
         }
 
@@ -1750,19 +1771,6 @@ public final class DashboardActivity extends Activity {
                 }
             } catch (Exception ignored) {
                 homeAttentionBlock.setVisibility(View.GONE);
-            }
-        }
-
-        if (homeRemoteState != null) {
-            if (!relayConfigured) {
-                setState(homeRemoteState, "LOCAL READY", GREEN);
-                if (homeRemoteDetail != null) homeRemoteDetail.setText("Remote access is not configured (optional).");
-            } else if (relayConnected) {
-                setState(homeRemoteState, "LOCAL + RELAY", GREEN);
-                if (homeRemoteDetail != null) homeRemoteDetail.setText("Cloud agents can reach this phone from outside your LAN.");
-            } else {
-                setState(homeRemoteState, "LOCAL · RELAY " + relayStatus.toUpperCase(), AMBER);
-                if (homeRemoteDetail != null) homeRemoteDetail.setText("Relay is configured but not currently connected.");
             }
         }
 
@@ -1799,13 +1807,13 @@ public final class DashboardActivity extends Activity {
             setState(homeCapabilitiesState, value, needSetup > 0 ? AMBER : GREEN);
         }
 
-        if (homeNodeAction != null) {
+        if (topNodeAction != null) {
             if (homeNodeState != null) {
                 setState(homeNodeState, running ? "RUNNING" : "STOPPED", running ? GREEN : RED);
             }
-            homeNodeAction.setText(running ? "STOP" : "START");
-            applyTextColor(homeNodeAction, running ? RED : GREEN);
-            homeNodeAction.setBackground(pillDrawable(
+            topNodeAction.setText(running ? "STOP" : "START");
+            applyTextColor(topNodeAction, running ? RED : GREEN);
+            topNodeAction.setBackground(pillDrawable(
                     running ? Color.argb(30, 255, 91, 99) : Color.argb(22, 61, 214, 129),
                     running ? Color.argb(95, 255, 91, 99) : Color.argb(95, 61, 214, 129)));
         }
@@ -2269,9 +2277,28 @@ public final class DashboardActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_NODE_MEDIA && !McpNodeService.isNodeRunning()) {
-            startNodeService();
+            if (hasNodeStartupPermissions()) {
+                startNodeService();
+            } else {
+                Toast.makeText(this,
+                        "PickPico was not started because required permissions were not granted.",
+                        Toast.LENGTH_LONG).show();
+            }
         }
         handler.postDelayed(this::refreshStatus, 250L);
+    }
+
+    private boolean hasNodeStartupPermissions() {
+        if (!hasPermission(Manifest.permission.CAMERA)
+                || !hasPermission(Manifest.permission.RECORD_AUDIO)
+                || !hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return hasPermission(Manifest.permission.BLUETOOTH_SCAN)
+                    && hasPermission(Manifest.permission.BLUETOOTH_CONNECT);
+        }
+        return true;
     }
 
     private void openAppPermissionSettings(String message) {

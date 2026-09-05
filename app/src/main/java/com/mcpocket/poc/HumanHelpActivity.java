@@ -6,8 +6,10 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.ImageDecoder;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,6 +26,8 @@ import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -368,9 +372,9 @@ public final class HumanHelpActivity extends Activity {
         String rejectAction = HumanHelpStore.rejectAction(request);
 
         phoneActionsContainer = actionRow();
-        addCompactActionButton(phoneActionsContainer, "✓", "Approve", 0,
+        addCompactActionButton(phoneActionsContainer, "✓", approveAction, 0,
                 () -> submit(approveAction));
-        addCompactActionButton(phoneActionsContainer, "×", "Reject", 1,
+        addCompactActionButton(phoneActionsContainer, "×", rejectAction, 1,
                 () -> submit(rejectAction));
         addCompactActionButton(phoneActionsContainer, "🎙", "Voice", 2,
                 this::startVoiceReply);
@@ -381,11 +385,14 @@ public final class HumanHelpActivity extends Activity {
         dockActionsContainer = new LinearLayout(this);
         dockActionsContainer.setOrientation(LinearLayout.VERTICAL);
         dockActionsContainer.setPadding(dp(10), dp(7), dp(10), dp(7));
-        TextView dockTitle = text("●  DUCK CONNECTED", 12, Typeface.BOLD);
+        TextView dockTitle = text("●  PICO DOCK CONNECTED", 12, Typeface.BOLD);
         dockTitle.setTextColor(PickPicoTheme.GREEN);
         dockTitle.setGravity(android.view.Gravity.CENTER);
         dockActionsContainer.addView(dockTitle);
-        TextView dockMapping = text("Approve   ·   Reject   ·   Voice   ·   Details", 12, Typeface.NORMAL);
+        TextView dockMapping = text(
+                approveAction + "   ·   " + rejectAction + "   ·   Voice   ·   Details",
+                12,
+                Typeface.NORMAL);
         dockMapping.setTextColor(secondaryTextColor());
         dockMapping.setGravity(android.view.Gravity.CENTER);
         dockMapping.setPadding(0, dp(5), 0, dp(7));
@@ -608,7 +615,7 @@ public final class HumanHelpActivity extends Activity {
             if (resultCode == RESULT_OK && data != null) {
                 ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                 if (results != null && !results.isEmpty() && !TextUtils.isEmpty(results.get(0))) {
-                    submit("語音回覆", results.get(0).trim());
+                    showVoiceReplyConfirmation(results.get(0).trim());
                 }
             }
             return;
@@ -902,6 +909,99 @@ public final class HumanHelpActivity extends Activity {
             return;
         }
         startActivityForResult(intent, REQUEST_VOICE_REPLY);
+    }
+
+    private void showVoiceReplyConfirmation(String transcript) {
+        String safeTranscript = transcript == null ? "" : transcript.trim();
+        if (safeTranscript.isEmpty()) {
+            Toast.makeText(this, "沒有辨識到文字，請重新錄音", Toast.LENGTH_LONG).show();
+            startVoiceReply();
+            return;
+        }
+        renewActivity("voice_review");
+
+        LinearLayout panel = glassCard();
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(20), dp(22), dp(16));
+        panel.setBackground(PickPicoTheme.strongGlass(theme, dp(24)));
+
+        TextView kicker = text("VOICE REPLY", 10, Typeface.BOLD);
+        kicker.setTextColor(PickPicoTheme.accentB(theme));
+        kicker.setLetterSpacing(.12f);
+        panel.addView(kicker);
+
+        TextView title = text("辨識結果正確嗎？", 21, Typeface.BOLD);
+        title.setTextColor(primaryTextColor());
+        title.setPadding(0, dp(8), 0, dp(12));
+        panel.addView(title);
+
+        TextView transcriptView = text("「" + safeTranscript + "」", 17, Typeface.NORMAL);
+        transcriptView.setTextColor(primaryTextColor());
+        transcriptView.setPadding(dp(14), dp(13), dp(14), dp(13));
+        transcriptView.setBackground(PickPicoTheme.control(
+                theme, dp(14), PickPicoTheme.accentB(theme), false));
+        panel.addView(transcriptView, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView hint = text("確認後才會傳給 Agent。", 12, Typeface.NORMAL);
+        hint.setTextColor(secondaryTextColor());
+        hint.setPadding(0, dp(10), 0, dp(14));
+        panel.addView(hint);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button retry = voiceReviewButton("不正確，重錄", PickPicoTheme.BLUE);
+        actions.addView(retry, new LinearLayout.LayoutParams(0, dp(50), 1f));
+
+        Button send = voiceReviewButton("正確，傳送", PickPicoTheme.GREEN);
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(0, dp(50), 1f);
+        sendParams.setMarginStart(dp(9));
+        actions.addView(send, sendParams);
+        panel.addView(actions);
+
+        TextView cancel = text("取消", 13, Typeface.BOLD);
+        cancel.setTextColor(secondaryTextColor());
+        cancel.setGravity(android.view.Gravity.CENTER);
+        cancel.setPadding(0, dp(13), 0, 0);
+        panel.addView(cancel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46)));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(panel)
+                .create();
+        retry.setOnClickListener(v -> {
+            dialog.dismiss();
+            startVoiceReply();
+        });
+        send.setOnClickListener(v -> {
+            dialog.dismiss();
+            submit("語音回覆", safeTranscript);
+        });
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        dialog.setOnShowListener(ignored -> {
+            Window window = dialog.getWindow();
+            if (window == null) return;
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.width = getResources().getDisplayMetrics().widthPixels - dp(36);
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            window.setAttributes(params);
+        });
+        dialog.show();
+    }
+
+    private Button voiceReviewButton(String label, int accent) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(primaryTextColor());
+        button.setPadding(dp(8), dp(4), dp(8), dp(4));
+        button.setBackground(PickPicoTheme.control(theme, dp(14), accent, true));
+        return button;
     }
 
     private int primaryTextColor() {

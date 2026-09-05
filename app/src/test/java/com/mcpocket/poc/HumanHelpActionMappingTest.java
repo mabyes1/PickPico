@@ -36,4 +36,22 @@ public final class HumanHelpActionMappingTest {
         assertEquals("Approve", HumanHelpStore.approveAction(request));
         assertEquals("Reject", HumanHelpStore.rejectAction(request));
     }
+
+    @Test
+    public void rejectDoesNotMatchNoInsideAnotherWord() throws Exception {
+        JSONObject request = new JSONObject()
+                .put("actions", new JSONArray().put("Continue now").put("Reject"));
+
+        assertEquals("Continue now", HumanHelpStore.approveAction(request));
+        assertEquals("Reject", HumanHelpStore.rejectAction(request));
+    }
+
+    @Test
+    public void negatedChineseApprovalIsRejected() throws Exception {
+        JSONObject request = new JSONObject()
+                .put("actions", new JSONArray().put("不同意").put("同意"));
+
+        assertEquals("同意", HumanHelpStore.approveAction(request));
+        assertEquals("不同意", HumanHelpStore.rejectAction(request));
+    }
 }
