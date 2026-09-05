@@ -290,7 +290,6 @@ pwsh scripts/hackathon-readiness.ps1 -RelayBaseUrl 'https://your-relay.example.c
 pwsh scripts/hackathon-readiness.ps1 -RelayBaseUrl 'https://your-relay.example.com' -Device -HumanHelp
 ```
 
-完整展示流程請見 [`docs/demo-runbook.md`](docs/demo-runbook.md)。
 
 ## 專案結構
 
@@ -407,8 +406,7 @@ npx wrangler deploy --config wrangler.local.jsonc
 ## 作品展示
 
 - Repository：<https://github.com/mabyes1/PickPico>
-- 完整展示流程：[docs/demo-runbook.md](docs/demo-runbook.md)
-- 評選影片：**待補上 YouTube 連結**
+- 評選影片：https://youtu.be/Y9fLNbH9LDE
 
 ## 限制與未來工作
 
@@ -466,7 +464,7 @@ PickPico Logo、產品文案與本專案自製介面素材由團隊製作。若�
 | 姓名 | 分工 |
 | --- | --- |
 | Ken Huang (`Ken`) | Product design、Android / MCP / Relay integration、Agent workflow、testing |
-| Kate Li（`Kate`）<br>`kateli02022024@gmail.com` | Frontend UI/UX design、PICO 實體手機架設計 |
+| Kate Li（`Kate`） | Frontend UI/UX design、PICO 實體手機架設計 |
 
 本專案使用 OPEN AI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
 
