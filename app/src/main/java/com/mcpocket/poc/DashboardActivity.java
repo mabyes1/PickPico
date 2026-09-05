@@ -126,6 +126,10 @@ public final class DashboardActivity extends Activity {
     private TextView homeNodeState;
     private TextView homeNodeAction;
     private TextView homeCopyAction;
+    private LinearLayout homeAttentionBlock;
+    private TextView homeAttentionTitle;
+    private TextView homeAttentionDetail;
+    private TextView homeAttentionState;
 
     // Capabilities
     private Switch cameraSwitch;
@@ -414,6 +418,10 @@ public final class DashboardActivity extends Activity {
         homeNodeState = null;
         homeNodeAction = null;
         homeCopyAction = null;
+        homeAttentionBlock = null;
+        homeAttentionTitle = null;
+        homeAttentionDetail = null;
+        homeAttentionState = null;
 
         cameraSwitch = null;
         microphoneSwitch = null;
@@ -482,6 +490,24 @@ public final class DashboardActivity extends Activity {
         nodeActions.addView(homeNodeAction, nodeActionParams);
         root.addView(readyCard, cardParams(0));
 
+        homeAttentionBlock = new LinearLayout(this);
+        homeAttentionBlock.setOrientation(LinearLayout.VERTICAL);
+        homeAttentionBlock.setVisibility(View.GONE);
+        TextView attentionHeading = sectionLabel("NEEDS ATTENTION");
+        attentionHeading.setPadding(0, dp(20), 0, dp(7));
+        homeAttentionBlock.addView(attentionHeading);
+        LinearLayout attention = homeRowCard(
+                "!",
+                "HUMAN HELP",
+                "An Agent is waiting for your response.",
+                this::openLatestHumanHelp);
+        attention.setBackground(PickPicoTheme.card(theme, dp(22), true));
+        homeAttentionTitle = findTitle(attention);
+        homeAttentionDetail = findDetail(attention);
+        homeAttentionState = rowState(attention, "NEEDS RESPONSE", AMBER);
+        homeAttentionBlock.addView(attention, cardParams(0));
+        root.addView(homeAttentionBlock);
+
         TextView setupHeading = sectionLabel("YOUR SETUP");
         setupHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(setupHeading);
@@ -548,6 +574,19 @@ public final class DashboardActivity extends Activity {
         }
     }
 
+    private void openLatestHumanHelp() {
+        try {
+            JSONObject pending = HumanHelpStore.latestWaiting(this);
+            if (pending == null) return;
+            String pendingId = pending.optString("requestId", "");
+            if (TextUtils.isEmpty(pendingId)) return;
+            startActivity(new Intent(this, HumanHelpActivity.class)
+                    .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, pendingId));
+        } catch (Exception error) {
+            Toast.makeText(this, "Unable to open Human Help", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private LinearLayout homeRowCard(String icon, String title, String detail, Runnable action) {
         LinearLayout card = glassCard(false);
         card.setOnClickListener(v -> action.run());
@@ -570,6 +609,7 @@ public final class DashboardActivity extends Activity {
         heading.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView titleView = text(title, 14, Typeface.BOLD, TEXT);
+        titleView.setTag("title");
         titleView.setLetterSpacing(0.04f);
         copy.addView(titleView);
 
@@ -600,6 +640,18 @@ public final class DashboardActivity extends Activity {
         for (int i = 0; i < copy.getChildCount(); i++) {
             View child = copy.getChildAt(i);
             if (child instanceof TextView && "detail".equals(child.getTag())) {
+                return (TextView) child;
+            }
+        }
+        return null;
+    }
+
+    private TextView findTitle(LinearLayout card) {
+        LinearLayout heading = (LinearLayout) card.getChildAt(0);
+        LinearLayout copy = findCopyColumn(heading);
+        for (int i = 0; i < copy.getChildCount(); i++) {
+            View child = copy.getChildAt(i);
+            if (child instanceof TextView && "title".equals(child.getTag())) {
                 return (TextView) child;
             }
         }
@@ -735,10 +787,6 @@ public final class DashboardActivity extends Activity {
             if (updatingUi) return;
             toggleScreenCapture();
         });
-        screenCaptureDetail = text("NOT ACTIVE", 10, Typeface.BOLD, AMBER);
-        screenCaptureDetail.setLetterSpacing(0.035f);
-        screenCaptureDetail.setPadding(0, dp(8), 0, 0);
-        advancedCard.addView(screenCaptureDetail);
 
         root.addView(advancedCard, cardParams(7));
         addBottomSpace(root);
@@ -767,16 +815,30 @@ public final class DashboardActivity extends Activity {
 
         TextView titleView = text(title, 14, Typeface.BOLD, TEXT);
         copy.addView(titleView);
+        TextView stateView = text("CHECKING", 10, Typeface.BOLD, DIM);
+        stateView.setLetterSpacing(.055f);
+        stateView.setPadding(0, dp(4), 0, 0);
+        copy.addView(stateView);
         TextView detailView = text(detail, 12, Typeface.NORMAL, MUTED);
         detailView.setPadding(0, dp(4), dp(12), 0);
         copy.addView(detailView);
 
         Switch toggle = new Switch(this);
         toggle.setShowText(false);
+        toggle.setTag(stateView);
         tintSwitch(toggle);
         toggle.setOnCheckedChangeListener((buttonView, isChecked) -> listener.onChanged(isChecked));
         row.addView(toggle, new LinearLayout.LayoutParams(dp(58), dp(48)));
         return toggle;
+    }
+
+    private void setCapabilityState(Switch toggle, String state, int color) {
+        if (toggle == null) return;
+        Object tag = toggle.getTag();
+        if (!(tag instanceof TextView)) return;
+        TextView stateView = (TextView) tag;
+        stateView.setText(state);
+        applyTextColor(stateView, color);
     }
 
     private String capabilityGlyph(String title) {
@@ -1616,6 +1678,28 @@ public final class DashboardActivity extends Activity {
             homeCopyAction.setVisibility(running ? View.VISIBLE : View.GONE);
         }
 
+        if (homeAttentionBlock != null) {
+            try {
+                JSONObject pending = HumanHelpStore.latestWaiting(this);
+                boolean hasPending = pending != null;
+                homeAttentionBlock.setVisibility(hasPending ? View.VISIBLE : View.GONE);
+                if (hasPending) {
+                    boolean approvalRequest = "approval".equals(pending.optString("requestType", "help"));
+                    if (homeAttentionTitle != null) {
+                        homeAttentionTitle.setText(approvalRequest ? "APPROVAL NEEDED" : "HUMAN HELP");
+                    }
+                    if (homeAttentionDetail != null) {
+                        homeAttentionDetail.setText(pending.optString("title", "An Agent is waiting for your response."));
+                    }
+                    if (homeAttentionState != null) {
+                        setState(homeAttentionState, "NEEDS RESPONSE", AMBER);
+                    }
+                }
+            } catch (Exception ignored) {
+                homeAttentionBlock.setVisibility(View.GONE);
+            }
+        }
+
         if (homeRemoteState != null) {
             if (!relayConfigured) {
                 setState(homeRemoteState, "LOCAL READY", GREEN);
@@ -1688,6 +1772,26 @@ public final class DashboardActivity extends Activity {
         } finally {
             updatingUi = false;
         }
+        setCapabilityState(cameraSwitch, cameraSwitch != null && cameraSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                cameraSwitch != null && cameraSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(microphoneSwitch, microphoneSwitch != null && microphoneSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                microphoneSwitch != null && microphoneSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(locationSwitch, locationSwitch != null && locationSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                locationSwitch != null && locationSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(contactsSwitch, contactsSwitch != null && contactsSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                contactsSwitch != null && contactsSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(calendarSwitch, calendarSwitch != null && calendarSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                calendarSwitch != null && calendarSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(notificationSwitch, notificationSwitch != null && notificationSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                notificationSwitch != null && notificationSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(lockPhoneSwitch, lockPhoneSwitch != null && lockPhoneSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                lockPhoneSwitch != null && lockPhoneSwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(hyperModeSwitch, hyperModeSwitch != null && hyperModeSwitch.isChecked() ? "READY" : "OFF",
+                hyperModeSwitch != null && hyperModeSwitch.isChecked() ? GREEN : DIM);
+        setCapabilityState(accessibilitySwitch, accessibilitySwitch != null && accessibilitySwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+                accessibilitySwitch != null && accessibilitySwitch.isChecked() ? GREEN : AMBER);
+        setCapabilityState(screenCaptureSwitch, screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? "READY" : "OFF",
+                screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? GREEN : DIM);
         if (screenCaptureDetail != null) {
             setState(screenCaptureDetail,
                     ScreenCaptureService.isActive() ? "ACTIVE SESSION" : "NOT ACTIVE",

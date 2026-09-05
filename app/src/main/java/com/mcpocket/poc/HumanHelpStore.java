@@ -54,8 +54,7 @@ final class HumanHelpStore {
                 .put("status", "waiting_human")
                 .put("title", "Physical Inspection Required")
                 .put("instruction", "Codex needs a live camera view to identify the device in front of you and continue.")
-                .put("actions", new JSONArray().put("Approve").put("Reject").put("Voice").put("Ask Human"))
-                .put("customAction", "Ask Human")
+                .put("actions", new JSONArray().put("Approve").put("Reject").put("Voice"))
                 .put("allowTextReply", true)
                 .put("allowImages", true)
                 .put("maxImages", 3)
@@ -86,7 +85,6 @@ final class HumanHelpStore {
                 .put("title", arguments.optString("title", "AI needs your help"))
                 .put("instruction", arguments.optString("instruction", ""))
                 .put("actions", actions)
-                .put("customAction", sanitizedAction(arguments.optString("customAction", "")))
                 .put("allowTextReply", arguments.optBoolean("allowTextReply", true))
                 .put("allowImages", arguments.optBoolean("allowImages", true))
                 .put("maxImages", arguments.optInt("maxImages", 3))
@@ -418,31 +416,6 @@ final class HumanHelpStore {
                 new String[]{"拒絕", "否決", "做不到", "deny", "reject", "no", "cancel"},
                 1,
                 "拒絕");
-    }
-
-    static String customAction(JSONObject request) {
-        if (request == null) {
-            return "";
-        }
-        String explicit = sanitizedAction(request.optString("customAction", ""));
-        if (!explicit.isEmpty()) {
-            return explicit;
-        }
-        JSONArray actions = request.optJSONArray("actions");
-        if (actions == null) {
-            return "";
-        }
-        String approve = approveAction(request);
-        String reject = rejectAction(request);
-        for (int index = 0; index < actions.length(); index++) {
-            String action = sanitizedAction(actions.optString(index, ""));
-            String normalized = action.toLowerCase(Locale.ROOT);
-            boolean voice = normalized.contains("voice") || normalized.contains("語音");
-            if (!action.isEmpty() && !action.equals(approve) && !action.equals(reject) && !voice) {
-                return action;
-            }
-        }
-        return "";
     }
 
     private static String matchingAction(JSONObject request, String[] words, int fallbackIndex, String fallbackValue) {

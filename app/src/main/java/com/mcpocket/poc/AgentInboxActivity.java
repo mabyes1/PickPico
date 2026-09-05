@@ -37,6 +37,7 @@ public final class AgentInboxActivity extends Activity {
     private static final int RED = Color.rgb(240, 113, 120);
 
     private LinearLayout itemsContainer;
+    private LinearLayout pendingContainer;
     private TextView inboxCount;
     private TextView clearAction;
     private TextView topStatusDot;
@@ -122,6 +123,11 @@ public final class AgentInboxActivity extends Activity {
         clearParams.leftMargin = dp(8);
         summary.addView(clearAction, clearParams);
         root.addView(summary);
+
+        pendingContainer = new LinearLayout(this);
+        pendingContainer.setOrientation(LinearLayout.VERTICAL);
+        pendingContainer.setVisibility(View.GONE);
+        root.addView(pendingContainer);
 
         TextView section = text("RECENT", 10, Typeface.BOLD, DIM);
         section.setLetterSpacing(.12f);
@@ -236,6 +242,7 @@ public final class AgentInboxActivity extends Activity {
 
     private void renderItems() {
         if (itemsContainer == null) return;
+        renderPending();
         itemsContainer.removeAllViews();
         JSONArray items = AgentInboxStore.list(this);
         if (inboxCount != null) inboxCount.setText(items.length() + (items.length() == 1 ? " EVENT" : " EVENTS"));
@@ -311,6 +318,46 @@ public final class AgentInboxActivity extends Activity {
                     ViewGroup.LayoutParams.WRAP_CONTENT);
             if (index > 0) params.topMargin = dp(10);
             itemsContainer.addView(card, params);
+        }
+    }
+
+    private void renderPending() {
+        if (pendingContainer == null) return;
+        pendingContainer.removeAllViews();
+        try {
+            JSONObject pending = HumanHelpStore.latestWaiting(this);
+            if (pending == null) {
+                pendingContainer.setVisibility(View.GONE);
+                return;
+            }
+            pendingContainer.setVisibility(View.VISIBLE);
+            TextView label = text("NEEDS RESPONSE", 10, Typeface.BOLD, DIM);
+            label.setLetterSpacing(.12f);
+            label.setPadding(dp(2), dp(20), 0, dp(10));
+            pendingContainer.addView(label);
+
+            LinearLayout card = glassCard(true);
+            card.setOnClickListener(v -> {
+                String requestId = pending.optString("requestId", "");
+                if (TextUtils.isEmpty(requestId)) return;
+                startActivity(new Intent(this, HumanHelpActivity.class)
+                        .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId));
+            });
+            TextView state = text(
+                    "approval".equals(pending.optString("requestType", "help")) ? "APPROVAL NEEDED" : "HUMAN HELP",
+                    11,
+                    Typeface.BOLD,
+                    BLUE);
+            state.setLetterSpacing(.08f);
+            card.addView(state);
+            TextView title = text(pending.optString("title", "Agent is waiting for you"), 16, Typeface.BOLD, TEXT);
+            title.setPadding(0, dp(8), 0, dp(4));
+            card.addView(title);
+            TextView detail = text("Open to respond and let the Agent continue.", 12, Typeface.NORMAL, MUTED);
+            card.addView(detail);
+            pendingContainer.addView(card);
+        } catch (Exception ignored) {
+            pendingContainer.setVisibility(View.GONE);
         }
     }
 

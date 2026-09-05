@@ -63,6 +63,8 @@ final class BleButtonBridge {
     private static final long SCAN_WINDOW_MS = 12_000L;
     private static final long MAX_VOICE_MS = 45_000L;
 
+    private static volatile boolean connected;
+
     private final McpNodeService service;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -94,10 +96,15 @@ final class BleButtonBridge {
 
     void stop() {
         active = false;
+        connected = false;
         mainHandler.removeCallbacksAndMessages(null);
         stopScan();
         closeGatt();
         cancelVoice();
+    }
+
+    static boolean isConnected() {
+        return connected;
     }
 
     private void scanOrRetry() {
@@ -217,6 +224,7 @@ final class BleButtonBridge {
                     disconnectAndRetry("Button pad notification setup failed");
                     return;
                 }
+                connected = true;
                 recordRecent("Button pad connected");
             } catch (SecurityException error) {
                 disconnectAndRetry("Button pad setup blocked: " + safeMessage(error));
@@ -262,7 +270,7 @@ final class BleButtonBridge {
                 handlePreset(false);
                 break;
             case EVENT_DETAIL:
-                handleCustom();
+                handleDetails();
                 break;
             case EVENT_VOICE_DOWN:
                 handleVoiceDown();
@@ -294,23 +302,23 @@ final class BleButtonBridge {
         }
     }
 
-    private void handleCustom() {
+    private void handleDetails() {
         try {
             JSONObject request = HumanHelpStore.latestWaiting(service);
             if (request == null) {
-                recordRecent("Button pad: no pending custom action");
+                recordRecent("Button pad: no pending request for details");
                 return;
             }
             String requestId = request.optString("requestId", "");
-            String action = HumanHelpStore.customAction(request);
-            if (action.isEmpty()) {
-                recordRecent("Button pad: custom action unavailable for " + requestId);
-                return;
-            }
-            HumanHelpStore.complete(service, requestId, action, "");
-            recordRecent("Button pad: custom action " + action + " for " + requestId);
+            Intent intent = new Intent(service, HumanHelpActivity.class)
+                    .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId)
+                    .putExtra(HumanHelpActivity.EXTRA_OPEN_DETAILS, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            service.startActivity(intent);
+            HumanHelpStore.renewHumanActivity(service, requestId, "ble_details", false);
+            recordRecent("Button pad: opened details for " + requestId);
         } catch (Exception error) {
-            recordRecent("Button pad custom action failed: " + safeMessage(error));
+            recordRecent("Button pad details failed: " + safeMessage(error));
         }
     }
 
@@ -575,6 +583,7 @@ final class BleButtonBridge {
     }
 
     private void closeGatt() {
+        connected = false;
         BluetoothGatt current = gatt;
         gatt = null;
         if (current == null) {

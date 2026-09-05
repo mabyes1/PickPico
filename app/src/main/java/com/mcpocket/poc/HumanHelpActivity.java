@@ -51,6 +51,7 @@ public final class HumanHelpActivity extends Activity {
     static final String EXTRA_BLE_VOICE_PATH = "ble_voice_path";
     static final String EXTRA_BLE_VOICE_TRANSCRIPT = "ble_voice_transcript";
     static final String EXTRA_BLE_VOICE_STT_STATUS = "ble_voice_stt_status";
+    static final String EXTRA_OPEN_DETAILS = "open_details";
     private static final int REQUEST_PICK_IMAGE = 201;
     private static final int REQUEST_CAMERA = 202;
     private static final int REQUEST_CAMERA_PERMISSION = 203;
@@ -71,8 +72,12 @@ public final class HumanHelpActivity extends Activity {
     private TextView lifecycleStatus;
     private TextView attachmentStatus;
     private LinearLayout actionContainer;
-    private Button customActionButton;
-    private String customAction = "";
+    private LinearLayout detailsContainer;
+    private LinearLayout phoneActionsContainer;
+    private LinearLayout dockActionsContainer;
+    private Button detailsButton;
+    private boolean detailsExpanded;
+    private boolean phoneControlsOverride;
     private Button uploadButton;
     private Button cameraButton;
     private File pendingCameraFile;
@@ -100,6 +105,7 @@ public final class HumanHelpActivity extends Activity {
         getWindow().setNavigationBarColor(SCREEN_BG);
         getWindow().getDecorView().setSystemUiVisibility(0);
         requestId = getIntent().getStringExtra(HumanHelpStore.EXTRA_REQUEST_ID);
+        detailsExpanded = getIntent().getBooleanExtra(EXTRA_OPEN_DETAILS, false);
         if (TextUtils.isEmpty(requestId)) {
             finish();
             return;
@@ -125,6 +131,15 @@ public final class HumanHelpActivity extends Activity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_DETAILS, false)) {
+            setDetailsExpanded(true);
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         if (requestId != null && actionContainer != null) {
@@ -142,12 +157,19 @@ public final class HumanHelpActivity extends Activity {
     }
 
     private View buildContent() {
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackground(screenBackground());
+
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackground(screenBackground());
+        scroll.setVerticalScrollBarEnabled(false);
+        shell.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(24), dp(18), dp(24), dp(30));
+        root.setPadding(dp(24), dp(18), dp(24), dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
@@ -229,6 +251,20 @@ public final class HumanHelpActivity extends Activity {
         lifecycleStatus.setVisibility(View.GONE);
         root.addView(lifecycleStatus);
 
+        detailsContainer = new LinearLayout(this);
+        detailsContainer.setOrientation(LinearLayout.VERTICAL);
+        detailsContainer.setVisibility(detailsExpanded ? View.VISIBLE : View.GONE);
+        TextView detailsHeading = text("DETAILS", 11, Typeface.BOLD);
+        detailsHeading.setTextColor(ACCENT_BLUE);
+        detailsHeading.setLetterSpacing(.12f);
+        detailsHeading.setPadding(dp(2), dp(12), 0, dp(8));
+        detailsContainer.addView(detailsHeading);
+        TextView detailsIntro = text("Add context, a note, or an image when the Agent needs more information.", 12, Typeface.NORMAL);
+        detailsIntro.setTextColor(TEXT_SECONDARY);
+        detailsIntro.setPadding(dp(2), 0, dp(2), dp(10));
+        detailsContainer.addView(detailsIntro);
+        root.addView(detailsContainer);
+
         if (request.optBoolean("allowTextReply", true)) {
             LinearLayout replyCard = glassCard();
             replyCard.setOrientation(LinearLayout.VERTICAL);
@@ -262,7 +298,7 @@ public final class HumanHelpActivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT);
             replyParams.topMargin = dp(10);
             replyCard.addView(replyInput, replyParams);
-            root.addView(replyCard, cardParams(14));
+            detailsContainer.addView(replyCard, cardParams(14));
         }
 
         if (request.optBoolean("allowImages", true) && request.optInt("maxImages", 3) > 0) {
@@ -294,43 +330,104 @@ public final class HumanHelpActivity extends Activity {
             cameraParams.setMarginStart(dp(8));
             imageButtons.addView(cameraButton, cameraParams);
             attachmentCard.addView(imageButtons);
-            root.addView(attachmentCard, cardParams(10));
+            detailsContainer.addView(attachmentCard, cardParams(10));
         }
 
         actionContainer = new LinearLayout(this);
         actionContainer.setOrientation(LinearLayout.VERTICAL);
-        root.addView(actionContainer);
+        actionContainer.setPadding(dp(18), dp(8), dp(18), dp(10));
+        actionContainer.setBackground(roundedBackground(Color.argb(235, 55, 67, 74), CARD_STROKE, 22));
+        shell.addView(actionContainer, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         rebuildActions();
         refreshState();
-        return scroll;
+        return shell;
     }
 
     private void rebuildActions() {
         actionContainer.removeAllViews();
         String approveAction = HumanHelpStore.approveAction(request);
         String rejectAction = HumanHelpStore.rejectAction(request);
-        customAction = HumanHelpStore.customAction(request);
 
-        LinearLayout primaryRow = actionRow();
-        addActionButton(primaryRow, "✓", "Approve", "確認繼續", 0,
+        phoneActionsContainer = actionRow();
+        addCompactActionButton(phoneActionsContainer, "✓", "Approve", 0,
                 () -> submit(approveAction));
-        addActionButton(primaryRow, "×", "Reject", "拒絕", 1,
+        addCompactActionButton(phoneActionsContainer, "×", "Reject", 1,
                 () -> submit(rejectAction));
-        actionContainer.addView(primaryRow, actionRowParams());
-
-        LinearLayout secondaryRow = actionRow();
-        addActionButton(secondaryRow, "🎙", "Voice", "語音回覆", 2,
+        addCompactActionButton(phoneActionsContainer, "🎙", "Voice", 2,
                 this::startVoiceReply);
-        customActionButton = addActionButton(
-                secondaryRow,
-                "✦",
-                customAction.isEmpty() ? "Custom" : customAction,
-                "CUSTOM",
-                3,
-                () -> submit(customAction));
-        customActionButton.setEnabled(!customAction.isEmpty());
-        customActionButton.setAlpha(customAction.isEmpty() ? 0.38f : 1f);
-        actionContainer.addView(secondaryRow, actionRowParams());
+        detailsButton = addCompactActionButton(phoneActionsContainer, "≡", "Details", 3,
+                () -> setDetailsExpanded(!detailsExpanded));
+        actionContainer.addView(phoneActionsContainer, actionRowParams());
+
+        dockActionsContainer = new LinearLayout(this);
+        dockActionsContainer.setOrientation(LinearLayout.VERTICAL);
+        dockActionsContainer.setPadding(dp(10), dp(7), dp(10), dp(7));
+        TextView dockTitle = text("●  DUCK CONNECTED", 12, Typeface.BOLD);
+        dockTitle.setTextColor(Color.rgb(169, 231, 205));
+        dockTitle.setGravity(android.view.Gravity.CENTER);
+        dockActionsContainer.addView(dockTitle);
+        TextView dockMapping = text("Approve   ·   Reject   ·   Voice   ·   Details", 12, Typeface.NORMAL);
+        dockMapping.setTextColor(TEXT_SECONDARY);
+        dockMapping.setGravity(android.view.Gravity.CENTER);
+        dockMapping.setPadding(0, dp(5), 0, dp(7));
+        dockActionsContainer.addView(dockMapping);
+        Button usePhone = new Button(this);
+        usePhone.setText("Use phone controls");
+        styleUtilityButton(usePhone);
+        usePhone.setOnClickListener(v -> {
+            phoneControlsOverride = true;
+            refreshActionMode();
+        });
+        dockActionsContainer.addView(usePhone, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(40)));
+        actionContainer.addView(dockActionsContainer);
+        setDetailsExpanded(detailsExpanded);
+        refreshActionMode();
+    }
+
+    private Button addCompactActionButton(
+            LinearLayout row,
+            String icon,
+            String label,
+            int index,
+            Runnable action) {
+        Button button = new Button(this);
+        button.setText(icon + "\n" + label);
+        button.setAllCaps(false);
+        button.setTextSize(12);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(TEXT_PRIMARY);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setPadding(dp(4), dp(3), dp(4), dp(3));
+        button.setBackgroundTintList(ColorStateList.valueOf(actionColor(index)));
+        button.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(68), 1f);
+        if (row.getChildCount() > 0) params.setMarginStart(dp(7));
+        row.addView(button, params);
+        return button;
+    }
+
+    private void setDetailsExpanded(boolean expanded) {
+        detailsExpanded = expanded;
+        if (detailsContainer != null) {
+            detailsContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+        if (detailsButton != null) {
+            detailsButton.setText((expanded ? "⌃" : "≡") + "\nDetails");
+        }
+        if (expanded) renewActivity("details");
+    }
+
+    private void refreshActionMode() {
+        boolean dockConnected = BleButtonBridge.isConnected();
+        boolean showDock = dockConnected && !phoneControlsOverride;
+        if (phoneActionsContainer != null) {
+            phoneActionsContainer.setVisibility(showDock ? View.GONE : View.VISIBLE);
+        }
+        if (dockActionsContainer != null) {
+            dockActionsContainer.setVisibility(showDock ? View.VISIBLE : View.GONE);
+        }
     }
 
     private LinearLayout actionRow() {
@@ -659,12 +756,12 @@ public final class HumanHelpActivity extends Activity {
         if (replyInput != null) {
             replyInput.setEnabled(waiting);
         }
-        setActionButtonsEnabled(actionContainer, waiting);
-        if (customActionButton != null) {
-            boolean customEnabled = waiting && !customAction.isEmpty();
-            customActionButton.setEnabled(customEnabled);
-            customActionButton.setAlpha(customEnabled ? 1f : 0.38f);
+        setActionButtonsEnabled(phoneActionsContainer, waiting);
+        if (detailsButton != null) {
+            detailsButton.setEnabled(true);
+            detailsButton.setAlpha(1f);
         }
+        refreshActionMode();
     }
 
     private void renewActivity(String activity) {
