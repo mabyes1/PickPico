@@ -38,8 +38,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class SelfUpdateManager {
     private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;
     private static final long MAX_MANIFEST_BYTES = 256L * 1024L;
-    private static final String OFFICIAL_UPDATE_MANIFEST_URL =
-            RelayClient.DEFAULT_RELAY_BASE_URL + "/v1/update/latest";
     private static final String UPDATE_CHANNEL_ID = "mcpocket_self_update";
     private static final int UPDATE_NOTIFICATION_ID = 8768;
     private static final AtomicBoolean ACTIVE = new AtomicBoolean(false);
@@ -152,8 +150,9 @@ final class SelfUpdateManager {
     }
 
     static JSONObject checkLatest(Context context, JSONObject arguments, long callCount) {
-        String manifestUrl = resolveManifestUrl(context, arguments);
+        String manifestUrl = "";
         try {
+            manifestUrl = resolveManifestUrl(context, arguments);
             JSONObject manifest = fetchManifest(manifestUrl);
             validateManifest(manifest);
 
@@ -392,7 +391,18 @@ final class SelfUpdateManager {
             }
             return explicit;
         }
-        return OFFICIAL_UPDATE_MANIFEST_URL;
+        String relay = context == null ? "" : context
+                .getSharedPreferences(McpNodeService.PREFS, Context.MODE_PRIVATE)
+                .getString(McpNodeService.KEY_RELAY_BASE_URL, "");
+        return updateManifestForRelay(relay);
+    }
+
+    static String updateManifestForRelay(String relay) {
+        if (relay == null || relay.trim().isEmpty()) {
+            throw new CommandRuntime.CommandInputException(
+                    "No update source configured. Set your own Relay URL or provide manifestUrl.");
+        }
+        return RelayClient.normalizeBaseUrl(relay) + "/v1/update/latest";
     }
 
     private static JSONObject fetchManifest(String manifestUrl) throws Exception {

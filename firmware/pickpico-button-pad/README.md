@@ -4,16 +4,16 @@ This firmware turns an ESP32-S3 into the four physical controls mounted on the P
 
 ## Default wiring
 
-Each button connects its GPIO to GND when pressed. Internal pull-ups are enabled, so no external resistor is required for the demo wiring.
+The current demo uses four 3-pin button modules. Each module's `OUT` connects to its input GPIO, while `VCC` is supplied by a dedicated GPIO held at 3.3 V. The module's `GND` pin remains disconnected. Internal pull-downs keep the inputs LOW while idle, and a press drives `OUT` HIGH.
 
-| Button | GPIO | Android action |
-| --- | ---: | --- |
-| Approve | 4 | Complete the newest waiting human-help request with its positive/first action |
-| Reject | 5 | Complete it with its negative/second action |
-| Detail | 6 | Open the newest waiting human-help request on the phone |
-| Voice | 7 | Hold to record from the phone microphone; release to send the WAV reply to the Agent |
+| Button | OUT GPIO | VCC GPIO | Android action |
+| --- | ---: | ---: | --- |
+| Approve | 4 | 15 | Complete the newest waiting human-help request with its positive/first action |
+| Reject | 5 | 16 | Complete it with its negative/second action |
+| Detail | 6 | 17 | Open the newest waiting human-help request on the phone |
+| Voice | 7 | 18 | Hold to record from the phone microphone; release to send the WAV reply to the Agent |
 
-Change the four `PIN_*` constants in `pickpico_button_pad.ino` if the final CS533 shell uses different pins.
+Change the `PIN_*` and matching `PIN_POWER_*` constants in `pickpico_button_pad.ino` if the final CS533 shell uses different pins. Do not wire these inputs to GND unless the firmware is also changed to `INPUT_PULLUP` with active-LOW presses.
 
 ## BLE protocol
 

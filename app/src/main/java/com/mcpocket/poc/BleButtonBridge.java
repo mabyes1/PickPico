@@ -314,9 +314,18 @@ final class BleButtonBridge {
                     .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId)
                     .putExtra(HumanHelpActivity.EXTRA_OPEN_DETAILS, true)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            service.startActivity(intent);
+            if (AgentAttention.canStartActivityNow(service)) {
+                service.startActivity(intent);
+                recordRecent("Button pad: opened details for " + requestId);
+            } else {
+                // Android 10+ can silently block Activity launches from a
+                // background Service. Repost the request instead: in Hyper Mode
+                // its full-screen trampoline can surface over a locked screen;
+                // otherwise Android presents the normal user-tappable alert.
+                HumanHelpStore.postRequestNotification(service, request, intent);
+                recordRecent("Button pad: surfaced details notification for " + requestId);
+            }
             HumanHelpStore.renewHumanActivity(service, requestId, "ble_details", false);
-            recordRecent("Button pad: opened details for " + requestId);
         } catch (Exception error) {
             recordRecent("Button pad details failed: " + safeMessage(error));
         }
@@ -505,7 +514,20 @@ final class BleButtonBridge {
                 .putExtra(HumanHelpActivity.EXTRA_BLE_VOICE_TRANSCRIPT, voiceTranscript)
                 .putExtra(HumanHelpActivity.EXTRA_BLE_VOICE_STT_STATUS, voiceSpeechStatus)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        service.startActivity(intent);
+        try {
+            JSONObject request = HumanHelpStore.load(service, requestId);
+            if (AgentAttention.canStartActivityNow(service)) {
+                service.startActivity(intent);
+            } else if (request != null) {
+                HumanHelpStore.postRequestNotification(service, request, intent);
+            } else {
+                recordRecent("Button pad: voice review request disappeared");
+                return;
+            }
+        } catch (Exception error) {
+            recordRecent("Button pad voice review failed: " + safeMessage(error));
+            return;
+        }
         recordRecent("Button pad: voice review STT=" + voiceSpeechStatus
                 + (voiceTranscript.isEmpty() ? "" : " text=" + voiceTranscript)
                 + (timedOut ? " (45s max)" : ""));

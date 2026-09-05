@@ -37,9 +37,6 @@ import okhttp3.WebSocketListener;
  * loopback hop so clients such as ChatGPT do not need custom HTTP-header authentication support.
  */
 final class RelayClient {
-    static final String LEGACY_RELAY_BASE_URL = "https://relay.mcpocket.workers.dev";
-    static final String INTERMEDIATE_RELAY_BASE_URL = "https://pickpico-relay.mcpocket.workers.dev";
-    static final String DEFAULT_RELAY_BASE_URL = "https://relay.pickpico.workers.dev";
 
     interface Listener {
         void onRelayState(String status, String remoteEndpoint, String detail);
@@ -55,7 +52,9 @@ final class RelayClient {
     private final String relayBaseUrl;
     private final Listener listener;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService requestExecutor = Executors.newFixedThreadPool(2);
+    // HUMAN HELP and picker calls wait for people. Keep spare workers available for
+    // status and independent commands while an interactive request is pending.
+    private final ExecutorService requestExecutor = Executors.newFixedThreadPool(4);
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -90,23 +89,8 @@ final class RelayClient {
     }
 
     static String migrateLegacyRelayIfNeeded(SharedPreferences prefs, String relayBaseUrl) {
-        String normalized = normalizeBaseUrl(relayBaseUrl);
-        if (!isProjectLegacyRelayBaseUrl(normalized)) {
-            return normalized;
-        }
-
-        prefs.edit()
-                .putString(McpNodeService.KEY_RELAY_BASE_URL, DEFAULT_RELAY_BASE_URL)
-                .remove(PREF_NODE_ID)
-                .remove(PREF_NODE_SECRET)
-                .apply();
-        return DEFAULT_RELAY_BASE_URL;
-    }
-
-    static boolean isProjectLegacyRelayBaseUrl(String relayBaseUrl) {
-        String normalized = normalizeBaseUrl(relayBaseUrl);
-        return LEGACY_RELAY_BASE_URL.equals(normalized)
-                || INTERMEDIATE_RELAY_BASE_URL.equals(normalized);
+        // Preserve explicitly configured endpoints; never redirect to a project host.
+        return normalizeBaseUrl(relayBaseUrl);
     }
 
     void start() {
@@ -406,7 +390,7 @@ final class RelayClient {
         return value;
     }
 
-    private static String normalizeBaseUrl(String value) {
+    static String normalizeBaseUrl(String value) {
         String result = value == null ? "" : value.trim();
         while (result.endsWith("/")) {
             result = result.substring(0, result.length() - 1);

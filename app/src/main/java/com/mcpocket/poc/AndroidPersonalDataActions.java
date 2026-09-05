@@ -398,7 +398,7 @@ final class AndroidPersonalDataActions {
 
         Intent chooser = Intent.createChooser(send, chooserTitle)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (!MainActivity.isUiVisible()) {
+        if (!AgentAttention.canStartActivityNow(context)) {
             AgentInboxStore.add(context, "share.send", "Share content", chooserTitle);
             int notificationId = postActionNotification(context, chooser, "Share content", chooserTitle);
             return new JSONObject()
@@ -559,7 +559,7 @@ final class AndroidPersonalDataActions {
                 .setContentText(body)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true);
-        AgentAttention.applyUrgentBehavior(context, builder, notificationId);
+        AgentAttention.applyUrgentBehavior(context, builder, notificationId, target);
         Notification notification = builder.build();
         manager.notify(notificationId, notification);
         AgentAttention.alert(context);

@@ -1,6 +1,5 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "account_id": "4fb4cc61ab103b04cac2e15a8e6e4a09",
   "name": "relay",
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",
@@ -15,7 +14,7 @@
   "kv_namespaces": [
     {
       "binding": "UPDATE_KV",
-      "id": "c92655d154da45eebace142612f17780"
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
     }
   ],
   "migrations": [

@@ -18,11 +18,13 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -80,7 +82,8 @@ final class AndroidDeviceCapabilities {
                 .put("microphonePermission", hasPermission(Manifest.permission.RECORD_AUDIO))
                 .put("notificationPermission", notificationPermissionGranted())
                 .put("cameraForegroundType", foregroundTypeActive(ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA))
-                .put("microphoneForegroundType", foregroundTypeActive(ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE));
+                .put("microphoneForegroundType", foregroundTypeActive(ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE))
+                .put("audio", inspectMediaAudio(false));
         if (ttsReady.getCount() == 0L) {
             result.put("ttsReady", ttsInitStatus == TextToSpeech.SUCCESS);
         } else {
@@ -112,9 +115,11 @@ final class AndroidDeviceCapabilities {
         HandlerThread cameraThread = new HandlerThread("mcpocket-camera");
         cameraThread.start();
         Handler cameraHandler = new Handler(cameraThread.getLooper());
+        // Device/session callbacks must outlive the per-capture image thread:
+        // openCamera may deliver its result after our eight-second deadline.
+        Handler stateHandler = new Handler(Looper.getMainLooper());
+        CaptureResources resources = new CaptureResources();
         ImageReader reader = null;
-        CameraDevice camera = null;
-        CameraCaptureSession session = null;
         try {
             CameraSelection selection = selectCamera(manager, lens, maxWidth, maxHeight);
             reader = ImageReader.newInstance(
@@ -122,12 +127,11 @@ final class AndroidDeviceCapabilities {
                     selection.size.getHeight(),
                     ImageFormat.JPEG,
                     2);
+            resources.add(reader);
 
             CountDownLatch finished = new CountDownLatch(1);
             AtomicReference<byte[]> imageBytes = new AtomicReference<>();
             AtomicReference<Throwable> failure = new AtomicReference<>();
-            AtomicReference<CameraDevice> cameraRef = new AtomicReference<>();
-            AtomicReference<CameraCaptureSession> sessionRef = new AtomicReference<>();
             ImageReader captureReader = reader;
 
             reader.setOnImageAvailableListener(imageReader -> {
@@ -149,66 +153,74 @@ final class AndroidDeviceCapabilities {
             manager.openCamera(selection.cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(CameraDevice openedCamera) {
-                    cameraRef.set(openedCamera);
-                    try {
-                        openedCamera.createCaptureSession(
-                                Collections.singletonList(captureReader.getSurface()),
-                                new CameraCaptureSession.StateCallback() {
-                                    @Override
-                                    public void onConfigured(CameraCaptureSession captureSession) {
-                                        sessionRef.set(captureSession);
-                                        try {
-                                            CaptureRequest.Builder request = openedCamera.createCaptureRequest(
-                                                    CameraDevice.TEMPLATE_STILL_CAPTURE);
-                                            request.addTarget(captureReader.getSurface());
-                                            request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-                                            request.set(CaptureRequest.JPEG_QUALITY, (byte) quality);
-                                            if (selection.sensorOrientation != null) {
-                                                request.set(CaptureRequest.JPEG_ORIENTATION, selection.sensorOrientation);
+                    synchronized (resources) {
+                        if (!resources.add(openedCamera)) return;
+                        try {
+                            openedCamera.createCaptureSession(
+                                    Collections.singletonList(captureReader.getSurface()),
+                                    new CameraCaptureSession.StateCallback() {
+                                        @Override
+                                        public void onConfigured(CameraCaptureSession captureSession) {
+                                            synchronized (resources) {
+                                                if (!resources.add(captureSession)) return;
+                                                try {
+                                                    CaptureRequest.Builder request = openedCamera.createCaptureRequest(
+                                                            CameraDevice.TEMPLATE_STILL_CAPTURE);
+                                                    request.addTarget(captureReader.getSurface());
+                                                    request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                                                    request.set(CaptureRequest.JPEG_QUALITY, (byte) quality);
+                                                    if (selection.sensorOrientation != null) {
+                                                        request.set(CaptureRequest.JPEG_ORIENTATION, selection.sensorOrientation);
+                                                    }
+                                                    captureSession.capture(
+                                                            request.build(),
+                                                            new CameraCaptureSession.CaptureCallback() {},
+                                                            cameraHandler);
+                                                } catch (Throwable error) {
+                                                    failure.compareAndSet(null, error);
+                                                    finished.countDown();
+                                                }
                                             }
-                                            captureSession.capture(
-                                                    request.build(),
-                                                    new CameraCaptureSession.CaptureCallback() {},
-                                                    cameraHandler);
-                                        } catch (Throwable error) {
-                                            failure.compareAndSet(null, error);
+                                        }
+
+                                        @Override
+                                        public void onConfigureFailed(CameraCaptureSession captureSession) {
+                                            resources.add(captureSession);
+                                            resources.close();
+                                            failure.compareAndSet(
+                                                    null,
+                                                    new IllegalStateException("Camera capture session configuration failed"));
                                             finished.countDown();
                                         }
-                                    }
-
-                                    @Override
-                                    public void onConfigureFailed(CameraCaptureSession captureSession) {
-                                        failure.compareAndSet(
-                                                null,
-                                                new IllegalStateException("Camera capture session configuration failed"));
-                                        finished.countDown();
-                                    }
-                                },
-                                cameraHandler);
-                    } catch (Throwable error) {
-                        failure.compareAndSet(null, error);
-                        finished.countDown();
+                                    },
+                                    stateHandler);
+                        } catch (Throwable error) {
+                            failure.compareAndSet(null, error);
+                            finished.countDown();
+                        }
                     }
                 }
 
                 @Override
                 public void onDisconnected(CameraDevice disconnectedCamera) {
+                    resources.add(disconnectedCamera);
+                    resources.close();
                     failure.compareAndSet(null, new IllegalStateException("Camera disconnected"));
                     finished.countDown();
                 }
 
                 @Override
                 public void onError(CameraDevice errorCamera, int errorCode) {
+                    resources.add(errorCamera);
+                    resources.close();
                     failure.compareAndSet(
                             null,
                             new IllegalStateException("Camera error code " + errorCode));
                     finished.countDown();
                 }
-            }, cameraHandler);
+            }, stateHandler);
 
             boolean completed = finished.await(CAMERA_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            camera = cameraRef.get();
-            session = sessionRef.get();
             if (!completed) {
                 return failure("camera_timeout", "Timed out waiting for a camera frame", callCount);
             }
@@ -261,15 +273,7 @@ final class AndroidDeviceCapabilities {
                     error.getClass().getSimpleName() + ": " + safeMessage(error),
                     callCount);
         } finally {
-            if (session != null) {
-                session.close();
-            }
-            if (camera != null) {
-                camera.close();
-            }
-            if (reader != null) {
-                reader.close();
-            }
+            resources.close();
             cameraThread.quitSafely();
         }
     }
@@ -352,11 +356,14 @@ final class AndroidDeviceCapabilities {
         }
         tts.setSpeechRate(rate);
         tts.setPitch(pitch);
+        JSONObject audioState = inspectMediaAudio(true);
         String utteranceId = "mcpocket-" + UUID.randomUUID();
+        Bundle speechParameters = new Bundle();
+        speechParameters.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
         int result = tts.speak(
                 text,
                 "add".equals(queue) ? TextToSpeech.QUEUE_ADD : TextToSpeech.QUEUE_FLUSH,
-                null,
+                speechParameters,
                 utteranceId);
         if (result != TextToSpeech.SUCCESS) {
             return failure("tts_speak_failed", "Android rejected the TTS request", callCount);
@@ -369,8 +376,234 @@ final class AndroidDeviceCapabilities {
                 .put("rate", rate)
                 .put("pitch", pitch)
                 .put("queue", queue)
+                .put("audio", audioState)
                 .put("timestamp", Instant.now().toString())
                 .put("toolCallCount", callCount);
+    }
+
+    private JSONObject inspectMediaAudio(boolean autoAdjust) throws JSONException {
+        AudioManager audio = (AudioManager) service.getSystemService(Service.AUDIO_SERVICE);
+        if (audio == null) {
+            return new JSONObject()
+                    .put("available", false)
+                    .put("stream", "music")
+                    .put("autoBoostRecommended", false)
+                    .put("volumeAdjusted", false)
+                    .put("decision", "audio_unavailable");
+        }
+
+        int currentVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+        int maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int ringerMode = audio.getRingerMode();
+        int interruptionFilter = currentInterruptionFilter();
+        boolean quietMode = ringerMode == AudioManager.RINGER_MODE_SILENT
+                || interruptionFilter == NotificationManager.INTERRUPTION_FILTER_NONE
+                || interruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS;
+        AudioVolumePolicy.Decision decision = AudioVolumePolicy.decide(
+                currentVolume,
+                maxVolume,
+                quietMode);
+
+        boolean adjusted = false;
+        int appliedVolume = currentVolume;
+        String decisionReason = decision.reason;
+        if (autoAdjust && decision.shouldAdjust) {
+            try {
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, decision.targetVolume, 0);
+                appliedVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+                adjusted = appliedVolume > currentVolume;
+                decisionReason = adjusted ? "raised_low_media_volume" : "volume_adjustment_not_applied";
+            } catch (SecurityException | IllegalArgumentException error) {
+                decisionReason = "volume_adjustment_failed";
+            }
+        }
+
+        return new JSONObject()
+                .put("available", true)
+                .put("stream", "music")
+                .put("volume", appliedVolume)
+                .put("maxVolume", maxVolume)
+                .put("volumePercent", volumePercent(appliedVolume, maxVolume))
+                .put("previousVolume", currentVolume)
+                .put("recommendedVolume", decision.targetVolume)
+                .put("autoBoostRecommended", decision.shouldAdjust)
+                .put("volumeAdjusted", adjusted)
+                .put("ringerMode", ringerModeName(ringerMode))
+                .put("interruptionFilter", interruptionFilterName(interruptionFilter))
+                .put("quietModeRespected", quietMode)
+                .put("decision", decisionReason);
+    }
+
+    JSONObject audioStatus(long callCount) throws JSONException {
+        AudioManager audio = (AudioManager) service.getSystemService(Service.AUDIO_SERVICE);
+        if (audio == null) {
+            return failure("audio_unavailable", "Android AudioManager is unavailable", callCount);
+        }
+        return buildAudioStatus(audio)
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    JSONObject audioSet(JSONObject arguments, long callCount) throws JSONException {
+        AudioManager audio = (AudioManager) service.getSystemService(Service.AUDIO_SERVICE);
+        if (audio == null) {
+            return failure("audio_unavailable", "Android AudioManager is unavailable", callCount);
+        }
+        if (audio.isVolumeFixed()) {
+            return failure("audio_volume_fixed", "Android reports fixed device volume", callCount);
+        }
+
+        String streamName = arguments.optString("stream", "");
+        int requestedPercent = arguments.optInt("percent", -1);
+        boolean showUi = arguments.optBoolean("showUi", false);
+        int stream = audioStream(streamName);
+        int maxVolume = audio.getStreamMaxVolume(stream);
+        int before = audio.getStreamVolume(stream);
+        int notificationBefore = audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+        int ringBefore = audio.getStreamVolume(AudioManager.STREAM_RING);
+        int target = Math.round((maxVolume * requestedPercent) / 100f);
+        if (requestedPercent > 0 && target == 0 && maxVolume > 0) {
+            target = 1;
+        }
+
+        try {
+            audio.setStreamVolume(
+                    stream,
+                    target,
+                    showUi ? AudioManager.FLAG_SHOW_UI : 0);
+        } catch (SecurityException error) {
+            return failure(
+                    "audio_set_denied",
+                    "Android denied the volume change: " + safeMessage(error),
+                    callCount);
+        } catch (IllegalArgumentException error) {
+            return failure(
+                    "audio_set_invalid",
+                    "Android rejected the volume change: " + safeMessage(error),
+                    callCount);
+        }
+
+        int after = audio.getStreamVolume(stream);
+        int notificationAfter = audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
+        int ringAfter = audio.getStreamVolume(AudioManager.STREAM_RING);
+        JSONObject result = new JSONObject()
+                .put("set", after == target)
+                .put("changed", before != after)
+                .put("stream", streamName)
+                .put("requestedPercent", requestedPercent)
+                .put("before", streamState(audio, streamName, stream, before))
+                .put("after", streamState(audio, streamName, stream, after))
+                .put("ringerMode", ringerModeName(audio.getRingerMode()))
+                .put("interruptionFilter", interruptionFilterName(currentInterruptionFilter()))
+                .put("linkedNotificationChanged", notificationBefore != notificationAfter && !"notification".equals(streamName))
+                .put("linkedRingChanged", ringBefore != ringAfter && !"ring".equals(streamName))
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+        if (notificationBefore != notificationAfter || ringBefore != ringAfter) {
+            result.put("notificationAfter", streamState(
+                    audio,
+                    "notification",
+                    AudioManager.STREAM_NOTIFICATION,
+                    notificationAfter));
+            result.put("ringAfter", streamState(
+                    audio,
+                    "ring",
+                    AudioManager.STREAM_RING,
+                    ringAfter));
+        }
+        return result;
+    }
+
+    private JSONObject buildAudioStatus(AudioManager audio) throws JSONException {
+        return new JSONObject()
+                .put("available", true)
+                .put("fixedVolume", audio.isVolumeFixed())
+                .put("ringerMode", ringerModeName(audio.getRingerMode()))
+                .put("interruptionFilter", interruptionFilterName(currentInterruptionFilter()))
+                .put("media", streamState(audio, "media", AudioManager.STREAM_MUSIC))
+                .put("notification", streamState(audio, "notification", AudioManager.STREAM_NOTIFICATION))
+                .put("ring", streamState(audio, "ring", AudioManager.STREAM_RING))
+                .put("alarm", streamState(audio, "alarm", AudioManager.STREAM_ALARM));
+    }
+
+    private static JSONObject streamState(AudioManager audio, String name, int stream) throws JSONException {
+        return streamState(audio, name, stream, audio.getStreamVolume(stream));
+    }
+
+    private static JSONObject streamState(
+            AudioManager audio,
+            String name,
+            int stream,
+            int currentVolume) throws JSONException {
+        int maxVolume = audio.getStreamMaxVolume(stream);
+        return new JSONObject()
+                .put("stream", name)
+                .put("volume", currentVolume)
+                .put("maxVolume", maxVolume)
+                .put("volumePercent", volumePercent(currentVolume, maxVolume))
+                .put("muted", Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audio.isStreamMute(stream));
+    }
+
+    private static int audioStream(String streamName) {
+        switch (streamName) {
+            case "media":
+                return AudioManager.STREAM_MUSIC;
+            case "notification":
+                return AudioManager.STREAM_NOTIFICATION;
+            case "ring":
+                return AudioManager.STREAM_RING;
+            case "alarm":
+                return AudioManager.STREAM_ALARM;
+            default:
+                throw new IllegalArgumentException("Unsupported audio stream: " + streamName);
+        }
+    }
+
+    private int currentInterruptionFilter() {
+        NotificationManager manager = (NotificationManager) service.getSystemService(Service.NOTIFICATION_SERVICE);
+        if (manager == null) {
+            return NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+        }
+        try {
+            return manager.getCurrentInterruptionFilter();
+        } catch (RuntimeException ignored) {
+            return NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+        }
+    }
+
+    private static int volumePercent(int volume, int maxVolume) {
+        if (maxVolume <= 0) {
+            return 0;
+        }
+        return Math.round((volume * 100f) / maxVolume);
+    }
+
+    private static String ringerModeName(int ringerMode) {
+        switch (ringerMode) {
+            case AudioManager.RINGER_MODE_SILENT:
+                return "silent";
+            case AudioManager.RINGER_MODE_VIBRATE:
+                return "vibrate";
+            case AudioManager.RINGER_MODE_NORMAL:
+                return "normal";
+            default:
+                return "unknown";
+        }
+    }
+
+    private static String interruptionFilterName(int interruptionFilter) {
+        switch (interruptionFilter) {
+            case NotificationManager.INTERRUPTION_FILTER_ALL:
+                return "all";
+            case NotificationManager.INTERRUPTION_FILTER_PRIORITY:
+                return "priority";
+            case NotificationManager.INTERRUPTION_FILTER_NONE:
+                return "none";
+            case NotificationManager.INTERRUPTION_FILTER_ALARMS:
+                return "alarms";
+            default:
+                return "unknown";
+        }
     }
 
     JSONObject recordMicrophone(JSONObject arguments, long callCount) throws JSONException {

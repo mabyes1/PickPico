@@ -279,7 +279,7 @@ final class McpToolRegistry {
 
         register(
                 "phone_speak",
-                "Speak text through Android TextToSpeech.",
+                "Speak text through Android TextToSpeech. PickPico inspects media volume first and can raise very low volume while respecting silent/DND state.",
                 CommandRuntime.phoneSpeakSchema(),
                 (arguments, callCount) -> runtime.execute("phone.speak", arguments, callCount));
 
@@ -331,26 +331,9 @@ final class McpToolRegistry {
 
         register(
                 "phone_wake",
-                "Turn on the Android phone display without dismissing the lock screen.",
+                "Turn on the Android phone display only. Does not dismiss keyguard, navigate Home, or keep the screen awake for background work.",
                 CommandRuntime.noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("phone.wake", arguments, callCount));
-
-        register(
-                "phone_echo",
-                "Echo text on the Android node, vibrate the phone briefly, and update its foreground notification.",
-                new JSONObject()
-                        .put("type", "object")
-                        .put("properties", new JSONObject()
-                                .put("text", new JSONObject()
-                                        .put("type", "string")
-                                        .put("minLength", 1)
-                                        .put("maxLength", 512)
-                                        .put("description", "Text to echo on the phone.")))
-                        .put("required", new JSONArray().put("text"))
-                        .put("additionalProperties", false),
-                (arguments, callCount) -> {
-                    return runtime.execute("phone.echo", arguments, callCount);
-                });
     }
 
     JSONObject list(boolean modern, String profile) throws JSONException {
@@ -407,6 +390,14 @@ final class McpToolRegistry {
                     .put("isError", false);
         } catch (ToolInputException | CommandRuntime.CommandInputException error) {
             return toolError(error.getMessage(), modern);
+        } catch (Exception error) {
+            String message = error.getMessage();
+            if (message == null || message.trim().isEmpty()) {
+                message = error.getClass().getSimpleName();
+            } else {
+                message = error.getClass().getSimpleName() + ": " + message;
+            }
+            return toolError("Tool execution failed: " + message, modern);
         }
     }
 

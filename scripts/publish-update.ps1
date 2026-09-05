@@ -1,12 +1,16 @@
 param(
-    [string]$RelayBaseUrl = 'https://relay.pickpico.workers.dev',
+    [string]$RelayBaseUrl = $env:PICKPICO_RELAY_BASE_URL,
     [string]$KvBinding = 'UPDATE_KV',
+    [string]$WranglerConfig = '',
     [int]$ChunkSizeMiB = 20,
     [switch]$SkipBuild,
     [switch]$SkipDeploy
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($RelayBaseUrl)) {
+    throw 'Specify your own Relay with -RelayBaseUrl or PICKPICO_RELAY_BASE_URL.'
+}
 
 # The current stable OTA channel is signed with the interactive Windows user's
 # Android debug keystore. Running this script from Session 0 (for example the
@@ -21,6 +25,10 @@ if ([System.Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0) {
 $root = Split-Path -Parent $PSScriptRoot
 $gradle = Join-Path $root 'app\build.gradle'
 $relayDir = Join-Path $root 'relay'
+if ([string]::IsNullOrWhiteSpace($WranglerConfig)) {
+    $privateConfig = Join-Path $relayDir 'wrangler.local.jsonc'
+    $WranglerConfig = if (Test-Path -LiteralPath $privateConfig) { $privateConfig } else { Join-Path $relayDir 'wrangler.jsonc' }
+}
 $apk = Join-Path $root 'app\build\outputs\apk\debug\app-debug.apk'
 $jdk = 'D:\DevTools\PhoneMonitorAndroid\jdk-17'
 $androidSdk = 'D:\DevTools\PhoneMonitorAndroid\android-sdk'
@@ -158,20 +166,20 @@ $metadata = [ordered]@{
 Push-Location $relayDir
 try {
     if (-not $SkipDeploy) {
-        npx wrangler deploy
+        npx wrangler deploy --config $WranglerConfig
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
     for ($index = 0; $index -lt $chunkPaths.Count; $index++) {
         $chunkKey = "$objectKey`:chunk:{0:D3}" -f $index
-        npx wrangler kv key put $chunkKey --path $chunkPaths[$index] --binding $KvBinding --remote
+        npx wrangler kv key put $chunkKey --path $chunkPaths[$index] --binding $KvBinding --remote --config $WranglerConfig
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
-    npx wrangler kv key put "$objectKey`:meta" --path $metadataPath --binding $KvBinding --remote
+    npx wrangler kv key put "$objectKey`:meta" --path $metadataPath --binding $KvBinding --remote --config $WranglerConfig
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    npx wrangler kv key put 'latest.json' --path $manifestPath --binding $KvBinding --remote
+    npx wrangler kv key put 'latest.json' --path $manifestPath --binding $KvBinding --remote --config $WranglerConfig
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } finally {
     Pop-Location

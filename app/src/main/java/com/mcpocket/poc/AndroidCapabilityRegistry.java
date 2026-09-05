@@ -123,6 +123,7 @@ final class AndroidCapabilityRegistry {
 
     static boolean isHyperCommand(String commandId) {
         return "phone.lock".equals(commandId)
+                || "phone.home".equals(commandId)
                 || "notification.list".equals(commandId)
                 || "notification.get".equals(commandId)
                 || "notification.dismiss".equals(commandId)

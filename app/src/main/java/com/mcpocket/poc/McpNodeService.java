@@ -2,6 +2,7 @@ package com.mcpocket.poc;
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -31,9 +32,14 @@ import android.os.StatFs;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.system.Os;
 import android.system.OsConstants;
 import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.View;
+import android.view.WindowManager;
+import android.graphics.PixelFormat;
 
 import org.json.JSONException;
 import org.json.JSONArray;
@@ -61,6 +67,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class McpNodeService extends Service implements McpToolActions {
+    private static final long AGENT_SCREEN_IDLE_LEASE_MS = 90_000L;
+    // human.help can legitimately wait for up to 360 seconds. Keep an active
+    // command covered longer than that, while retaining a bounded safety timeout
+    // in case Android tears down execution before the finish hook runs.
+    private static final long AGENT_SCREEN_ACTIVE_LEASE_MS = TimeUnit.MINUTES.toMillis(10L);
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
@@ -99,6 +110,25 @@ public final class McpNodeService extends Service implements McpToolActions {
     private int previousAlarmVolume = -1;
     private AndroidDeviceCapabilities deviceCapabilities;
     private boolean mediaForegroundRequested;
+    private PowerManager.WakeLock agentScreenWakeLock;
+    private int activeAgentCommandCount;
+    private boolean agentScreenDestroyed;
+    private final Runnable agentScreenRetryRunnable = () -> {
+        if (!agentScreenDestroyed) {
+            refreshAgentScreenAwakeState(activeAgentCommandCount > 0
+                    ? AGENT_SCREEN_ACTIVE_LEASE_MS : AGENT_SCREEN_IDLE_LEASE_MS);
+        }
+    };
+    private WindowManager agentScreenWindowManager;
+    private View agentScreenKeepAwakeView;
+    private final Runnable agentScreenIdleReleaseRunnable = () -> {
+        synchronized (McpNodeService.this) {
+            if (activeAgentCommandCount == 0) {
+                releaseAgentScreenKeepAwakeWindow();
+                releaseAgentScreenLease();
+            }
+        }
+    };
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
 
@@ -182,7 +212,13 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public void onDestroy() {
         nodeActive = false;
+        agentScreenDestroyed = true;
+        mainHandler.removeCallbacks(agentScreenRetryRunnable);
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
+        mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+        activeAgentCommandCount = 0;
+        releaseAgentScreenKeepAwakeWindow();
+        releaseAgentScreenLease();
         stopAlertSound();
         stopAllProcessSessions();
         if (buttonBridge != null) {
@@ -200,6 +236,157 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_RUNNING, false).apply();
         super.onDestroy();
+    }
+
+    @Override
+    public void onAgentCommandStarted(String commandId) {
+        if ("phone.wake".equals(commandId)) {
+            return;
+        }
+        postAgentScreenAction(this::startAgentScreenCommand);
+    }
+
+    // WindowManager views and their lifecycle belong to the main Looper, even
+    // when the command itself runs on an HTTP worker. Never block that worker
+    // waiting for the main thread, and ignore callbacks after service teardown.
+    private void postAgentScreenAction(Runnable action) {
+        mainHandler.post(() -> {
+            if (!agentScreenDestroyed) action.run();
+        });
+    }
+
+    private void startAgentScreenCommand() {
+        activeAgentCommandCount++;
+        mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+        refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
+        // Some commands (notably human.help / urgent notifications) wake the
+        // screen from inside their handler. If the start hook ran while the
+        // display was still asleep, retry once after that wake has had time to
+        // land so a long-running command remains visibly awake.
+        mainHandler.removeCallbacks(agentScreenRetryRunnable);
+        mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
+    }
+
+    @Override
+    public void onAgentCommandFinished(String commandId) {
+        if ("phone.wake".equals(commandId)) {
+            return;
+        }
+        postAgentScreenAction(this::finishAgentScreenCommand);
+    }
+
+    private void finishAgentScreenCommand() {
+        if (activeAgentCommandCount > 0) {
+            activeAgentCommandCount--;
+        }
+        if (activeAgentCommandCount > 0) {
+            refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
+        } else {
+            // Keep the display awake briefly after the last Agent command so a
+            // multi-command flow can continue without racing the user's normal
+            // screen timeout. Manual power-button locking is still respected.
+            refreshAgentScreenAwakeState(AGENT_SCREEN_IDLE_LEASE_MS);
+            mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+            mainHandler.postDelayed(agentScreenIdleReleaseRunnable, AGENT_SCREEN_IDLE_LEASE_MS);
+        }
+    }
+
+    private synchronized void refreshAgentScreenAwakeState(long fallbackLeaseMs) {
+        if (ensureAgentScreenKeepAwakeWindow()) {
+            releaseAgentScreenLease();
+            return;
+        }
+        refreshAgentScreenLease(fallbackLeaseMs);
+    }
+
+    private synchronized boolean ensureAgentScreenKeepAwakeWindow() {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null || !power.isInteractive()) {
+            return false;
+        }
+        if (agentScreenKeepAwakeView != null) {
+            return true;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !Settings.canDrawOverlays(this)) {
+            return false;
+        }
+        try {
+            WindowManager manager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            if (manager == null) {
+                return false;
+            }
+            View marker = new View(this);
+            marker.setAlpha(0.01f);
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    1,
+                    1,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                            | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                    PixelFormat.TRANSLUCENT);
+            params.gravity = Gravity.TOP | Gravity.START;
+            manager.addView(marker, params);
+            agentScreenWindowManager = manager;
+            agentScreenKeepAwakeView = marker;
+            return true;
+        } catch (RuntimeException ignored) {
+            releaseAgentScreenKeepAwakeWindow();
+            return false;
+        }
+    }
+
+    private synchronized void releaseAgentScreenKeepAwakeWindow() {
+        View marker = agentScreenKeepAwakeView;
+        WindowManager manager = agentScreenWindowManager;
+        agentScreenKeepAwakeView = null;
+        agentScreenWindowManager = null;
+        if (marker == null || manager == null) {
+            return;
+        }
+        try {
+            manager.removeView(marker);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private synchronized void refreshAgentScreenLease(long leaseMs) {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null) {
+            return;
+        }
+        if (!power.isInteractive()) {
+            releaseAgentScreenLease();
+            return;
+        }
+        try {
+            if (agentScreenWakeLock == null) {
+                agentScreenWakeLock = power.newWakeLock(
+                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK,
+                        "PickPico:agentOperation");
+                agentScreenWakeLock.setReferenceCounted(false);
+            }
+            if (agentScreenWakeLock.isHeld()) {
+                agentScreenWakeLock.release();
+            }
+            agentScreenWakeLock.acquire(leaseMs);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private synchronized void releaseAgentScreenLease() {
+        if (agentScreenWakeLock == null) {
+            return;
+        }
+        try {
+            if (agentScreenWakeLock.isHeld()) {
+                agentScreenWakeLock.release();
+            }
+        } catch (RuntimeException ignored) {
+        }
+        agentScreenWakeLock = null;
     }
 
     private void scheduleAutoUpdateCheck(long delayMs) {
@@ -979,32 +1166,98 @@ public final class McpNodeService extends Service implements McpToolActions {
 
         long observationMs = android.os.SystemClock.elapsedRealtime() - observationStartedAt;
         boolean woke = !wasInteractive && interactive;
+        KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        boolean keyguardLocked = keyguard != null && keyguard.isKeyguardLocked();
         return new JSONObject()
                 .put("woke", woke)
                 .put("wasInteractive", wasInteractive)
                 .put("interactive", interactive)
                 .put("observationMs", observationMs)
-                .put("unlocked", false)
+                .put("keyguardLocked", keyguardLocked)
+                .put("unlocked", !keyguardLocked)
+                .put("keepsScreenAwake", false)
+                .put("backgroundKeepAlive", false)
                 .put("timestamp", Instant.now().toString())
                 .put("toolCallCount", callCount);
     }
 
     @Override
-    public JSONObject phoneEcho(String text, long callCount) throws JSONException {
-        vibrate();
-        String inboxId = AgentInboxStore.add(this, "phone.echo", "PickPico Agent", text);
-        String summary = "phone_echo #" + callCount + ": " + abbreviate(text, 80);
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putString(KEY_RECENT, summary + "\n" + Instant.now())
-                .putLong(KEY_CALL_COUNT, callCount)
-                .apply();
-        updateNotification(summary);
+    public JSONObject phoneHome(long callCount) throws JSONException {
+        JSONObject wake = phoneWake(callCount);
+        boolean interactive = wake.optBoolean("interactive", false);
+        KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        boolean keyguardLocked = keyguard != null && keyguard.isKeyguardLocked();
+        boolean secureKeyguard = keyguard != null && keyguard.isDeviceSecure();
+
+        Intent home = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        if (keyguardLocked) {
+            Intent unlock = new Intent(this, HyperUnlockActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            | Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    .putExtra(AgentAttention.EXTRA_FORWARD_INTENT, home);
+            try {
+                startActivity(unlock);
+                return new JSONObject()
+                        .put("woke", wake.optBoolean("woke", false))
+                        .put("interactive", interactive)
+                        .put("keyguardLocked", true)
+                        .put("secureKeyguard", secureKeyguard)
+                        .put("dismissRequested", true)
+                        .put("homeRequested", true)
+                        .put("atHome", false)
+                        .put("requiresUserAction", secureKeyguard)
+                        .put("transition", "keyguard_dismiss_requested")
+                        .put("toolCallCount", callCount);
+            } catch (RuntimeException error) {
+                return new JSONObject()
+                        .put("woke", wake.optBoolean("woke", false))
+                        .put("interactive", interactive)
+                        .put("keyguardLocked", true)
+                        .put("secureKeyguard", secureKeyguard)
+                        .put("dismissRequested", false)
+                        .put("homeRequested", false)
+                        .put("atHome", false)
+                        .put("requiresUserAction", true)
+                        .put("reason", "keyguard_transition_blocked")
+                        .put("toolCallCount", callCount);
+            }
+        }
+
+        boolean homeRequested = false;
+        String method = "launcher_intent";
+        if (McpAccessibilityService.hasAccess(this)) {
+            try {
+                JSONObject result = McpAccessibilityService.action(
+                        new JSONObject().put("action", "home"),
+                        callCount);
+                homeRequested = result.optBoolean("performed", false);
+                method = "accessibility_home";
+            } catch (RuntimeException ignored) {
+            }
+        }
+        if (!homeRequested) {
+            try {
+                startActivity(home);
+                homeRequested = true;
+                method = "launcher_intent";
+            } catch (RuntimeException ignored) {
+            }
+        }
+
         return new JSONObject()
-                .put("echo", text)
-                .put("inboxId", inboxId)
-                .put("executedOn", Build.MANUFACTURER + " " + Build.MODEL)
-                .put("timestamp", Instant.now().toString())
-                .put("action", "vibrated_and_updated_notification")
+                .put("woke", wake.optBoolean("woke", false))
+                .put("interactive", interactive)
+                .put("keyguardLocked", false)
+                .put("secureKeyguard", secureKeyguard)
+                .put("dismissRequested", false)
+                .put("homeRequested", homeRequested)
+                .put("atHome", homeRequested)
+                .put("requiresUserAction", !homeRequested)
+                .put("method", method)
                 .put("toolCallCount", callCount);
     }
 
@@ -1035,6 +1288,24 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         JSONObject result = deviceCapabilities.speak(arguments, callCount);
         recordCapabilityAction("phone.speak", result, callCount);
+        return result;
+    }
+
+    @Override
+    public JSONObject audioStatus(long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("audio", callCount);
+        }
+        return deviceCapabilities.audioStatus(callCount);
+    }
+
+    @Override
+    public JSONObject audioSet(JSONObject arguments, long callCount) throws JSONException {
+        if (deviceCapabilities == null) {
+            return capabilityRuntimeUnavailable("audio", callCount);
+        }
+        JSONObject result = deviceCapabilities.audioSet(arguments, callCount);
+        recordCapabilityAction("audio.set", result, callCount);
         return result;
     }
 
@@ -1407,7 +1678,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     }
 
     private Notification buildNotification(String message) {
-        Intent openIntent = new Intent(this, MainActivity.class);
+        Intent openIntent = new Intent(this, DashboardActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
                 0,

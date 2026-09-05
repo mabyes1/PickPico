@@ -158,7 +158,7 @@ final class CommandRuntime {
 
         register(
                 "phone.wake",
-                "Turn on the phone display without dismissing the lock screen.",
+                "Turn on the phone display only. This does not dismiss keyguard, navigate Home, keep the screen awake for background work, or keep PickPico running.",
                 "phone",
                 "physical_action",
                 true,
@@ -166,30 +166,13 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.phoneWake(callCount));
 
         register(
-                "phone.echo",
-                "Show an observable message through vibration and the foreground notification.",
+                "phone.home",
+                "Bring the phone toward an interactive Home state. Wakes the display, asks Android to dismiss keyguard through OS-owned authentication when needed, then navigates Home. Secure authentication is never bypassed.",
                 "phone",
-                "physical_action",
+                "ui_action",
                 true,
-                new JSONObject()
-                        .put("type", "object")
-                        .put("properties", new JSONObject()
-                                .put("text", new JSONObject()
-                                        .put("type", "string")
-                                        .put("minLength", 1)
-                                        .put("maxLength", 512)))
-                        .put("required", new JSONArray().put("text"))
-                        .put("additionalProperties", false),
-                (arguments, callCount) -> {
-                    String text = arguments.optString("text", "");
-                    if (text.isEmpty()) {
-                        throw new CommandInputException("phone.echo requires a non-empty text argument");
-                    }
-                    if (text.length() > 512) {
-                        throw new CommandInputException("phone.echo text is limited to 512 characters");
-                    }
-                    return actions.phoneEcho(text, callCount);
-                });
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.phoneHome(callCount));
 
         register(
                 "camera.capture",
@@ -236,7 +219,7 @@ final class CommandRuntime {
 
         register(
                 "phone.speak",
-                "Speak text through Android TextToSpeech so the Agent can address people near the phone.",
+                "Speak text through Android TextToSpeech. PickPico inspects media volume first and can raise very low volume to an audible level while respecting silent/DND state.",
                 "interaction",
                 "physical_action",
                 true,
@@ -256,6 +239,38 @@ final class CommandRuntime {
                         throw new CommandInputException("phone.speak queue must be flush or add");
                     }
                     return actions.phoneSpeak(arguments, callCount);
+                });
+
+        register(
+                "audio.status",
+                "Inspect Android media, notification, ringtone, and alarm volume separately, plus ringer mode and Do Not Disturb state.",
+                "audio",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.audioStatus(callCount));
+
+        register(
+                "audio.set",
+                "Set one Android audio stream by percentage without changing unrelated streams or Do Not Disturb state.",
+                "audio",
+                "physical_action",
+                true,
+                audioSetSchema(),
+                (arguments, callCount) -> {
+                    String stream = arguments.optString("stream", "");
+                    if (!"media".equals(stream)
+                            && !"notification".equals(stream)
+                            && !"ring".equals(stream)
+                            && !"alarm".equals(stream)) {
+                        throw new CommandInputException(
+                                "audio.set stream must be media, notification, ring, or alarm");
+                    }
+                    int percent = arguments.optInt("percent", -1);
+                    if (percent < 0 || percent > 100) {
+                        throw new CommandInputException("audio.set percent must be between 0 and 100");
+                    }
+                    return actions.audioSet(arguments, callCount);
                 });
 
         register(
@@ -934,22 +949,26 @@ final class CommandRuntime {
 
         List<SearchMatch> matches = new ArrayList<>();
         for (Command command : commands.values()) {
+            if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
+                continue;
+            }
+            int score = searchScore(query, command);
+            if (!query.isEmpty() && score <= 0) {
+                continue;
+            }
+
+            // Availability may consult Android system services (notification listener,
+            // accessibility settings, device admin, etc.). Do the cheap in-memory
+            // category/text filtering first so a narrow discovery query does not probe
+            // every unrelated capability and inherit an occasional Binder/settings stall.
             JSONObject state = actions.capabilityState(command.id);
             String commandGroup = state.optString(
                     "group",
                     AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
-            if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
-                continue;
-            }
             if (!group.isEmpty() && !group.equalsIgnoreCase(commandGroup)) {
                 continue;
             }
             if (availableOnly && !state.optBoolean("available", false)) {
-                continue;
-            }
-
-            int score = searchScore(query, command);
-            if (!query.isEmpty() && score <= 0) {
                 continue;
             }
             matches.add(new SearchMatch(command, state, score));
@@ -1229,20 +1248,30 @@ final class CommandRuntime {
     }
 
     private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
-        if (requiresApproval(command)) {
-            JSONObject approval = actions.requestApproval(
-                    command.id,
-                    command.description,
-                    command.risk,
-                    arguments,
-                    callCount);
-            if (!approval.optBoolean("approved", false)) {
-                String status = approval.optString("status", "rejected");
-                throw new CommandInputException(
-                        "Human approval not granted for " + command.id + " (" + status + ")");
+        // Every capability funnels through here. Android uses these lifecycle
+        // hooks to keep the display awake for the whole Agent operation and to
+        // renew a short idle lease after the command finishes. The finish hook
+        // matters for commands such as phone.wake that turn the display on only
+        // after the start hook has already observed a sleeping device.
+        actions.onAgentCommandStarted(command.id);
+        try {
+            if (requiresApproval(command)) {
+                JSONObject approval = actions.requestApproval(
+                        command.id,
+                        command.description,
+                        command.risk,
+                        arguments,
+                        callCount);
+                if (!approval.optBoolean("approved", false)) {
+                    String status = approval.optString("status", "rejected");
+                    throw new CommandInputException(
+                            "Human approval not granted for " + command.id + " (" + status + ")");
+                }
             }
+            return command.handler.call(arguments, callCount);
+        } finally {
+            actions.onAgentCommandFinished(command.id);
         }
-        return command.handler.call(arguments, callCount);
     }
 
     private boolean requiresApproval(Command command) {
@@ -1469,6 +1498,30 @@ final class CommandRuntime {
                                 .put("enum", new JSONArray().put("flush").put("add"))
                                 .put("default", "flush")))
                 .put("required", new JSONArray().put("text"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject audioSetSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("stream", new JSONObject()
+                                .put("type", "string")
+                                .put("enum", new JSONArray()
+                                        .put("media")
+                                        .put("notification")
+                                        .put("ring")
+                                        .put("alarm")))
+                        .put("percent", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 0)
+                                .put("maximum", 100)
+                                .put("description", "Requested volume as a percentage of the stream maximum."))
+                        .put("showUi", new JSONObject()
+                                .put("type", "boolean")
+                                .put("default", false)
+                                .put("description", "Ask Android to briefly show its native volume UI.")))
+                .put("required", new JSONArray().put("stream").put("percent"))
                 .put("additionalProperties", false);
     }
 

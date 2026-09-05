@@ -43,8 +43,6 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_NODE_MEDIA = 101;
     private static final int REQUEST_LOCATION = 102;
     private static final int REQUEST_SCREEN_CAPTURE = 103;
-    private static volatile boolean uiVisible;
-
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView statusView;
     private TextView endpointView;
@@ -90,20 +88,14 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        uiVisible = true;
         refreshMediaForegroundTypesIfRunning();
         handler.post(refreshTask);
     }
 
     @Override
     protected void onPause() {
-        uiVisible = false;
         handler.removeCallbacks(refreshTask);
         super.onPause();
-    }
-
-    static boolean isUiVisible() {
-        return uiVisible;
     }
 
     private View buildContent() {
@@ -325,7 +317,7 @@ public final class MainActivity extends Activity {
         TextView note = text(
                 "This build exposes only explicit phone capabilities. phone_status is read-only; " +
                         "phone_exec remains a restricted compatibility tool; exec_command runs Linux shell " +
-                        "commands inside the PickPico app sandbox; phone_echo is observable.",
+                        "commands inside the PickPico app sandbox.",
                 13,
                 Typeface.NORMAL);
         note.setTextColor(Color.DKGRAY);

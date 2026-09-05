@@ -17,21 +17,30 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class McpHttpServerTest {
     private static final String TOKEN = "unit-test-token";
 
     private McpHttpServer server;
     private int port;
-    private final AtomicReference<String> echoed = new AtomicReference<>();
+    private AtomicInteger capabilityStateProbeCount;
+    private final AtomicBoolean failPhoneStatus = new AtomicBoolean();
 
     @Before
     public void setUp() throws Exception {
         try (ServerSocket reservation = new ServerSocket(0)) {
             port = reservation.getLocalPort();
         }
+        capabilityStateProbeCount = new AtomicInteger();
         server = new McpHttpServer(port, TOKEN, new McpToolActions() {
+            @Override
+            public JSONObject capabilityState(String commandId) throws org.json.JSONException {
+                capabilityStateProbeCount.incrementAndGet();
+                return McpToolActions.super.capabilityState(commandId);
+            }
+
             @Override
             public JSONObject serverInfo(long callCount) throws org.json.JSONException {
                 return new JSONObject().put("name", "test-node").put("toolCallCount", callCount);
@@ -39,6 +48,9 @@ public final class McpHttpServerTest {
 
             @Override
             public JSONObject phoneStatus(long callCount) throws org.json.JSONException {
+                if (failPhoneStatus.get()) {
+                    throw new SecurityException("simulated denied permission");
+                }
                 return new JSONObject()
                         .put("battery", new JSONObject().put("percent", 80))
                         .put("toolCallCount", callCount);
@@ -185,9 +197,15 @@ public final class McpHttpServerTest {
             }
 
             @Override
-            public JSONObject phoneEcho(String text, long callCount) throws org.json.JSONException {
-                echoed.set(text);
-                return new JSONObject().put("echo", text).put("toolCallCount", callCount);
+            public JSONObject phoneHome(long callCount) throws org.json.JSONException {
+                return new JSONObject()
+                        .put("woke", true)
+                        .put("interactive", true)
+                        .put("keyguardLocked", false)
+                        .put("homeRequested", true)
+                        .put("atHome", true)
+                        .put("requiresUserAction", false)
+                        .put("toolCallCount", callCount);
             }
 
             @Override
@@ -235,7 +253,7 @@ public final class McpHttpServerTest {
     }
 
     @Test
-    public void handlesLegacyInitializeAndPhoneEcho() throws Exception {
+    public void handlesLegacyInitialize() throws Exception {
         HttpResult initialize = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"," +
                         "\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{}," +
@@ -244,17 +262,6 @@ public final class McpHttpServerTest {
         assertEquals(200, initialize.status);
         assertEquals("2025-11-25",
                 new JSONObject(initialize.body).getJSONObject("result").getString("protocolVersion"));
-
-        HttpResult echo = post(
-                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\"," +
-                        "\"params\":{\"name\":\"phone_echo\",\"arguments\":{\"text\":\"hello phone\"}}}",
-                authorizedHeaders());
-        assertEquals(200, echo.status);
-        assertEquals("hello phone", echoed.get());
-        assertEquals("hello phone", new JSONObject(echo.body)
-                .getJSONObject("result")
-                .getJSONObject("structuredContent")
-                .getString("echo"));
     }
 
     @Test
@@ -279,6 +286,26 @@ public final class McpHttpServerTest {
                 .getJSONObject("structuredContent")
                 .getJSONObject("battery")
                 .getInt("percent"));
+    }
+
+    @Test
+    public void unexpectedToolFailureReturnsStructuredErrorInsteadOfDroppingConnection() throws Exception {
+        failPhoneStatus.set(true);
+        HttpResult failed = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":601,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"phone_status\",\"arguments\":{}}}",
+                authorizedHeaders());
+
+        assertEquals(200, failed.status);
+        JSONObject result = new JSONObject(failed.body).getJSONObject("result");
+        assertTrue(result.getBoolean("isError"));
+        assertTrue(result.getJSONArray("content").toString().contains("SecurityException"));
+
+        failPhoneStatus.set(false);
+        HttpResult recovered = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":602,\"method\":\"ping\"}",
+                authorizedHeaders());
+        assertEquals(200, recovered.status);
     }
 
     @Test
@@ -327,6 +354,7 @@ public final class McpHttpServerTest {
         assertTrue(!toolText.contains("camera_capture"));
         assertTrue(!toolText.contains("exec_command"));
 
+        capabilityStateProbeCount.set(0);
         HttpResult search = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":53,\"method\":\"tools/call\"," +
                         "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
@@ -339,6 +367,8 @@ public final class McpHttpServerTest {
         assertTrue(discovery.getJSONArray("matches").length() > 0);
         assertEquals("screen.capture", discovery.getJSONArray("matches").getJSONObject(0).getString("id"));
         assertTrue(discovery.getJSONArray("matches").getJSONObject(0).has("inputSchema"));
+        assertTrue(discovery.getInt("totalCandidates") < 10);
+        assertEquals(discovery.getInt("totalCandidates"), capabilityStateProbeCount.get());
 
         HttpResult chineseSearch = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":531,\"method\":\"tools/call\"," +
@@ -388,10 +418,9 @@ public final class McpHttpServerTest {
     }
 
     @Test
-    public void relayMigrationRecognizesBothHistoricalProjectEndpoints() {
-        assertTrue(RelayClient.isProjectLegacyRelayBaseUrl("https://relay.mcpocket.workers.dev"));
-        assertTrue(RelayClient.isProjectLegacyRelayBaseUrl("https://pickpico-relay.mcpocket.workers.dev/"));
-        assertTrue(!RelayClient.isProjectLegacyRelayBaseUrl("https://relay.pickpico.workers.dev"));
+    public void configuredRelayIsNotRedirected() {
+        assertEquals("https://relay.example.test",
+                RelayClient.migrateLegacyRelayIfNeeded(null, "https://relay.example.test/"));
     }
 
     @Test
@@ -484,16 +513,19 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(57, listed.getInt("count"));
+        assertEquals(59, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.ring"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.lock"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.wake"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("phone.home"));
         assertTrue(listed.getJSONArray("commands").toString().contains("camera.capture"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.notify"));
         assertTrue(listed.getJSONArray("commands").toString().contains("phone.speak"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("audio.status"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("audio.set"));
         assertTrue(listed.getJSONArray("commands").toString().contains("microphone.record"));
         assertTrue(listed.getJSONArray("commands").toString().contains("human.help"));
         assertTrue(listed.getJSONArray("commands").toString().contains("human.help.status"));
@@ -581,9 +613,12 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(57, capabilityList.getInt("count"));
+        assertEquals(59, capabilityList.getInt("count"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("phone.home"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.status"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.set"));
 
         HttpResult status = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\"," +
@@ -636,6 +671,22 @@ public final class McpHttpServerTest {
         assertEquals("phone.wake", execution.getString("commandId"));
         assertEquals("completed", execution.getString("status"));
         assertTrue(execution.getJSONObject("result").getBoolean("woke"));
+    }
+
+    @Test
+    public void commandRuntimeCanInvokeHomeCapabilityThroughDynamicCommandId() throws Exception {
+        HttpResult home = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":232,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"command_run\",\"arguments\":{" +
+                        "\"commandId\":\"phone.home\",\"arguments\":{}}}}",
+                authorizedHeaders());
+        assertEquals(200, home.status);
+        JSONObject execution = new JSONObject(home.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals("phone.home", execution.getString("commandId"));
+        assertEquals("completed", execution.getString("status"));
+        assertTrue(execution.getJSONObject("result").getBoolean("atHome"));
     }
 
     @Test
@@ -774,6 +825,28 @@ public final class McpHttpServerTest {
         HttpResult response = post("{not-json", authorizedHeaders());
         assertEquals(400, response.status);
         assertEquals(-32700, new JSONObject(response.body).getJSONObject("error").getInt("code"));
+    }
+
+    @Test
+    public void acceptsWorkspaceWritesLargerThanLegacy64KiBLimit() throws Exception {
+        String content = "x".repeat(70 * 1024);
+        String body = new JSONObject()
+                .put("jsonrpc", "2.0")
+                .put("id", 801)
+                .put("method", "tools/call")
+                .put("params", new JSONObject()
+                        .put("name", "workspace_write_file")
+                        .put("arguments", new JSONObject()
+                                .put("path", "large.txt")
+                                .put("content", content)))
+                .toString();
+
+        HttpResult response = post(body, authorizedHeaders());
+        assertEquals(200, response.status);
+        assertEquals(content.length(), new JSONObject(response.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent")
+                .getInt("bytesWritten"));
     }
 
     private Map<String, String> authorizedHeaders() {

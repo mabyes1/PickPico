@@ -21,7 +21,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 final class McpHttpServer {
-    private static final int MAX_BODY_BYTES = 64 * 1024;
+    // workspace.write accepts up to 1 MiB of text; leave room for JSON framing
+    // and UTF-8 expansion while still bounding memory use per connection.
+    private static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
     private static final int MAX_LINE_BYTES = 8 * 1024;
     private static final int SOCKET_TIMEOUT_MS = 10_000;
 
@@ -161,7 +163,21 @@ final class McpHttpServer {
             }
 
             String toolProfile = request.header("x-pickpico-tool-profile");
-            McpProtocol.Response response = protocol.handle(json, protocolVersion, toolProfile);
+            McpProtocol.Response response;
+            try {
+                response = protocol.handle(json, protocolVersion, toolProfile);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                if (message == null || message.trim().isEmpty()) {
+                    message = error.getClass().getSimpleName();
+                } else {
+                    message = error.getClass().getSimpleName() + ": " + message;
+                }
+                JSONObject body = McpProtocol.error(json.opt("id"), -32603, "Internal error: " + message);
+                writeText(output, 500, "Internal Server Error", "application/json; charset=utf-8",
+                        body.toString(), corsHeaders(origin));
+                return;
+            }
             Map<String, String> headers = corsHeaders(origin);
             headers.put("MCP-Protocol-Version", response.protocolVersion);
             if (response.body == null) {

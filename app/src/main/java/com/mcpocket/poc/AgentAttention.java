@@ -1,6 +1,8 @@
 package com.mcpocket.poc;
 
 import android.app.Activity;
+import android.app.ActivityOptions;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -28,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 
 /** Shared attention policy for Agent-originated notifications and human handoffs. */
 final class AgentAttention {
+    static final String EXTRA_FORWARD_INTENT = "com.mcpocket.poc.extra.HYPER_FORWARD_INTENT";
     private static final long SCREEN_WAKE_MS = 4500L;
     private static final long[] DOUBLE_PULSE_PATTERN_MS = {0L, 115L, 90L, 115L};
     private static final String VOICE_ASSET = "pickpico_voice.b64";
@@ -48,6 +51,14 @@ final class AgentAttention {
     }
 
     static boolean applyUrgentBehavior(Context context, Notification.Builder builder, int requestCode) {
+        return applyUrgentBehavior(context, builder, requestCode, null);
+    }
+
+    static boolean applyUrgentBehavior(
+            Context context,
+            Notification.Builder builder,
+            int requestCode,
+            Intent forwardIntent) {
         builder.setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setPriority(Notification.PRIORITY_HIGH);
         if (!McpocketPolicySettings.isHyperModeEnabled(context)) return false;
@@ -58,11 +69,28 @@ final class AgentAttention {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
                         | Intent.FLAG_ACTIVITY_NO_HISTORY);
-        PendingIntent fullScreen = PendingIntent.getActivity(
-                context,
-                15000 + Math.abs(requestCode % 10000),
-                unlock,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        if (forwardIntent != null) {
+            unlock.putExtra(EXTRA_FORWARD_INTENT, new Intent(forwardIntent));
+        }
+        int pendingRequestCode = 15000 + Math.abs(requestCode % 10000);
+        PendingIntent fullScreen;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ActivityOptions options = ActivityOptions.makeBasic()
+                    .setPendingIntentCreatorBackgroundActivityStartMode(
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+            fullScreen = PendingIntent.getActivity(
+                    context,
+                    pendingRequestCode,
+                    unlock,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE,
+                    options.toBundle());
+        } else {
+            fullScreen = PendingIntent.getActivity(
+                    context,
+                    pendingRequestCode,
+                    unlock,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        }
         builder.setFullScreenIntent(fullScreen, true);
         return true;
     }
@@ -72,6 +100,34 @@ final class AgentAttention {
         NotificationManager manager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         return manager != null && manager.canUseFullScreenIntent();
+    }
+
+    static boolean canLaunchBackgroundActivities(Context context) {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || Settings.canDrawOverlays(context);
+    }
+
+    static boolean canStartActivityNow(Context context) {
+        if (PickPicoApplication.isAppInForeground()) return true;
+        if (!McpocketPolicySettings.isHyperModeEnabled(context)
+                || !canLaunchBackgroundActivities(context)) {
+            return false;
+        }
+        KeyguardManager keyguard =
+                (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+        return keyguard == null || !keyguard.isKeyguardLocked();
+    }
+
+    static boolean requestBackgroundLaunchAccessIfNeeded(Activity activity) {
+        if (canLaunchBackgroundActivities(activity)) return false;
+        try {
+            Intent settings = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + activity.getPackageName()));
+            activity.startActivity(settings);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     static boolean requestHyperUnlockAccessIfNeeded(Activity activity) {

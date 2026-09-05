@@ -1,11 +1,14 @@
 param(
-    [string]$RelayBaseUrl = 'https://relay.pickpico.workers.dev',
+    [string]$RelayBaseUrl = $env:PICKPICO_RELAY_BASE_URL,
     [switch]$SkipBuild,
     [switch]$Device,
     [switch]$HumanHelp
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($RelayBaseUrl)) {
+    throw 'Specify your own Relay with -RelayBaseUrl or PICKPICO_RELAY_BASE_URL.'
+}
 $root = Split-Path -Parent $PSScriptRoot
 $adb = 'D:\DevTools\Android\platform-tools\adb.exe'
 $jdk = 'D:\DevTools\PhoneMonitorAndroid\jdk-17'
