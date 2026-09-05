@@ -123,7 +123,7 @@ flowchart LR
     P[PickPico Android Node]
     D[Capability Discovery<br/>& Approval Policy]
     CORE[Core Capabilities<br/>Camera · Location · Files<br/>Node.js · Share · Calendar]
-    HYPER[Hyper Mode<br/>UI · Screen Capture<br/>Notifications · Wake]
+    HYPER[Hyper Mode<br/>UI · Screen Capture<br/>Notifications · Home]
     HUMAN[HUMAN HELP<br/>Text · Choice · Photo · Camera]
     BLE[Optional BLE Button Pad]
     U[Human]
