@@ -70,6 +70,24 @@ final class AgentAttention {
         return applyUrgentBehavior(context, builder, requestCode, forwardIntent, true);
     }
 
+    static boolean tryLaunchLockedHumanHelp(Context context, Intent humanHelpIntent) {
+        if (!McpocketPolicySettings.isHyperModeEnabled(context)) return false;
+        if (!canLaunchBackgroundActivities(context)) return false;
+
+        KeyguardManager keyguard =
+                (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+        if (keyguard == null || !keyguard.isKeyguardLocked()) return false;
+
+        Intent direct = new Intent(humanHelpIntent)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        try {
+            context.startActivity(direct);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     private static boolean applyUrgentBehavior(
             Context context,
             Notification.Builder builder,

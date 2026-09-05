@@ -3,6 +3,7 @@ package com.mcpocket.poc;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.KeyguardManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -129,11 +130,27 @@ public final class HumanHelpActivity extends Activity {
         } catch (Exception ignored) {
         }
         setContentView(buildContent());
+        if (McpocketPolicySettings.isHyperModeEnabled(this)) {
+            getWindow().getDecorView().post(this::requestHyperKeyguardDismissal);
+        }
         if (getIntent().getBooleanExtra(EXTRA_CONFIRM_BLE_VOICE, false)) {
             showBleVoiceConfirmation(
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_PATH),
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_TRANSCRIPT),
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_STT_STATUS));
+        }
+    }
+
+    private void requestHyperKeyguardDismissal() {
+        KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        if (keyguard == null || !keyguard.isKeyguardLocked()) return;
+        try {
+            keyguard.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {
+                @Override public void onDismissSucceeded() { }
+                @Override public void onDismissCancelled() { }
+                @Override public void onDismissError() { }
+            });
+        } catch (RuntimeException ignored) {
         }
     }
 

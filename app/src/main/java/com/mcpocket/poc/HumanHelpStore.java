@@ -678,7 +678,12 @@ final class HumanHelpStore {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(false)
                 .setContentIntent(pending);
-        AgentAttention.applyHumanHelpBehavior(context, builder, requestId.hashCode(), open);
+        boolean launchedDirectly = AgentAttention.tryLaunchLockedHumanHelp(context, open);
+        if (!launchedDirectly) {
+            AgentAttention.applyHumanHelpBehavior(context, builder, requestId.hashCode(), open);
+        } else {
+            AgentAttention.applyPublicLockscreen(builder);
+        }
         Notification notification = builder.build();
         manager.notify(requestId.hashCode(), notification);
         AgentAttention.alert(context);
