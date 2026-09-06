@@ -50,7 +50,7 @@ PickPico 的目標不是做另一個「遠端遙控手機」工具，而是讓�
 
 ### HUMAN HELP：讓人類成為工作流程的一部分
 
-案例:請 Agent 協助檢查設備
+案例：請 Agent 協助檢查設備
 
 1. Agent 透過手機拍攝設備面板。
 2. 畫面看不清楚，Agent 判斷讓附近的人補拍最有效率。
@@ -71,13 +71,13 @@ PickPico 內建 Node.js Mobile runtime。Agent 可以在 App 私有工作空間�
 交代需求 → Agent 寫入程式 → 手機執行 → 取得結果
 ```
 
-案例:臨時網站架設
+案例：臨時網站架設
 
-人再沒電腦的環境、需要臨時產生HTTP網頁」
-1. Agent直接在手機沙盒寫出頁面，遇到設計或需判斷文提出求助
-2. 起 localhost server
-3. 再穿透成 public URL
-4. 提交臨時網站
+人在沒有電腦的環境下，臨時需要一個可公開瀏覽的產品介紹頁。
+1. Agent 直接在手機沙盒建立頁面，遇到需要設計或人類判斷的內容時發出求助。
+2. 在手機啟動 localhost server。
+3. 將服務穿透成 public URL。
+4. 交付臨時網站。
 
 
 ### 手機開發自迭代：讓手機成為開發節點
@@ -466,7 +466,7 @@ PickPico Logo、產品文案與本專案自製介面素材由團隊製作。若�
 | Ken Huang (`Ken`) | Product design、Android / MCP / Relay integration、Agent workflow、testing |
 | Kate Li（`Kate`） | Frontend UI/UX design、PICO 實體手機架設計 |
 
-本專案使用 OPEN AI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
+本專案使用 OpenAI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
 
 ## Repository 結構
 
