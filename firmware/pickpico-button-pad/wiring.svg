@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" role="img" aria-labelledby="title desc">
+  <title id="title">PickPico four-button ESP32-S3 wiring</title>
+  <desc id="desc">Four ESP32-S3 GPIO outputs power four simple three-pin button modules. The module outputs connect to four input GPIOs with internal pull-downs. Module ground pins are intentionally unused in the hackathon prototype.</desc>
+  <rect width="1100" height="520" rx="28" fill="#f7f7f5"/>
+  <text x="550" y="48" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#151515">PickPico button-pad prototype wiring</text>
+  <text x="550" y="79" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#555">Exact hackathon prototype wiring. GPIO15–18 are intentionally used as low-current 3.3 V sources.</text>
+
+  <rect x="55" y="115" width="220" height="330" rx="22" fill="#ffffff" stroke="#222" stroke-width="2"/>
+  <text x="165" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#111">ESP32-S3</text>
+
+  <g font-family="Arial, sans-serif" font-size="17" fill="#222">
+    <text x="86" y="205">GPIO15  HIGH</text>
+    <text x="86" y="260">GPIO16  HIGH</text>
+    <text x="86" y="315">GPIO17  HIGH</text>
+    <text x="86" y="370">GPIO18  HIGH</text>
+    <text x="174" y="205" text-anchor="end"></text>
+  </g>
+
+  <g font-family="Arial, sans-serif" font-size="17" fill="#222" text-anchor="end">
+    <text x="1040" y="205">GPIO4  INPUT_PULLDOWN</text>
+    <text x="1040" y="260">GPIO5  INPUT_PULLDOWN</text>
+    <text x="1040" y="315">GPIO6  INPUT_PULLDOWN</text>
+    <text x="1040" y="370">GPIO7  INPUT_PULLDOWN</text>
+  </g>
+
+  <g stroke="#333" stroke-width="3" fill="none">
+    <line x1="275" y1="198" x2="385" y2="198"/>
+    <line x1="275" y1="253" x2="385" y2="253"/>
+    <line x1="275" y1="308" x2="385" y2="308"/>
+    <line x1="275" y1="363" x2="385" y2="363"/>
+    <line x1="715" y1="198" x2="825" y2="198"/>
+    <line x1="715" y1="253" x2="825" y2="253"/>
+    <line x1="715" y1="308" x2="825" y2="308"/>
+    <line x1="715" y1="363" x2="825" y2="363"/>
+  </g>
+
+  <g font-family="Arial, sans-serif">
+    <g>
+      <rect x="385" y="173" width="330" height="50" rx="12" fill="#fff" stroke="#222" stroke-width="2"/>
+      <text x="550" y="204" text-anchor="middle" font-size="18" font-weight="700">Approve button module</text>
+    </g>
+    <g>
+      <rect x="385" y="228" width="330" height="50" rx="12" fill="#fff" stroke="#222" stroke-width="2"/>
+      <text x="550" y="259" text-anchor="middle" font-size="18" font-weight="700">Reject button module</text>
+    </g>
+    <g>
+      <rect x="385" y="283" width="330" height="50" rx="12" fill="#fff" stroke="#222" stroke-width="2"/>
+      <text x="550" y="314" text-anchor="middle" font-size="18" font-weight="700">Detail button module</text>
+    </g>
+    <g>
+      <rect x="385" y="338" width="330" height="50" rx="12" fill="#fff" stroke="#222" stroke-width="2"/>
+      <text x="550" y="369" text-anchor="middle" font-size="18" font-weight="700">Voice button module</text>
+    </g>
+  </g>
+
+  <g font-family="Arial, sans-serif" font-size="14" fill="#666">
+    <text x="400" y="166">VCC</text>
+    <text x="682" y="166">OUT</text>
+    <text x="400" y="221">VCC</text>
+    <text x="682" y="221">OUT</text>
+    <text x="400" y="276">VCC</text>
+    <text x="682" y="276">OUT</text>
+    <text x="400" y="331">VCC</text>
+    <text x="682" y="331">OUT</text>
+  </g>
+
+  <rect x="335" y="420" width="430" height="62" rx="14" fill="#fff" stroke="#888" stroke-dasharray="7 6"/>
+  <text x="550" y="447" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#333">Module GND pins: intentionally not connected</text>
+  <text x="550" y="469" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#666">Prototype shortcut only. Use normal 3V3/GND rails for a clean permanent design.</text>
+</svg>
