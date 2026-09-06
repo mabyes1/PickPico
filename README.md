@@ -461,10 +461,10 @@ PickPico Logo、產品文案與本專案自製介面素材由團隊製作。若�
 
 ## 團隊成員
 
-| Team member | Contribution |
+| 姓名 | 分工 |
 | --- | --- |
-| Ken Huang | Software product definition, system architecture, Android / MCP / Relay engineering, agent workflow, integration, testing, README & technical documentation |
-| Kate Li | PickPico Dock product definition, industrial design, physical interaction design, Dock specification & design documentation, brand identity, UI/UX visual design, demo visual design & production |
+| Ken Huang (`Ken`) | Product design、Android / MCP / Relay integration、Agent workflow、testing |
+| Kate Li（`Kate`） | Frontend UI/UX design、PICO 實體手機架設計 |
 
 本專案使用 OpenAI coding agents 協助開發、程式審閱與測試；產品方向、整合、實機驗證與最終決策由團隊負責。
 
