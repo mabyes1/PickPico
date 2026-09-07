@@ -86,7 +86,7 @@ public final class AgentInboxActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         shell.addView(buildTopBar(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(88)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -110,7 +110,7 @@ public final class AgentInboxActivity extends Activity {
         summaryIcon.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
         summary.addView(summaryIcon, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        inboxCount = text("0 EVENTS", 18, Typeface.BOLD, TEXT);
+        inboxCount = text("0 messages", 14, Typeface.BOLD, TEXT);
         inboxCount.setLetterSpacing(.035f);
         inboxCount.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
@@ -140,8 +140,8 @@ public final class AgentInboxActivity extends Activity {
 
         View nav = buildBottomNav();
         LinearLayout.LayoutParams navLayout = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(76));
-        navLayout.setMargins(dp(18), 0, dp(18), dp(8));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(66));
+        navLayout.setMargins(dp(4), 0, dp(4), dp(4));
         shell.addView(nav, navLayout);
         return stage;
     }
@@ -165,24 +165,21 @@ public final class AgentInboxActivity extends Activity {
     }
 
     private TextView navItem(String icon, String label, boolean active, int page) {
-        TextView item = text(icon + "\n" + label, 10, Typeface.BOLD, active ? GREEN : MUTED);
-        item.setGravity(Gravity.CENTER);
-        item.setLetterSpacing(.055f);
-        item.setLineSpacing(0f, 1.18f);
-        if (active) {
-            item.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, true));
-        } else {
-            item.setOnClickListener(v -> openDashboard(page));
-        }
-        return item;
+        return PulseNavigation.item(this, theme, label, active, () -> { if (!active) openDashboard(page); });
     }
 
     private void openDashboard(int page) {
         Intent intent = new Intent(this, DashboardActivity.class)
                 .putExtra(DashboardActivity.EXTRA_PAGE, page)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
         startActivity(intent);
         finish();
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
     }
 
     private void confirmClearInbox() {
@@ -209,8 +206,8 @@ public final class AgentInboxActivity extends Activity {
         titles.setOrientation(LinearLayout.VERTICAL);
         titles.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-        titles.addView(text("Activity", 27, Typeface.BOLD, TEXT));
-        TextView meta = text("AGENT ↔ HUMAN HISTORY", 10, Typeface.BOLD, BLUE);
+        titles.addView(text("Activity", 19, Typeface.BOLD, TEXT));
+        TextView meta = text("YOUR AGENT. IN ACTION.", 6, Typeface.NORMAL, DIM);
         meta.setLetterSpacing(.10f);
         meta.setPadding(0, dp(4), 0, 0);
         titles.addView(meta);
@@ -218,7 +215,7 @@ public final class AgentInboxActivity extends Activity {
         topStatusDot = text("● READY", 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
         topStatusDot.setLetterSpacing(.035f);
-        topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
+        topStatusDot.setBackground(null);
         bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(84), dp(34)));
         return bar;
     }
@@ -228,13 +225,13 @@ public final class AgentInboxActivity extends Activity {
         android.content.SharedPreferences prefs = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE);
         boolean running = McpNodeService.isNodeRunning();
         String relayUrl = prefs.getString(McpNodeService.KEY_RELAY_BASE_URL, "");
-        String relayStatus = prefs.getString(McpNodeService.KEY_RELAY_STATUS, "disabled");
+        String relayStatus = McpNodeService.relayStatus(prefs);
         boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
         boolean relayConnected = "connected".equals(relayStatus);
         int color = !running ? RED : relayConfigured && !relayConnected ? Color.rgb(246, 169, 69) : GREEN;
-        topStatusDot.setText(running ? "● READY" : "● OFF");
+        topStatusDot.setText(running ? "● Online" : "● Offline");
         topStatusDot.setTextColor(resolveThemeTextColor(color));
-        topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), color, false));
+        topStatusDot.setBackground(null);
         topStatusDot.setContentDescription(!running
                 ? "Node stopped"
                 : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready");
@@ -244,15 +241,52 @@ public final class AgentInboxActivity extends Activity {
         if (itemsContainer == null) return;
         renderPending();
         itemsContainer.removeAllViews();
+        JSONArray taskHistory = HomePulse.taskHistory();
+        for (int index = taskHistory.length() - 1; index >= 0; index--) {
+            JSONObject task = taskHistory.optJSONObject(index);
+            if (task == null) continue;
+            LinearLayout card = glassCard(false);
+            String agent = task.isNull("agent") ? "Agent" : task.optString("agent", "Agent");
+            card.addView(text(agent + " · " + task.optString("status", "created"), 12, Typeface.BOLD, BLUE));
+            String title = task.isNull("title") ? task.optString("objective") : task.optString("title");
+            TextView heading = text(title, 14, Typeface.BOLD, TEXT);
+            heading.setPadding(0, dp(8), 0, dp(6));
+            card.addView(heading);
+            TextView objective = text(task.optString("objective"), 13, Typeface.NORMAL, MUTED);
+            objective.setTextIsSelectable(true);
+            card.addView(objective);
+            JSONArray notes = task.optJSONArray("notes");
+            if (notes != null) for (int n = 0; n < notes.length(); n++) {
+                JSONObject note = notes.optJSONObject(n);
+                if (note != null) card.addView(text(note.optString("text"), 12, Typeface.NORMAL, MUTED));
+            }
+            LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
+            layout.bottomMargin = dp(12);
+            itemsContainer.addView(card, layout);
+        }
         JSONArray items = AgentInboxStore.list(this);
-        if (inboxCount != null) inboxCount.setText(items.length() + (items.length() == 1 ? " EVENT" : " EVENTS"));
+        JSONArray commands = HomePulse.commandHistory();
+        if (commands.length() > 0) {
+            LinearLayout history = glassCard(false);
+            history.addView(text("RECENT COMMANDS · THIS SESSION", 10, Typeface.BOLD, DIM));
+            for (int index = commands.length() - 1; index >= 0; index--) {
+                JSONObject command = commands.optJSONObject(index);
+                if (command == null) continue;
+                TextView line = text(command.optString("command") + (command.optBoolean("failed") ? " · failed" : " · finished")
+                        + "\n" + compactTimestamp(command.optString("at")), 12, Typeface.NORMAL, MUTED);
+                line.setPadding(0, dp(9), 0, dp(5));
+                history.addView(line);
+            }
+            itemsContainer.addView(history);
+        }
+        if (inboxCount != null) inboxCount.setText(items.length() + (items.length() == 1 ? " saved message" : " saved messages"));
         if (clearAction != null) {
             clearAction.setEnabled(items.length() > 0);
             clearAction.setAlpha(items.length() > 0 ? 1f : 0.35f);
         }
 
         String highlightedId = getIntent() == null ? "" : getIntent().getStringExtra(EXTRA_ENTRY_ID);
-        if (items.length() == 0) {
+        if (items.length() == 0 && taskHistory.length() == 0 && commands.length() == 0) {
             LinearLayout empty = glassCard(false);
             empty.addView(text("No activity yet", 15, Typeface.BOLD, TEXT));
             TextView detail = text("Agent requests, notifications, and human-help handoffs will appear here.", 12, Typeface.NORMAL, MUTED);
@@ -281,13 +315,13 @@ public final class AgentInboxActivity extends Activity {
 
             String itemTitle = item.optString("title", "");
             if (!itemTitle.isEmpty()) {
-                TextView heading = text(itemTitle, 16, Typeface.BOLD, TEXT);
+                TextView heading = text(itemTitle, 14, Typeface.BOLD, TEXT);
                 heading.setPadding(0, dp(7), 0, dp(2));
                 card.addView(heading);
             }
 
             String body = item.optString("body", "");
-            TextView bodyView = text(body, 14, Typeface.NORMAL, MUTED);
+            TextView bodyView = text(body, 13, Typeface.NORMAL, MUTED);
             bodyView.setTextIsSelectable(true);
             bodyView.setLineSpacing(0f, 1.08f);
             bodyView.setOnLongClickListener(v -> {
@@ -364,9 +398,9 @@ public final class AgentInboxActivity extends Activity {
     private LinearLayout glassCard(boolean accented) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(18), dp(16), dp(18), dp(16));
-        card.setBackground(PickPicoTheme.card(theme, dp(22), accented));
-        card.setElevation(dp(6));
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackground(PickPicoTheme.card(theme, dp(12), accented));
+        card.setElevation(0);
         return card;
     }
 

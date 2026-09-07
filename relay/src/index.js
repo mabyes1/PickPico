@@ -335,7 +335,7 @@ export class NodeRelay extends DurableObject {
     if (payload?.type !== "response" || typeof payload.requestId !== "string") return;
 
     const pending = this.pending.get(payload.requestId);
-    if (!pending) return;
+    if (!pending || pending.socket !== ws) return;
     clearTimeout(pending.timeout);
     if (pending.ackTimer) clearTimeout(pending.ackTimer);
     this.pending.delete(payload.requestId);
@@ -372,7 +372,7 @@ export class NodeRelay extends DurableObject {
   }
 
   isSocketHealthy(socket) {
-    return this.socketHeartbeatAgeMs(socket) <= HEARTBEAT_STALE_MS;
+    return socket.readyState === 1 && this.socketHeartbeatAgeMs(socket) <= HEARTBEAT_STALE_MS;
   }
 
   failPendingForSocket(socket, error) {

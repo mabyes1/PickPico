@@ -162,7 +162,24 @@ final class PickPicoTheme {
     }
 
     static Drawable card(State state, float radius, boolean accented) {
-        return new GlassDrawable(state, radius, false, accented);
+        return pulseSurface(state, radius, accented);
+    }
+
+    // The same quiet surface used by the Home pulse, shared by every content page.
+    static Drawable pulseSurface(State state, float radius, boolean accented) {
+        boolean light = isLightBackground(state);
+        int tint = (state.colorA & 0xffffff) | ((accented ? 48 : 18) << 24);
+        android.graphics.drawable.GradientDrawable surface = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{light ? Color.argb(170,255,255,255) : tint,
+                        light ? Color.argb(100,255,255,255) : Color.argb(100,12,14,16)});
+        float opacity = clamp((state.glassOpacity - DEFAULT_GLASS_OPACITY) / 100f, -.04f, .96f);
+        if (opacity != 0f) surface.setColors(new int[]{
+                light ? withAlpha(Color.WHITE, clamp(.67f + opacity * .3f, 0f, 1f)) : withAlpha(state.colorA, clamp((accented ? .188f : .071f) + opacity * .45f, 0f, 1f)),
+                light ? withAlpha(Color.WHITE, clamp(.39f + opacity * .5f, 0f, 1f)) : withAlpha(Color.rgb(12,14,16), clamp(.39f + opacity * .5f, 0f, 1f))});
+        surface.setCornerRadius(radius);
+        surface.setStroke(1, light ? Color.argb(28,0,0,0) : Color.argb(Math.round((accented ? 78 : 22) * clamp(state.highlight / (float) DEFAULT_HIGHLIGHT, .25f, 1.7f)),220,225,230));
+        return surface;
     }
 
     static Drawable strongGlass(State state, float radius) {

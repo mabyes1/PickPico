@@ -66,7 +66,7 @@ final class McpToolRegistry {
 
         register(
                 "task_create",
-                "Create a long-lived Agent task that can span multiple MCP commands, device capabilities, and human interactions.",
+                "Create a long-lived Agent task before multi-step phone work. Include agent (your actual name, e.g. Codex or Claude) and a short user-facing title. The phone displays these on Home. Keep task_update status accurate through running, waiting_human, blocked and completion.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
@@ -111,7 +111,7 @@ final class McpToolRegistry {
 
         register(
                 "capability_search",
-                "Search the connected PickPico device's dynamic abilities. Use this before concluding that a phone, app, screen, sensor, file, contact, calendar, notification, physical-world, or human-assisted action cannot be performed. Returns matching capability IDs, current availability/setup state, risk metadata, and input schemas.",
+                "Search the connected PickPico device's dynamic abilities and adaptive operation guides. For multi-step app/UI tasks, search the task intent and read a relevant guide via command_run guide.get before acting. Guides explain tool sequencing, pitfalls, recovery and result verification. Returns capability IDs, live availability/setup state, risk metadata, input schemas, and short guide summaries. Use this before concluding that a device action cannot be performed.",
                 capabilitySearchSchema(),
                 (arguments, callCount) -> runtime.search(arguments));
 

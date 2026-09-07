@@ -754,16 +754,16 @@ public final class HumanHelpActivity extends Activity {
                 long remainingSeconds = (remainingMs + 999L) / 1000L;
                 long minutes = remainingSeconds / 60L;
                 long seconds = remainingSeconds % 60L;
-                countdownStatus.setText((approvalRequest ? "等待核准" : "等待回覆")
+                setTextIfChanged(countdownStatus, (approvalRequest ? "等待核准" : "等待回覆")
                         + " · " + String.format(java.util.Locale.US, "%d:%02d", minutes, seconds));
                 countdownStatus.setTextColor(PickPicoTheme.accentB(theme));
                 countdownStatus.setVisibility(View.VISIBLE);
             } else if ("timed_out".equals(status)) {
-                countdownStatus.setText("等待已結束 · 已逾時");
+                setTextIfChanged(countdownStatus, "等待已結束 · 已逾時");
                 countdownStatus.setTextColor(PickPicoTheme.AMBER);
                 countdownStatus.setVisibility(View.VISIBLE);
             } else if ("completed".equals(status)) {
-                countdownStatus.setText("等待已結束 · 已完成");
+                setTextIfChanged(countdownStatus, "等待已結束 · 已完成");
                 countdownStatus.setTextColor(PickPicoTheme.GREEN);
                 countdownStatus.setVisibility(View.VISIBLE);
             } else {
@@ -772,7 +772,7 @@ public final class HumanHelpActivity extends Activity {
         }
         if (lifecycleStatus != null) {
             if ("timed_out".equals(status)) {
-                lifecycleStatus.setText(approvalRequest
+                setTextIfChanged(lifecycleStatus, approvalRequest
                         ? "此核准請求已逾時 · 操作不會執行。"
                         : "此請求已逾時 · AI 已停止等待，將自行決定下一步。");
                 lifecycleStatus.setTextColor(primaryTextColor());
@@ -780,7 +780,7 @@ public final class HumanHelpActivity extends Activity {
                         theme, dp(12), PickPicoTheme.AMBER, true));
                 lifecycleStatus.setVisibility(View.VISIBLE);
             } else if ("completed".equals(status)) {
-                lifecycleStatus.setText(approvalRequest
+                setTextIfChanged(lifecycleStatus, approvalRequest
                         ? "已完成 · Agent 已收到你的核准決定。"
                         : "已完成 · AI 已收到你的回覆。");
                 lifecycleStatus.setTextColor(primaryTextColor());
@@ -788,7 +788,7 @@ public final class HumanHelpActivity extends Activity {
                         theme, dp(12), PickPicoTheme.GREEN, true));
                 lifecycleStatus.setVisibility(View.VISIBLE);
             } else if (!waiting) {
-                lifecycleStatus.setText("此請求已結束，無法再提交回覆。");
+                setTextIfChanged(lifecycleStatus, "此請求已結束，無法再提交回覆。");
                 lifecycleStatus.setVisibility(View.VISIBLE);
             } else {
                 lifecycleStatus.setVisibility(View.GONE);
@@ -806,7 +806,7 @@ public final class HumanHelpActivity extends Activity {
         }
         int max = request.optInt("maxImages", 3);
         if (attachmentStatus != null) {
-            attachmentStatus.setText(count == 0
+            setTextIfChanged(attachmentStatus, count == 0
                     ? "No images attached"
                     : count + " / " + max + " image(s) attached");
         }
@@ -877,7 +877,7 @@ public final class HumanHelpActivity extends Activity {
     private LinearLayout glassCard() {
         LinearLayout card = new LinearLayout(this);
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
-        card.setBackground(PickPicoTheme.card(theme, dp(20), false));
+        card.setBackground(PickPicoTheme.card(theme, dp(12), false));
         return card;
     }
 
@@ -1054,6 +1054,14 @@ public final class HumanHelpActivity extends Activity {
         view.setTextSize(sp);
         view.setTypeface(Typeface.DEFAULT, style);
         return view;
+    }
+
+    private static void setTextIfChanged(TextView view, CharSequence value) {
+        if (view == null) return;
+        CharSequence next = value == null ? "" : value;
+        if (!TextUtils.equals(view.getText(), next)) {
+            view.setText(next);
+        }
     }
 
     private int dp(int value) {

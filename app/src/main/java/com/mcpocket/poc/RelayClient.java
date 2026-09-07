@@ -93,13 +93,21 @@ final class RelayClient {
         return normalizeBaseUrl(relayBaseUrl);
     }
 
-    void start() {
+    static void resetIdentity(SharedPreferences prefs) {
+        prefs.edit()
+                .remove(PREF_NODE_ID)
+                .remove(PREF_NODE_SECRET)
+                .apply();
+    }
+
+    synchronized void start() {
+        if (webSocket != null) return;
         closed = false;
         reconnectAttempt = 0;
         connect();
     }
 
-    void close() {
+    synchronized void close() {
         closed = true;
         mainHandler.removeCallbacksAndMessages(null);
         clearHeartbeatState();
@@ -113,8 +121,8 @@ final class RelayClient {
         listener.onRelayState("stopped", "", "relay stopped");
     }
 
-    private void connect() {
-        if (closed) {
+    private synchronized void connect() {
+        if (closed || webSocket != null) {
             return;
         }
         listener.onRelayState("connecting", remoteEndpoint, "connecting to relay");
@@ -125,9 +133,21 @@ final class RelayClient {
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(WebSocket webSocket, Response response) {
-                reconnectAttempt = 0;
-                listener.onRelayState("verifying", remoteEndpoint, "relay socket open; verifying heartbeat");
-                startHeartbeatLoop(webSocket);
+                synchronized (RelayClient.this) {
+                    if (closed || RelayClient.this.webSocket != webSocket) {
+                        webSocket.cancel();
+                        return;
+                    }
+                    listener.onRelayState("verifying", remoteEndpoint, "relay socket open; verifying heartbeat");
+                    startHeartbeatLoop(webSocket);
+                }
+            }
+
+            @Override
+            public void onClosing(WebSocket webSocket, int code, String reason) {
+                // A peer close stops delivery before onClosed. Do not wait for a
+                // close handshake (or a cancel callback) to recover the node.
+                recover(webSocket, "relay closing: " + code);
             }
 
             @Override
@@ -137,41 +157,34 @@ final class RelayClient {
 
             @Override
             public void onClosed(WebSocket webSocket, int code, String reason) {
-                if (RelayClient.this.webSocket != webSocket) {
-                    return;
-                }
-                RelayClient.this.webSocket = null;
-                clearHeartbeatState();
-                if (!closed) {
-                    listener.onRelayState("disconnected", remoteEndpoint, "relay closed: " + reason);
-                    scheduleReconnect();
-                }
+                recover(webSocket, "relay closed: " + code);
             }
 
             @Override
             public void onFailure(WebSocket webSocket, Throwable error, Response response) {
-                if (RelayClient.this.webSocket != webSocket) {
-                    return;
-                }
-                RelayClient.this.webSocket = null;
-                clearHeartbeatState();
-                if (!closed) {
-                    listener.onRelayState("disconnected", remoteEndpoint,
-                            "relay error: " + error.getClass().getSimpleName());
-                    scheduleReconnect();
-                }
+                recover(webSocket, "relay error: " + error.getClass().getSimpleName());
             }
         });
     }
 
+    private synchronized void recover(WebSocket socket, String detail) {
+        if (closed || socket != webSocket) return;
+        webSocket = null;
+        clearHeartbeatState();
+        socket.cancel();
+        listener.onRelayState("disconnected", remoteEndpoint, detail);
+        scheduleReconnect();
+    }
+
     private void scheduleReconnect() {
+        if (closed) return;
         int index = Math.min(reconnectAttempt, RECONNECT_DELAYS_MS.length - 1);
         long delay = RECONNECT_DELAYS_MS[index];
         reconnectAttempt++;
         mainHandler.postDelayed(this::connect, delay);
     }
 
-    private void sendHeartbeat(WebSocket socket) {
+    private synchronized void sendHeartbeat(WebSocket socket) {
         if (closed || socket != webSocket || pendingHeartbeatNonce != null) {
             return;
         }
@@ -186,12 +199,12 @@ final class RelayClient {
             if (!queued) {
                 pendingHeartbeatNonce = null;
                 listener.onRelayState("stale", remoteEndpoint, "relay heartbeat could not be queued");
-                socket.cancel();
+                recover(socket, "relay heartbeat could not be queued");
                 return;
             }
         } catch (JSONException error) {
             pendingHeartbeatNonce = null;
-            socket.cancel();
+            recover(socket, "relay heartbeat failed");
             return;
         }
         ScheduledFuture<?> previousTimeout = heartbeatTimeoutFuture;
@@ -214,13 +227,13 @@ final class RelayClient {
                 TimeUnit.MILLISECONDS);
     }
 
-    private void handleHeartbeatTimeout(WebSocket socket, String nonce) {
+    private synchronized void handleHeartbeatTimeout(WebSocket socket, String nonce) {
         if (closed || socket != webSocket || !nonce.equals(pendingHeartbeatNonce)) {
             return;
         }
         pendingHeartbeatNonce = null;
         listener.onRelayState("stale", remoteEndpoint, "relay heartbeat timed out");
-        socket.cancel();
+        recover(socket, "relay heartbeat timed out");
     }
 
     private void clearHeartbeatState() {
@@ -237,8 +250,8 @@ final class RelayClient {
         }
     }
 
-    private void handleHeartbeatPong(WebSocket socket, JSONObject payload) {
-        if (socket != webSocket) {
+    private synchronized void handleHeartbeatPong(WebSocket socket, JSONObject payload) {
+        if (closed || socket != webSocket) {
             return;
         }
         String nonce = payload.optString("nonce", "");
@@ -251,10 +264,12 @@ final class RelayClient {
         if (timeout != null) {
             timeout.cancel(false);
         }
+        reconnectAttempt = 0;
         listener.onRelayState("connected", remoteEndpoint, "relay heartbeat healthy");
     }
 
-    private void handleRelayMessage(WebSocket socket, String text) {
+    private synchronized void handleRelayMessage(WebSocket socket, String text) {
+        if (closed || socket != webSocket) return;
         final JSONObject envelope;
         try {
             envelope = new JSONObject(text);
@@ -278,11 +293,11 @@ final class RelayClient {
                     .put("requestId", requestId)
                     .toString());
             if (!acknowledged) {
-                socket.cancel();
+                recover(socket, "relay acknowledgement could not be queued");
                 return;
             }
         } catch (JSONException error) {
-            socket.cancel();
+            recover(socket, "relay acknowledgement failed");
             return;
         }
         requestExecutor.execute(() -> proxyToLoopback(socket, envelope));
@@ -324,7 +339,9 @@ final class RelayClient {
                         .put("status", response.code())
                         .put("headers", responseHeaders)
                         .put("body", responseBody);
-                socket.send(result.toString());
+                if (!socket.send(result.toString())) {
+                    recover(socket, "relay response could not be queued");
+                }
             }
         } catch (Exception error) {
             try {

@@ -74,6 +74,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private static final long AGENT_SCREEN_ACTIVE_LEASE_MS = TimeUnit.MINUTES.toMillis(10L);
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
+    public static final String ACTION_RESET_RELAY_IDENTITY = "com.mcpocket.poc.action.RESET_RELAY_IDENTITY";
     public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_ENABLE_MEDIA_FGS = "enableMediaForegroundCapabilities";
@@ -86,6 +87,15 @@ public final class McpNodeService extends Service implements McpToolActions {
     public static final String KEY_REMOTE_ENDPOINT = "remote_endpoint";
     public static final String KEY_RELAY_BASE_URL = "relay_base_url";
     public static final String KEY_RELAY_STATUS = "relay_status";
+    private static final String KEY_RELAY_HEARTBEAT = "relay_heartbeat_elapsed";
+
+    static String relayStatus(SharedPreferences prefs) {
+        String status = prefs.getString(KEY_RELAY_STATUS, "disabled");
+        long age = SystemClock.elapsedRealtime() - prefs.getLong(KEY_RELAY_HEARTBEAT, -1L);
+        if ("connected".equals(status) && (age < 0 || age > 35_000L
+                || !prefs.contains(KEY_RELAY_HEARTBEAT))) return "stale";
+        return status;
+    }
     public static final String KEY_TOKEN = "token";
     public static final String KEY_RECENT = "recent";
     public static final String KEY_CALL_COUNT = "call_count";
@@ -135,6 +145,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public void onCreate() {
         super.onCreate();
+        HomePulse.reset();
         createNotificationChannel();
         deviceCapabilities = new AndroidDeviceCapabilities(this, workspaceRoot());
         buttonBridge = new BleButtonBridge(this);
@@ -143,6 +154,13 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
+        if (ACTION_RESET_RELAY_IDENTITY.equals(action)) {
+            resetRelayIdentity(this);
+            if (nodeActive) {
+                startRelayIfConfigured();
+            }
+            return START_NOT_STICKY;
+        }
         if (ACTION_STOP.equals(action)) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(KEY_DESIRED_RUNNING, false)
@@ -219,6 +237,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public void onDestroy() {
         nodeActive = false;
+        HomePulse.reset();
         agentScreenDestroyed = true;
         mainHandler.removeCallbacks(agentScreenRetryRunnable);
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
@@ -519,6 +538,7 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public JSONObject serverInfo(long callCount) throws JSONException {
+        refreshLocalEndpoint();
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         return new JSONObject()
                 .put("name", "PickPico")
@@ -529,8 +549,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("endpoint", endpoint)
                 .put("remoteEndpoint", getSharedPreferences(PREFS, MODE_PRIVATE)
                         .getString(KEY_REMOTE_ENDPOINT, ""))
-                .put("relayStatus", getSharedPreferences(PREFS, MODE_PRIVATE)
-                        .getString(KEY_RELAY_STATUS, "disabled"))
+                .put("relayStatus", relayStatus(getSharedPreferences(PREFS, MODE_PRIVATE)))
                 .put("workspaceRoot", workspaceRoot().getAbsolutePath())
                 .put("uptimeSeconds", uptimeMs / 1000L)
                 .put("toolCallCount", callCount);
@@ -538,6 +557,7 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public JSONObject phoneStatus(long callCount) throws JSONException {
+        refreshLocalEndpoint();
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
         BatteryManager battery = (BatteryManager) getSystemService(BATTERY_SERVICE);
         int batteryPercent = battery == null
@@ -576,8 +596,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                         .put("endpoint", endpoint)
                         .put("remoteEndpoint", getSharedPreferences(PREFS, MODE_PRIVATE)
                                 .getString(KEY_REMOTE_ENDPOINT, ""))
-                        .put("relayStatus", getSharedPreferences(PREFS, MODE_PRIVATE)
-                                .getString(KEY_RELAY_STATUS, "disabled"))
+                        .put("relayStatus", relayStatus(getSharedPreferences(PREFS, MODE_PRIVATE)))
                         .put("uptimeSeconds", uptimeMs / 1000L)
                         .put("toolCallCount", callCount));
     }
@@ -1623,9 +1642,13 @@ public final class McpNodeService extends Service implements McpToolActions {
         relayClient = new RelayClient(this, relayBaseUrl, new RelayClient.Listener() {
             @Override
             public void onRelayState(String status, String remoteEndpoint, String detail) {
+                refreshLocalEndpoint();
                 SharedPreferences.Editor editor = getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                         .putString(KEY_RELAY_STATUS, status)
                         .putString(KEY_REMOTE_ENDPOINT, remoteEndpoint == null ? "" : remoteEndpoint);
+                if ("connected".equals(status)) {
+                    editor.putLong(KEY_RELAY_HEARTBEAT, SystemClock.elapsedRealtime());
+                }
                 if (detail != null && !detail.isEmpty()) {
                     editor.putString(KEY_RECENT, "relay: " + detail + "\n" + Instant.now());
                 }
@@ -1640,6 +1663,16 @@ public final class McpNodeService extends Service implements McpToolActions {
             relayClient.close();
             relayClient = null;
         }
+    }
+
+    public static void resetRelayIdentity(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        RelayClient.resetIdentity(prefs);
+        prefs.edit()
+                .putString(KEY_REMOTE_ENDPOINT, "")
+                .putString(KEY_RELAY_STATUS, "reset")
+                .remove(KEY_RELAY_HEARTBEAT)
+                .apply();
     }
 
     private void recordFailure(String message) {
@@ -1749,6 +1782,15 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .putLong(KEY_CALL_COUNT, callCount)
                 .apply();
         updateNotification(summary);
+    }
+
+    private synchronized void refreshLocalEndpoint() {
+        if (!nodeActive) return;
+        String current = "http://" + findLanAddress() + ":" + PORT + "/mcp";
+        if (current.equals(endpoint)) return;
+        endpoint = current;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_ENDPOINT, current).apply();
+        updateNotification("Listening on " + current);
     }
 
     private static String findLanAddress() {

@@ -111,14 +111,19 @@ final class McpProtocol {
             return "PickPico is a dynamic real-world Mobile Agent Node. The small top-level MCP tool list is a stable gateway, "
                     + "not the complete device capability set. Before saying that a phone, app, screen, sensor, file, "
                     + "contact, calendar, notification, physical-world, or human-assisted action cannot be performed, "
-                    + "call capability_search first. Execute discovered abilities with command_run. Representative "
+                    + "call capability_search first. For multi-step app/UI tasks, search the task intent and read the relevant returned guide using command_run guide.get. "
+                    + "Guides provide adaptive decisions, recovery and verification, not fixed scripts. Re-observe after UI changes; a completed tool call is not proof of task success. "
+                    + "Execute discovered abilities with command_run. Representative "
+                    + "For a multi-step task, call task_create with your agent name and a short user-facing title, "
+                    + "then task_update as running, waiting_human, blocked, or completed as appropriate so the phone can show live task status. "
                     + "capabilities include screen.capture, camera.capture, ui.inspect, ui.action, human.help, "
                     + "notification.reply, app.launch, location.get, workspace.read, and process.exec; examples are not exhaustive. "
                     + "Capability results report available/setup-required/disabled state, so guide required human setup rather than refusing prematurely.";
         }
         return "PickPico is a user-started real-world Mobile Agent Node for Android. It lets an external Agent execute work, "
                 + "sense through phone hardware, operate apps, and interact with people nearby. The full compatibility profile "
-                + "exposes direct tools plus the dynamic capability runtime.";
+                + "exposes direct tools plus the dynamic capability runtime. For multi-step app/UI tasks, use capability_search to find an operation guide, "
+                + "then command_run guide.get to read its decisions, pitfalls and verification rules before acting. A completed tool call is not proof of task success.";
     }
 
     private static JSONObject capabilities() throws JSONException {

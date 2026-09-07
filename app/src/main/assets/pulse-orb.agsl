@@ -1,0 +1,69 @@
+uniform float2 resolution;
+uniform float time;
+uniform float energy;
+uniform float tension;
+layout(color) uniform half4 primary;
+layout(color) uniform half4 secondary;
+
+float hash(float2 p) {
+    p = fract(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+float noise(float2 p) {
+    float2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + float2(1, 0)), f.x),
+               mix(hash(i + float2(0, 1)), hash(i + float2(1, 1)), f.x), f.y);
+}
+float cloud(float2 p) {
+    float v = 0.0, amplitude = 0.52;
+    for (int i = 0; i < 5; i++) {
+        v += amplitude * noise(p);
+        p = float2(p.x * 1.62 - p.y * 1.18, p.x * 1.18 + p.y * 1.62) + 13.7;
+        amplitude *= 0.48;
+    }
+    return v;
+}
+half4 main(float2 coord) {
+    float radius = min(resolution.x * 0.335, resolution.y * 0.397);
+    float2 p = (coord - resolution * 0.5) / radius;
+    float d = length(p);
+    float t = time;
+    float breath = 1.0 + sin(t * 0.72) * 0.009;
+    p /= breath; d /= breath;
+    float edge = 1.5 / radius;
+    float body = 1.0 - smoothstep(1.0 - edge, 1.0 + edge, d);
+    float3 a = float3(primary.rgb), b = float3(secondary.rgb);
+    float3 pearl = mix(a, float3(1.0), 0.88);
+    float halo = exp(-max(d - 1.0, 0.0) * 5.5) * 0.18;
+    halo += exp(-pow((d - 1.035) * 22.0, 2.0)) * 0.16;
+    halo *= 1.0 - smoothstep(1.05, 1.62, d);
+    float ring = (1.0 - smoothstep(0.001, 0.006, abs(d - 1.255))) * 0.11;
+    ring += (1.0 - smoothstep(0.001, 0.005, abs(d - 1.43))) * 0.045;
+    float angle = atan(p.y, p.x);
+    ring *= 0.6 + 0.4 * sin(angle * 2.0 + t * 0.12);
+    float glowAlpha = clamp(halo + ring, 0.0, 0.55) * energy;
+
+    // A spherical domain, warped twice. Both the cloud and its boundary advect.
+    float z = sqrt(max(0.0, 1.0 - dot(p, p)));
+    float2 sphere = p / (0.62 + z * 0.38);
+    float2 drift = float2(t * 0.15, -t * 0.11);
+    float2 q = float2(cloud(sphere * 2.1 + drift), cloud(sphere * 2.1 - drift + 7.3));
+    float mist = cloud(sphere * 3.3 + q * 2.5 + float2(-t * 0.12, t * 0.09));
+    float filaments = cloud(sphere * 10.0 + q * 4.0 + drift * 1.6);
+    float front = p.y + 0.15 * sin(p.x * 2.8 + t * 0.4) + (mist - 0.5) * 0.8;
+    float white = smoothstep(-0.15, 0.29, front);
+    float3 pigment = mix(a, b, clamp(mist * 0.55 + p.x * 0.12, 0.0, 1.0));
+    pigment *= 0.77 + z * 0.3 + mist * 0.16;
+    float3 col = mix(pigment, pearl, white);
+    float lace = exp(-abs(front - 0.05) * 15.0) * (0.3 + filaments * 0.7);
+    col = mix(col, float3(1.0), lace * 0.62);
+    col += pow(max(0.0, 1.0 - length(p - float2(-0.53, 0.21)) * 0.85), 5.0) * 0.45;
+    float rim = pow(clamp(d, 0.0, 1.0), 32.0) * 0.6;
+    col = mix(col, pearl, rim);
+    col *= energy * (1.0 - tension * 0.08 * sin(t * 1.2 + mist * 4.0));
+    float alpha = body + (1.0 - body) * glowAlpha;
+    float3 premul = col * body + a * glowAlpha * (1.0 - body);
+    return half4(half3(clamp(premul, 0.0, 1.0)), half(alpha));
+}

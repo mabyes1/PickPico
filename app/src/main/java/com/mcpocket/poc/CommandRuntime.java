@@ -72,6 +72,31 @@ final class CommandRuntime {
     CommandRuntime(McpToolActions actions) throws JSONException {
         this.actions = actions;
         register(
+                "guide.get",
+                "Read an adaptive phone-operation guide discovered by capability_search. Includes decision branches, pitfalls, verification and live capability states; does not execute phone actions.",
+                "guide", "read_only", false,
+                new JSONObject().put("type", "object")
+                        .put("properties", new JSONObject().put("guideId", new JSONObject()
+                                .put("type", "string").put("minLength", 1).put("maxLength", 80)))
+                        .put("required", new JSONArray().put("guideId"))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> {
+                    JSONObject guide;
+                    try {
+                        guide = OperationGuides.get(arguments.optString("guideId", ""));
+                    } catch (IllegalArgumentException error) {
+                        throw new CommandInputException(error.getMessage());
+                    }
+                    JSONArray ids = guide.getJSONArray("capabilityIds");
+                    JSONArray states = new JSONArray();
+                    for (int i = 0; i < ids.length(); i++) {
+                        String id = ids.getString(i);
+                        states.put(new JSONObject().put("id", id).put("state", actions.capabilityState(id)));
+                    }
+                    return guide.put("capabilityStates", states)
+                            .put("stateHint", "States are a snapshot, not permission or a guarantee. Search the exact capability ID for its current input schema before an unfamiliar call.");
+                });
+        register(
                 "node.info",
                 "Return PickPico node and Android device information.",
                 "node",
@@ -1016,8 +1041,9 @@ final class CommandRuntime {
                 .put("matches", result)
                 .put("count", result.length())
                 .put("totalCandidates", matches.size())
+                .put("guides", OperationGuides.search(query, result))
                 .put("discoveryHint",
-                        "Capabilities are dynamic. Search before concluding that a requested device action is unsupported.");
+                        "Capabilities are dynamic. For multi-step app/UI tasks, read a relevant guide with command_run guide.get before acting. Guides are advice, independent of capability filters; their tools may require setup. Search before concluding that an action is unsupported.");
     }
 
     JSONObject execute(String commandId, JSONObject arguments, long callCount) throws JSONException {
@@ -1254,6 +1280,8 @@ final class CommandRuntime {
         // matters for commands such as phone.wake that turn the display on only
         // after the start hook has already observed a sleeping device.
         actions.onAgentCommandStarted(command.id);
+        long pulseId = HomePulse.begin(command.id);
+        boolean pulseFailed = true;
         try {
             if (requiresApproval(command)) {
                 JSONObject approval = actions.requestApproval(
@@ -1268,8 +1296,14 @@ final class CommandRuntime {
                             "Human approval not granted for " + command.id + " (" + status + ")");
                 }
             }
-            return command.handler.call(arguments, callCount);
+            JSONObject result = command.handler.call(arguments, callCount);
+            String resultStatus = result.optString("status", "");
+            pulseFailed = result.optBoolean("isError", false) || resultStatus.equals("failed")
+                    || resultStatus.equals("error") || resultStatus.equals("rejected")
+                    || (result.has("success") && !result.optBoolean("success"));
+            return result;
         } finally {
+            HomePulse.finish(pulseId, pulseFailed);
             actions.onAgentCommandFinished(command.id);
         }
     }
@@ -1354,6 +1388,7 @@ final class CommandRuntime {
         if (commands.containsKey(id)) {
             throw new IllegalArgumentException("Duplicate command: " + id);
         }
+        HomePulse.registerCapability(id);
         commands.put(id, new Command(
                 id, description, category, risk, sideEffect, inputSchema, handler));
     }

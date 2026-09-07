@@ -33,8 +33,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
-import android.transition.AutoTransition;
-import android.transition.TransitionManager;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -102,7 +100,7 @@ public final class DashboardActivity extends Activity {
 
     private FrameLayout contentHost;
     private TextView topBack;
-    private ImageView topBrandLogo;
+    private PulseOrbView topBrandLogo;
     private TextView topTitle;
     private TextView topMeta;
     private TextView topStatusDot;
@@ -119,21 +117,17 @@ public final class DashboardActivity extends Activity {
     private final List<ThemedCardRef> themedCards = new ArrayList<>();
 
     // Home
-    private TextView homeReadyTitle;
-    private TextView homeReadyDetail;
-    private TextView homeApprovalState;
-    private TextView homeInboxState;
-    private TextView homeCapabilitiesState;
-    private TextView homeNodeState;
-    private TextView homeConnectionToggle;
-    private TextView homeCopyAction;
-    private LinearLayout homeReadyCard;
-    private LinearLayout homeConnectionPanel;
-    private boolean homeConnectionExpanded;
-    private LinearLayout homeAttentionBlock;
-    private TextView homeAttentionTitle;
-    private TextView homeAttentionDetail;
-    private TextView homeAttentionState;
+    private PulseOrbView pulseOrb;
+    private TextView pulseTitle, pulseAgent, pulseFlow, pulseState, pulseConnection, pulseCapabilities;
+    private TextView pulseBadge;
+    private LinearLayout pulseRecents;
+    private String pulseRecentKey = "";
+    private LinearLayout pulseAttention;
+    private TextView pulseAttentionTitle, pulseAttentionDetail, pulseAction;
+    private String pulseActionKind = "";
+    private volatile int pulseAvailable = -1;
+    private volatile boolean pulseCounting;
+    private long pulseCountAt;
 
     // Capabilities
     private Switch cameraSwitch;
@@ -202,12 +196,22 @@ public final class DashboardActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        PickPicoTheme.State savedTheme = PickPicoTheme.load(this);
+        if (savedTheme.colorA != theme.colorA || savedTheme.colorB != theme.colorB || savedTheme.gradient != theme.gradient) {
+            theme = savedTheme;
+            themeBackgroundView.setState(theme);
+            showPage(currentPage);
+        }
+        if (pulseOrb != null) pulseOrb.setResumed(true);
+        if (topBrandLogo != null) topBrandLogo.setResumed(currentPage == PAGE_HOME);
         refreshMediaForegroundTypesIfRunning();
         handler.post(refreshTask);
     }
 
     @Override
     protected void onPause() {
+        if (pulseOrb != null) pulseOrb.setResumed(false);
+        if (topBrandLogo != null) topBrandLogo.setResumed(false);
         handler.removeCallbacks(refreshTask);
         super.onPause();
     }
@@ -260,7 +264,7 @@ public final class DashboardActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         shell.addView(buildTopBar(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(88)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
 
         contentHost = new FrameLayout(this);
         shell.addView(contentHost, new LinearLayout.LayoutParams(
@@ -268,8 +272,8 @@ public final class DashboardActivity extends Activity {
 
         bottomNav = buildBottomNav();
         LinearLayout.LayoutParams navLayout = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(76));
-        navLayout.setMargins(dp(18), 0, dp(18), dp(8));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(66));
+        navLayout.setMargins(dp(4), 0, dp(4), dp(4));
         shell.addView(bottomNav, navLayout);
         return stage;
     }
@@ -286,12 +290,9 @@ public final class DashboardActivity extends Activity {
         topBack.setOnClickListener(v -> onBackPressed());
         bar.addView(topBack, new LinearLayout.LayoutParams(dp(34), dp(50)));
 
-        topBrandLogo = new ImageView(this);
-        topBrandLogo.setImageBitmap(PickPicoBrand.whiteLogo());
-        topBrandLogo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        topBrandLogo.setAdjustViewBounds(true);
+        topBrandLogo = new PulseOrbView(this, theme);
         topBrandLogo.setVisibility(View.GONE);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(27), dp(27));
         logoParams.rightMargin = dp(10);
         bar.addView(topBrandLogo, logoParams);
 
@@ -300,10 +301,10 @@ public final class DashboardActivity extends Activity {
         titles.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
 
-        topTitle = text("PickPico", 27, Typeface.BOLD, TEXT);
+        topTitle = text("PickPico", 19, Typeface.BOLD, TEXT);
         titles.addView(topTitle);
 
-        topMeta = text("", 10, Typeface.BOLD, BLUE);
+        topMeta = text("", 6, Typeface.NORMAL, DIM);
         topMeta.setLetterSpacing(0.10f);
         topMeta.setPadding(0, dp(4), 0, 0);
         titles.addView(topMeta);
@@ -337,7 +338,7 @@ public final class DashboardActivity extends Activity {
 
         navHome = navItem("⌂", "HOME", () -> showPage(PAGE_HOME));
         TextView navInbox = navItem("◷", "ACTIVITY", () ->
-                startActivity(new Intent(this, AgentInboxActivity.class)));
+                openActivityPage());
         navCapabilities = navItem("▦", "CAPABILITIES", () -> showPage(PAGE_CAPABILITIES));
         navSettings = navItem("⚙", "SETTINGS", () -> showPage(PAGE_SETTINGS));
 
@@ -348,17 +349,17 @@ public final class DashboardActivity extends Activity {
         return nav;
     }
 
+    private void openActivityPage() {
+        startActivity(new Intent(this, AgentInboxActivity.class).addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION));
+        overridePendingTransition(0, 0);
+    }
+
     private LinearLayout.LayoutParams navParams() {
         return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
     }
 
     private TextView navItem(String icon, String label, Runnable action) {
-        TextView item = text(icon + "\n" + label, 10, Typeface.BOLD, MUTED);
-        item.setGravity(Gravity.CENTER);
-        item.setLetterSpacing(0.055f);
-        item.setLineSpacing(0f, 1.18f);
-        item.setOnClickListener(v -> action.run());
-        return item;
+        return PulseNavigation.item(this, theme, label, false, action);
     }
 
     private void showPage(int page) {
@@ -385,7 +386,7 @@ public final class DashboardActivity extends Activity {
             configureTopBar("Appearance", "PERSONALIZATION", true);
         } else {
             content = buildHomePage();
-            configureTopBar("PickPico", "", false);
+            configureTopBar("PickPico", "YOUR AGENT. IN ACTION.", false);
         }
 
         contentHost.addView(content, new FrameLayout.LayoutParams(
@@ -398,11 +399,13 @@ public final class DashboardActivity extends Activity {
     private void configureTopBar(String title, String meta, boolean back) {
         boolean homeBrand = currentPage == PAGE_HOME && !back;
         topBrandLogo.setVisibility(homeBrand ? View.VISIBLE : View.GONE);
+        topBrandLogo.setTheme(theme);
+        topBrandLogo.setResumed(homeBrand);
         topTitle.setText(title);
         topMeta.setText(meta);
         topMeta.setVisibility(TextUtils.isEmpty(meta) ? View.GONE : View.VISIBLE);
         topBack.setVisibility(back ? View.VISIBLE : View.GONE);
-        topNodeAction.setVisibility(currentPage == PAGE_HOME && !back ? View.VISIBLE : View.GONE);
+        topNodeAction.setVisibility(currentPage == PAGE_SETTINGS && !back ? View.VISIBLE : View.GONE);
     }
 
     private void updateBottomNav() {
@@ -416,25 +419,25 @@ public final class DashboardActivity extends Activity {
     }
 
     private void setNavActive(TextView view, boolean active) {
-        applyTextColor(view, active ? GREEN : MUTED);
-        view.setBackground(active ? PickPicoTheme.control(theme, dp(14), GREEN, true) : null);
+        view.setTag(R.id.theme_text_role, null);
+        int color = active ? PickPicoTheme.accentA(theme) : PickPicoTheme.dim(theme);
+        view.setTextColor(color);
+        Object kind = view.getTag(R.id.theme_hint_role);
+        PulseGlyph glyph = new PulseGlyph(kind instanceof String ? (String)kind : "home", color);
+        glyph.setBounds(0, 0, dp(20), dp(20));
+        view.setCompoundDrawables(null, glyph, null, null);
+        view.setBackground(null);
     }
 
     private void clearPageReferences() {
-        homeReadyTitle = null;
-        homeReadyDetail = null;
-        homeApprovalState = null;
-        homeInboxState = null;
-        homeCapabilitiesState = null;
-        homeNodeState = null;
-        homeConnectionToggle = null;
-        homeCopyAction = null;
-        homeReadyCard = null;
-        homeConnectionPanel = null;
-        homeAttentionBlock = null;
-        homeAttentionTitle = null;
-        homeAttentionDetail = null;
-        homeAttentionState = null;
+        if (pulseOrb != null) pulseOrb.setResumed(false);
+        pulseOrb = null;
+        pulseTitle = pulseAgent = pulseFlow = pulseState = pulseConnection = pulseCapabilities = null;
+        pulseBadge = null;
+        pulseRecents = null;
+        pulseRecentKey = "";
+        pulseAttention = null;
+        pulseAttentionTitle = pulseAttentionDetail = pulseAction = null;
 
         cameraSwitch = null;
         microphoneSwitch = null;
@@ -470,113 +473,153 @@ public final class DashboardActivity extends Activity {
 
     private View buildHomePage() {
         LinearLayout root = pageRoot();
+        root.setPadding(dp(24), dp(3), dp(24), dp(12));
+        pulseTitle = text("No active agent tasks", 20, Typeface.NORMAL, TEXT);
+        pulseTitle.setGravity(Gravity.CENTER);
+        pulseTitle.setMaxLines(2);
+        pulseTitle.setEllipsize(TextUtils.TruncateAt.END);
+        root.addView(pulseTitle, new LinearLayout.LayoutParams(-1, dp(55)));
 
-        TextView nodeHeading = sectionLabel("NODE STATUS");
-        root.addView(nodeHeading);
+        pulseOrb = new PulseOrbView(this, theme);
+        float height = getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density;
+        int orbHeight = Math.max(210, Math.min(256, (int)(height * .32f)));
+        LinearLayout.LayoutParams orbParams = new LinearLayout.LayoutParams(-1, dp(orbHeight));
+        orbParams.topMargin = -dp(8);
+        root.addView(pulseOrb, orbParams);
+        pulseOrb.setResumed(true);
 
-        LinearLayout readyCard = glassCard(true);
-        homeReadyCard = readyCard;
-        LinearLayout readyHeading = new LinearLayout(this);
-        readyHeading.setOrientation(LinearLayout.HORIZONTAL);
-        readyHeading.setGravity(Gravity.CENTER_VERTICAL);
-        readyCard.addView(readyHeading);
+        LinearLayout taskCard = pulseCard(true);
+        taskCard.setOrientation(LinearLayout.HORIZONTAL);
+        taskCard.setGravity(Gravity.CENTER_VERTICAL);
+        taskCard.setPadding(dp(16), dp(12), dp(16), dp(12));
+        ImageView agentMark = new ImageView(this);
+        agentMark.setImageDrawable(new PulseGlyph("agent", PickPicoTheme.text(theme)));
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+        markParams.rightMargin = dp(14);
+        taskCard.addView(agentMark, markParams);
+        LinearLayout taskCopy = new LinearLayout(this);
+        taskCopy.setOrientation(LinearLayout.VERTICAL);
+        taskCard.addView(taskCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout agentLine = new LinearLayout(this);
+        agentLine.setGravity(Gravity.CENTER_VERTICAL);
+        pulseAgent = text("PickPico", 12, Typeface.BOLD, TEXT);
+        pulseAgent.setMaxLines(1); pulseAgent.setEllipsize(TextUtils.TruncateAt.END);
+        agentLine.addView(pulseAgent, new LinearLayout.LayoutParams(-2, -2));
+        pulseBadge = text(" · Ready", 11, Typeface.NORMAL, GREEN);
+        agentLine.addView(pulseBadge, new LinearLayout.LayoutParams(-2, -2));
+        taskCopy.addView(agentLine);
+        pulseFlow = text("Waiting for an agent task", 9, Typeface.NORMAL, DIM);
+        pulseFlow.setTypeface(Typeface.MONOSPACE);
+        pulseFlow.setMaxLines(1); pulseFlow.setEllipsize(TextUtils.TruncateAt.END);
+        pulseFlow.setPadding(0, dp(6), 0, 0);
+        taskCopy.addView(pulseFlow);
+        taskCard.setOnClickListener(v -> openActivityPage());
+        taskCard.setContentDescription("Current agent activity. Open Activity for details.");
+        LinearLayout.LayoutParams taskParams = new LinearLayout.LayoutParams(-1, -2);
+        taskParams.setMargins(dp(20), -dp(15), dp(20), 0);
+        root.addView(taskCard, taskParams);
 
-        TextView readyDot = text("●", 18, Typeface.BOLD, GREEN);
-        readyHeading.addView(readyDot, new LinearLayout.LayoutParams(dp(28), ViewGroup.LayoutParams.WRAP_CONTENT));
-        homeReadyTitle = text("READY", 19, Typeface.BOLD, GREEN);
-        readyHeading.addView(homeReadyTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        pulseRecents = new LinearLayout(this);
+        pulseRecents.setOrientation(LinearLayout.VERTICAL);
+        pulseRecents.setPadding(dp(24), dp(14), dp(24), dp(12));
+        root.addView(pulseRecents);
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.argb(24, 160, 170, 175));
+        root.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+        TextView summaryLabel = sectionLabel("SYSTEM STATUS");
+        summaryLabel.setTextSize(8);
+        summaryLabel.setLetterSpacing(.16f);
+        summaryLabel.setPadding(0, dp(14), 0, dp(9));
+        root.addView(summaryLabel);
+        LinearLayout summary = pulseCard(false);
+        summary.setOrientation(LinearLayout.HORIZONTAL);
+        summary.setGravity(Gravity.CENTER_VERTICAL);
+        summary.setPadding(dp(12), dp(11), dp(12), dp(11));
+        pulseState = text("● READY", 9, Typeface.NORMAL, GREEN);
+        pulseState.setLetterSpacing(.08f);
+        summary.addView(pulseState, new LinearLayout.LayoutParams(0, dp(30), .85f));
+        pulseState.setGravity(Gravity.CENTER_VERTICAL);
+        addPulseDivider(summary);
+        pulseConnection = pulseSummaryCell(summary, "relay");
+        addPulseDivider(summary);
+        pulseCapabilities = pulseSummaryCell(summary, "layers");
+        root.addView(summary);
 
-        homeReadyDetail = text("Local connection available · PickPico is ready for agents.", 13, Typeface.NORMAL, MUTED);
-        homeReadyDetail.setPadding(0, dp(7), 0, dp(12));
-        readyCard.addView(homeReadyDetail);
-
-        homeConnectionToggle = text("COPY CONNECTION ▾", 11, Typeface.BOLD, MUTED);
-        homeConnectionToggle.setGravity(Gravity.CENTER_VERTICAL);
-        homeConnectionToggle.setPadding(dp(4), 0, dp(4), dp(6));
-        homeConnectionToggle.setVisibility(View.GONE);
-        homeConnectionToggle.setOnClickListener(v -> {
-            homeConnectionExpanded = !homeConnectionExpanded;
-            updateHomeConnectionPanel(true);
+        pulseAttention = pulseCard(false);
+        pulseAttention.setOrientation(LinearLayout.HORIZONTAL);
+        pulseAttention.setGravity(Gravity.CENTER_VERTICAL);
+        pulseAttention.setPadding(dp(13), dp(14), dp(13), dp(14));
+        ImageView folder = new ImageView(this);
+        folder.setPadding(dp(10), dp(10), dp(10), dp(10));
+        folder.setImageDrawable(new PulseGlyph("folder", PickPicoTheme.muted(theme)));
+        folder.setBackground(PickPicoTheme.control(theme, dp(10), PickPicoTheme.accentA(theme), false));
+        pulseAttention.addView(folder, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        LinearLayout actionCopy = new LinearLayout(this);
+        actionCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
+        copyParams.setMargins(dp(11), 0, dp(9), 0);
+        pulseAttention.addView(actionCopy, copyParams);
+        TextView caption = text("CURRENT TASK", 7, Typeface.NORMAL, DIM);
+        caption.setLetterSpacing(.2f); actionCopy.addView(caption);
+        pulseAttentionTitle = text("", 12, Typeface.BOLD, TEXT);
+        pulseAttentionTitle.setMaxLines(2);
+        pulseAttentionTitle.setPadding(0, dp(4), 0, 0);
+        actionCopy.addView(pulseAttentionTitle);
+        pulseAttentionDetail = text("", 9, Typeface.NORMAL, DIM);
+        pulseAttentionDetail.setMaxLines(2);
+        pulseAttentionDetail.setEllipsize(TextUtils.TruncateAt.END);
+        pulseAttentionDetail.setPadding(0, dp(4), 0, 0);
+        actionCopy.addView(pulseAttentionDetail);
+        pulseAction = text("Open task  →", 10, Typeface.BOLD, TEXT);
+        pulseAction.setGravity(Gravity.CENTER);
+        int buttonColor = PickPicoTheme.accentA(theme);
+        GradientDrawable button = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{buttonColor, PickPicoTheme.accentB(theme)});
+        button.setCornerRadius(dp(10));
+        pulseAction.setBackground(button);
+        pulseAction.setTag(R.id.theme_text_role, null);
+        pulseAction.setTextColor(Color.luminance(buttonColor) > .35 ? Color.rgb(25, 27, 30) : Color.WHITE);
+        pulseAction.setElevation(dp(3));
+        pulseAction.setOnClickListener(v -> {
+            if ("help".equals(pulseActionKind)) openLatestHumanHelp();
+            else if ("start".equals(pulseActionKind)) startNode();
+            else if ("connection".equals(pulseActionKind)) showPage(PAGE_REMOTE);
+            else if ("update".equals(pulseActionKind)) showPage(PAGE_SETTINGS);
+            else openActivityPage();
         });
-        readyCard.addView(homeConnectionToggle, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(30)));
-
-        homeConnectionPanel = new LinearLayout(this);
-        homeConnectionPanel.setOrientation(LinearLayout.VERTICAL);
-        homeConnectionPanel.setVisibility(View.GONE);
-        readyCard.addView(homeConnectionPanel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        homeCopyAction = actionButton("COPY", false, false);
-        homeCopyAction.setOnClickListener(v -> copyConnection());
-        homeConnectionPanel.addView(homeCopyAction, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
-
-        root.addView(readyCard, cardParams(0));
-
-        homeAttentionBlock = new LinearLayout(this);
-        homeAttentionBlock.setOrientation(LinearLayout.VERTICAL);
-        homeAttentionBlock.setVisibility(View.GONE);
-        TextView attentionHeading = sectionLabel("NEEDS ATTENTION");
-        attentionHeading.setPadding(0, dp(20), 0, dp(7));
-        homeAttentionBlock.addView(attentionHeading);
-        LinearLayout attention = homeRowCard(
-                "!",
-                "HUMAN HELP",
-                "An Agent is waiting for your response.",
-                this::openLatestHumanHelp);
-        attention.setBackground(PickPicoTheme.card(theme, dp(22), true));
-        homeAttentionTitle = findTitle(attention);
-        homeAttentionDetail = findDetail(attention);
-        homeAttentionState = rowState(attention, "NEEDS RESPONSE", AMBER);
-        homeAttentionBlock.addView(attention, cardParams(0));
-        root.addView(homeAttentionBlock);
-
-        TextView setupHeading = sectionLabel("YOUR SETUP");
-        setupHeading.setPadding(0, dp(20), 0, dp(7));
-        root.addView(setupHeading);
-
-        LinearLayout approval = homeRowCard(
-                "✓",
-                "AGENT APPROVAL",
-                "Choose when an agent must ask before acting.",
-                () -> showPage(PAGE_SETTINGS));
-        homeApprovalState = rowState(approval, "AUTO APPROVE", GREEN);
-        root.addView(approval, cardParams(12));
-
-        LinearLayout capabilities = homeRowCard(
-                "▦",
-                "AGENT ACCESS",
-                "Review the phone features available to agents.",
-                () -> showPage(PAGE_CAPABILITIES));
-        homeCapabilitiesState = rowState(capabilities, "CHECKING", MUTED);
-        root.addView(capabilities, cardParams(12));
-
-        TextView activityHeading = sectionLabel("ACTIVITY");
-        activityHeading.setPadding(0, dp(20), 0, dp(7));
-        root.addView(activityHeading);
-
-        LinearLayout inbox = homeRowCard(
-                "◷",
-                "RECENT ACTIVITY",
-                "Requests, messages, and human handoffs.",
-                () -> startActivity(new Intent(this, AgentInboxActivity.class)));
-        homeInboxState = rowState(inbox, "0 ITEMS", BLUE);
-        root.addView(inbox, cardParams(7));
-
-        if ("preview".equals(BuildConfig.BUILD_TYPE)) {
-            LinearLayout preview = homeRowCard(
-                    "✦",
-                    "OPEN HUMAN HELP PREVIEW",
-                    "See the live Human Help experience.",
-                    this::openHumanHelpPreview);
-            preview.setBackground(PickPicoTheme.card(theme, dp(22), true));
-            rowState(preview, "PREVIEW", BLUE);
-            root.addView(preview, cardParams(12));
-        }
-
-        addBottomSpace(root);
+        pulseAttention.addView(pulseAction, new LinearLayout.LayoutParams(dp(92), dp(42)));
+        pulseAttention.setVisibility(View.GONE);
+        root.addView(pulseAttention, cardParams(12));
         return pageScroll(root);
+    }
+
+    private LinearLayout pulseCard(boolean accent) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(PickPicoTheme.pulseSurface(theme, dp(accent ? 13 : 12), accent));
+        if (accent) card.setElevation(dp(3));
+        return card;
+    }
+
+    private void addPulseDivider(LinearLayout row) {
+        View line = new View(this);
+        line.setBackgroundColor(Color.argb(24,160,170,175));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(1), dp(24));
+        p.setMargins(dp(8), 0, dp(8), 0);
+        row.addView(line, p);
+    }
+
+    private TextView pulseSummaryCell(LinearLayout row, String glyph) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView icon = new ImageView(this);
+        icon.setImageDrawable(new PulseGlyph(glyph, PickPicoTheme.dim(theme)));
+        cell.addView(icon, new LinearLayout.LayoutParams(dp(16), dp(16)));
+        TextView copy = text("", 8, Typeface.NORMAL, MUTED);
+        copy.setPadding(dp(7), 0, 0, 0);
+        cell.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(cell, new LinearLayout.LayoutParams(0, -2, 1.1f));
+        return copy;
     }
 
     private void openHumanHelpPreview() {
@@ -686,11 +729,11 @@ public final class DashboardActivity extends Activity {
     private View buildCapabilitiesPage() {
         LinearLayout root = pageRoot();
 
-        TextView intro = text("Control what agents can access on this phone. Android permissions remain the final boundary.", 13, Typeface.NORMAL, MUTED);
+        TextView intro = text("Choose what your agents can use.", 13, Typeface.NORMAL, MUTED);
         intro.setPadding(dp(2), 0, dp(2), dp(14));
         root.addView(intro);
 
-        TextView runtimeHeading = sectionLabel("EXECUTE · CORE RUNTIME");
+        TextView runtimeHeading = sectionLabel("BUILT IN");
         root.addView(runtimeHeading);
 
         LinearLayout runtimeCard = glassCard(false);
@@ -711,7 +754,7 @@ public final class DashboardActivity extends Activity {
         runtimeCopy.addView(runtimeDetail);
         root.addView(runtimeCard, cardParams(7));
 
-        TextView senseHeading = sectionLabel("SENSE · PHONE DATA");
+        TextView senseHeading = sectionLabel("PHONE ACCESS");
         senseHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(senseHeading);
 
@@ -757,7 +800,7 @@ public final class DashboardActivity extends Activity {
         });
         root.addView(senseCard, cardParams(7));
 
-        TextView interactHeading = sectionLabel("INTERACT · DEVICE ACTIONS");
+        TextView interactHeading = sectionLabel("DEVICE ACTIONS");
         interactHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(interactHeading);
 
@@ -769,7 +812,7 @@ public final class DashboardActivity extends Activity {
         });
         root.addView(interactCard, cardParams(7));
 
-        TextView advancedHeading = sectionLabel("HYPER · ADVANCED ACCESS");
+        TextView advancedHeading = sectionLabel("ADVANCED ACCESS");
         advancedHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(advancedHeading);
 
@@ -1238,15 +1281,18 @@ public final class DashboardActivity extends Activity {
 
     private void applyThemeLive(PickPicoTheme.State next) {
         theme = next;
+        if (pulseOrb != null) pulseOrb.setTheme(theme);
+        if (topBrandLogo != null) topBrandLogo.setTheme(theme);
+        updateBottomNav();
         applyWindowTheme();
         if (themeBackgroundView != null) {
             themeBackgroundView.setState(theme);
         }
         if (bottomNav != null) {
-            bottomNav.setBackground(PickPicoTheme.strongGlass(theme, dp(18)));
+            bottomNav.setBackground(PickPicoTheme.strongGlass(theme, dp(26)));
         }
         for (ThemedCardRef ref : themedCards) {
-            ref.card.setBackground(PickPicoTheme.card(theme, dp(18), ref.accented));
+            ref.card.setBackground(PickPicoTheme.card(theme, dp(12), ref.accented));
         }
         if (appearancePreview != null) {
             appearancePreview.setBackground(PickPicoTheme.preview(theme, dp(10)));
@@ -1458,6 +1504,24 @@ public final class DashboardActivity extends Activity {
         note.setPadding(dp(2), dp(12), dp(2), 0);
         root.addView(note);
 
+        TextView identityLabel = sectionLabel("RELAY IDENTITY");
+        identityLabel.setPadding(0, dp(24), 0, dp(7));
+        root.addView(identityLabel);
+
+        LinearLayout identityCard = glassCard(false);
+        identityCard.addView(text(
+                "Reset this phone's remote identity if another device may be using the same Remote MCP URL. Your local settings, inbox, approval mode, and theme are kept.",
+                12,
+                Typeface.NORMAL,
+                MUTED));
+        TextView resetIdentity = actionButton("RESET RELAY IDENTITY", false, false);
+        LinearLayout.LayoutParams resetParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
+        resetParams.topMargin = dp(12);
+        identityCard.addView(resetIdentity, resetParams);
+        resetIdentity.setOnClickListener(v -> confirmResetRelayIdentity());
+        root.addView(identityCard, cardParams(12));
+
         addBottomSpace(root);
         return pageScroll(root);
     }
@@ -1544,27 +1608,6 @@ public final class DashboardActivity extends Activity {
         return root;
     }
 
-    private void updateHomeConnectionPanel(boolean animate) {
-        if (homeConnectionToggle != null) {
-            homeConnectionToggle.setText(homeConnectionExpanded ? "COPY CONNECTION ▴" : "COPY CONNECTION ▾");
-            homeConnectionToggle.setContentDescription(homeConnectionExpanded
-                    ? "Collapse connection actions"
-                    : "Expand connection actions");
-        }
-        if (homeConnectionPanel == null) {
-            return;
-        }
-        int visibility = homeConnectionExpanded ? View.VISIBLE : View.GONE;
-        if (homeConnectionPanel.getVisibility() == visibility) {
-            return;
-        }
-        if (animate && homeReadyCard != null && homeReadyCard.isLaidOut()) {
-            AutoTransition transition = new AutoTransition();
-            transition.setDuration(180L);
-            TransitionManager.beginDelayedTransition(homeReadyCard, transition);
-        }
-        homeConnectionPanel.setVisibility(visibility);
-    }
 
     private ScrollView pageScroll(LinearLayout root) {
         ScrollView scroll = new ScrollView(this);
@@ -1580,9 +1623,9 @@ public final class DashboardActivity extends Activity {
     private LinearLayout glassCard(boolean accented) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(18), dp(16), dp(18), dp(16));
-        card.setBackground(PickPicoTheme.card(theme, dp(22), accented));
-        card.setElevation(dp(6));
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackground(PickPicoTheme.card(theme, dp(12), accented));
+        card.setElevation(0);
         themedCards.add(new ThemedCardRef(card, accented));
         return card;
     }
@@ -1596,7 +1639,7 @@ public final class DashboardActivity extends Activity {
     }
 
     private TextView sectionLabel(String value) {
-        TextView view = text(value, 10, Typeface.BOLD, DIM);
+        TextView view = text(value, 9, Typeface.NORMAL, DIM);
         view.setLetterSpacing(0.12f);
         view.setPadding(dp(2), 0, 0, dp(9));
         return view;
@@ -1655,7 +1698,7 @@ public final class DashboardActivity extends Activity {
     }
 
     private TextView actionButton(String label, boolean danger, boolean compact) {
-        int accent = danger ? RED : GREEN;
+        int accent = danger ? RED : PickPicoTheme.accentA(theme);
         TextView button = text(label, 11, Typeface.BOLD, danger ? RED : TEXT);
         button.setGravity(Gravity.CENTER);
         button.setLetterSpacing(0.065f);
@@ -1690,13 +1733,102 @@ public final class DashboardActivity extends Activity {
                 new int[]{}
         };
         toggle.setThumbTintList(new ColorStateList(states, new int[]{
-                Color.rgb(218, 255, 232),
+                PickPicoTheme.accentB(theme),
                 Color.rgb(130, 139, 147)
         }));
         toggle.setTrackTintList(new ColorStateList(states, new int[]{
-                GREEN,
+                PickPicoTheme.accentA(theme),
                 Color.rgb(55, 61, 67)
         }));
+    }
+
+    private void refreshPulseRecents() {
+        if (pulseRecents == null) return;
+        org.json.JSONArray events = HomePulse.commandHistory();
+        int length = events.length();
+        String key = length + ":" + (length == 0 ? "" : events.optJSONObject(length - 1).toString());
+        long minute = System.currentTimeMillis() / 60000;
+        key += ":" + minute;
+        if (key.equals(pulseRecentKey)) return;
+        pulseRecentKey = key;
+        pulseRecents.removeAllViews();
+        if (length == 0) {
+            TextView quiet = text("Ready for your next idea", 10, Typeface.NORMAL, DIM);
+            quiet.setGravity(Gravity.CENTER);
+            pulseRecents.addView(quiet, new LinearLayout.LayoutParams(-1, dp(32)));
+            return;
+        }
+        for (int i = length - 1; i >= Math.max(0, length - 3); i--) {
+            JSONObject event = events.optJSONObject(i);
+            if (event == null) continue;
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView dot = text("●", 8, Typeface.NORMAL, i == length - 1 ? GREEN : DIM);
+            row.addView(dot, new LinearLayout.LayoutParams(dp(15), -2));
+            TextView eventText = text(HomePulse.eventTitle(event.optString("command"))
+                    + (event.optBoolean("failed") ? " · failed" : ""), 9, Typeface.NORMAL, MUTED);
+            eventText.setMaxLines(1); eventText.setEllipsize(TextUtils.TruncateAt.END);
+            row.addView(eventText, new LinearLayout.LayoutParams(0, -2, 1));
+            String ago = "Just now";
+            try {
+                long minutes = Math.max(0, (System.currentTimeMillis() - java.time.Instant.parse(event.optString("at")).toEpochMilli()) / 60000);
+                if (minutes > 0) ago = minutes < 60 ? minutes + "m ago" : minutes / 60 + "h ago";
+            } catch (Exception ignored) { }
+            TextView time = text(ago, 8, Typeface.NORMAL, DIM);
+            time.setPadding(dp(8), 0, 0, 0);
+            row.addView(time);
+            pulseRecents.addView(row, new LinearLayout.LayoutParams(-1, dp(22)));
+        }
+    }
+
+    private void refreshPulse(boolean running, boolean configured, String relay, int available) {
+        if (pulseOrb == null) return;
+        JSONObject pending = null;
+        try { pending = HumanHelpStore.latestWaiting(this); } catch (Exception ignored) { }
+        HomePulse.Snapshot state = HomePulse.snapshot(running, configured, relay, pending, System.currentTimeMillis());
+        pulseOrb.setMode(state.mode);
+        setTextIfChanged(pulseTitle, state.title);
+        setTextIfChanged(pulseAgent, state.activeTasks > 1 ? state.activeTasks + " agents" : state.agent);
+        pulseAgent.setMaxWidth(dp(125));
+        String badge = state.mode.equals("running") ? "Running" : state.mode.equals("waiting") ? "Waiting"
+                : state.mode.equals("blocked") ? "Blocked" : state.mode.equals("connecting") ? "Connecting" : state.recent ? "Just finished" : "Ready";
+        setTextIfChanged(pulseBadge, " · " + badge);
+        applyTextColor(pulseBadge, state.mode.equals("blocked") || state.mode.equals("waiting") ? AMBER : GREEN);
+        setTextIfChanged(pulseFlow, state.flow);
+        setTextIfChanged(pulseState, "● " + state.label);
+        applyTextColor(pulseState, state.mode.equals("blocked") ? AMBER : state.mode.equals("waiting") ? AMBER : GREEN);
+        setTextIfChanged(pulseConnection, !running ? "Node\nstopped" : !configured ? "Local\nconnection"
+                : "connected".equals(relay) ? "Connected\nthrough Relay" : "Relay\n" + (state.mode.equals("connecting") ? "connecting" : "disconnected"));
+        if (running && !pulseCounting && System.currentTimeMillis() - pulseCountAt > 10000) {
+            pulseCounting = true;
+            pulseCountAt = System.currentTimeMillis();
+            final Context appContext = getApplicationContext();
+            new Thread(() -> {
+                int count = 0;
+                String[] ids = HomePulse.capabilities();
+                try {
+                    for (String id : ids) if (AndroidCapabilityRegistry.state(appContext, id).optBoolean("available")) count++;
+                    pulseAvailable = ids.length == 0 ? -1 : count;
+                } catch (Exception ignored) { pulseAvailable = -1; }
+                finally { pulseCounting = false; }
+            }, "pickpico-readiness").start();
+        }
+        setTextIfChanged(pulseCapabilities, running ? (pulseAvailable < 0 ? "Checking\ncapabilities" : pulseAvailable + " capabilities\navailable") : "Capabilities\npaused");
+        refreshPulseRecents();
+        pulseActionKind = state.action;
+        if (pulseActionKind.isEmpty() && state.mode.equals("idle")) {
+            JSONObject update = SelfUpdateManager.status(this, 0);
+            if (update.optString("status").equals("pending_user_action")) {
+                pulseActionKind = "update";
+                state.actionTitle = "Your update is ready";
+                state.actionDetail = "Finish installing the verified PickPico update.";
+                state.button = "View update";
+            }
+        }
+        pulseAttention.setVisibility(pulseActionKind.isEmpty() ? View.GONE : View.VISIBLE);
+        setTextIfChanged(pulseAttentionTitle, state.actionTitle);
+        setTextIfChanged(pulseAttentionDetail, state.actionDetail);
+        setTextIfChanged(pulseAction, state.button + "  →");
     }
 
     private void refreshStatus() {
@@ -1705,7 +1837,7 @@ public final class DashboardActivity extends Activity {
         String localEndpoint = prefs.getString(McpNodeService.KEY_ENDPOINT, "");
         String remoteEndpoint = prefs.getString(McpNodeService.KEY_REMOTE_ENDPOINT, "");
         String relayUrl = prefs.getString(McpNodeService.KEY_RELAY_BASE_URL, "");
-        String relayStatus = prefs.getString(McpNodeService.KEY_RELAY_STATUS, "disabled");
+        String relayStatus = McpNodeService.relayStatus(prefs);
         String token = prefs.getString(McpNodeService.KEY_TOKEN, "");
         boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
         boolean relayConnected = "connected".equals(relayStatus) && !TextUtils.isEmpty(remoteEndpoint);
@@ -1713,78 +1845,19 @@ public final class DashboardActivity extends Activity {
         CapabilitySummary capabilitySummary = capabilitySummary();
         int enabledCapabilities = capabilitySummary.available;
         int needSetup = capabilitySummary.total - enabledCapabilities;
+        refreshPulse(running, relayConfigured, relayStatus, enabledCapabilities);
 
         if (topStatusDot != null) {
             int dotColor = !running ? RED : relayConfigured && !relayConnected ? AMBER : GREEN;
             String dotState = !running
                     ? "Node stopped"
                     : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready";
-            topStatusDot.setText(running ? "● READY" : "● OFF");
+            setTextIfChanged(topStatusDot, running ? "● Online" : "● Offline");
             applyTextColor(topStatusDot, dotColor);
-            topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), dotColor, false));
+            topStatusDot.setBackground(currentPage == PAGE_HOME ? null : PickPicoTheme.control(theme, dp(14), dotColor, false));
             topStatusDot.setContentDescription(dotState);
         }
 
-        if (homeReadyTitle != null) {
-            if (!running) {
-                homeReadyTitle.setText("OFFLINE");
-                applyTextColor(homeReadyTitle, RED);
-                homeReadyDetail.setText("Node is stopped.");
-            } else if (relayConnected) {
-                homeReadyTitle.setText("READY");
-                applyTextColor(homeReadyTitle, GREEN);
-                homeReadyDetail.setText("LOCAL + RELAY");
-            } else {
-                homeReadyTitle.setText("READY");
-                applyTextColor(homeReadyTitle, GREEN);
-                homeReadyDetail.setText("LOCAL ONLY");
-            }
-            if (!running) {
-                homeConnectionToggle.setVisibility(View.GONE);
-                homeConnectionExpanded = false;
-                updateHomeConnectionPanel(true);
-            } else if (relayConnected) {
-                homeConnectionToggle.setVisibility(View.VISIBLE);
-                updateHomeConnectionPanel(true);
-            } else {
-                homeConnectionExpanded = false;
-                homeConnectionToggle.setVisibility(View.GONE);
-                homeConnectionPanel.setVisibility(View.VISIBLE);
-            }
-        }
-
-        if (homeAttentionBlock != null) {
-            try {
-                JSONObject pending = HumanHelpStore.latestWaiting(this);
-                boolean hasPending = pending != null;
-                homeAttentionBlock.setVisibility(hasPending ? View.VISIBLE : View.GONE);
-                if (hasPending) {
-                    boolean approvalRequest = "approval".equals(pending.optString("requestType", "help"));
-                    if (homeAttentionTitle != null) {
-                        homeAttentionTitle.setText(approvalRequest ? "APPROVAL NEEDED" : "HUMAN HELP");
-                    }
-                    if (homeAttentionDetail != null) {
-                        homeAttentionDetail.setText(pending.optString("title", "An Agent is waiting for your response."));
-                    }
-                    if (homeAttentionState != null) {
-                        setState(homeAttentionState, "NEEDS RESPONSE", AMBER);
-                    }
-                }
-            } catch (Exception ignored) {
-                homeAttentionBlock.setVisibility(View.GONE);
-            }
-        }
-
-        if (homeApprovalState != null) {
-            String approval = McpocketPolicySettings.approvalMode(this);
-            if (McpocketPolicySettings.APPROVAL_ASK.equals(approval)) {
-                setState(homeApprovalState, "ASK ME", BLUE);
-            } else if (McpocketPolicySettings.APPROVAL_YOLO.equals(approval)) {
-                setState(homeApprovalState, "YOLO MODE", RED);
-            } else {
-                setState(homeApprovalState, "AUTO APPROVE", GREEN);
-            }
-        }
 
         if (settingsApprovalState != null) {
             String approval = McpocketPolicySettings.approvalMode(this);
@@ -1797,22 +1870,9 @@ public final class DashboardActivity extends Activity {
             }
         }
 
-        if (homeInboxState != null) {
-            int inbox = AgentInboxStore.count(this);
-            setState(homeInboxState, inbox == 1 ? "1 ITEM" : inbox + " ITEMS", inbox > 0 ? BLUE : DIM);
-        }
-
-        if (homeCapabilitiesState != null) {
-            String value = enabledCapabilities + " OF " + capabilitySummary.total + " READY"
-                    + (needSetup > 0 ? " · " + needSetup + " NEED SETUP" : "");
-            setState(homeCapabilitiesState, value, needSetup > 0 ? AMBER : GREEN);
-        }
 
         if (topNodeAction != null) {
-            if (homeNodeState != null) {
-                setState(homeNodeState, running ? "RUNNING" : "STOPPED", running ? GREEN : RED);
-            }
-            topNodeAction.setText(running ? "STOP" : "START");
+            setTextIfChanged(topNodeAction, running ? "STOP" : "START");
             applyTextColor(topNodeAction, running ? RED : GREEN);
             topNodeAction.setBackground(pillDrawable(
                     running ? Color.argb(30, 255, 91, 99) : Color.argb(22, 61, 214, 129),
@@ -1877,7 +1937,7 @@ public final class DashboardActivity extends Activity {
         boolean hasCandidate = SelfUpdateManager.hasInstallableCandidate(this);
 
         if (settingsVersionState != null) {
-            settingsVersionState.setText("Version " + version + " · build " + versionCode);
+            setTextIfChanged(settingsVersionState, "Version " + version + " · build " + versionCode);
         }
         if (settingsUpdateState != null) {
             setState(
@@ -1891,51 +1951,59 @@ public final class DashboardActivity extends Activity {
             updateAction.setEnabled(!busy);
             updateAction.setAlpha(updateAction.isEnabled() ? 1f : 0.45f);
             if (updateCheckInProgress) {
-                updateAction.setText("CHECKING FOR UPDATE…");
+                setTextIfChanged(updateAction, "CHECKING FOR UPDATE…");
             } else if (downloading) {
-                updateAction.setText("DOWNLOADING UPDATE…");
+                setTextIfChanged(updateAction, "DOWNLOADING UPDATE…");
             } else if (hasCandidate && !TextUtils.isEmpty(candidateVersion)) {
-                updateAction.setText("INSTALL " + candidateVersion);
+                setTextIfChanged(updateAction, "INSTALL " + candidateVersion);
             } else {
-                updateAction.setText("CHECK FOR UPDATE");
+                setTextIfChanged(updateAction, "CHECK FOR UPDATE");
             }
         }
 
         if (remoteState != null) {
             if (!relayConfigured) {
                 setState(remoteState, "NOT CONFIGURED", AMBER);
-                remoteEndpointSummary.setText("Local access still works. A compatible relay is required for cloud agents outside your LAN.");
+                setTextIfChanged(remoteEndpointSummary, "Local access still works. A compatible relay is required for cloud agents outside your LAN.");
             } else if (relayConnected) {
                 setState(remoteState, "CONNECTED", GREEN);
-                remoteEndpointSummary.setText("Remote MCP is ready. This phone maintains the relay connection itself.");
+                setTextIfChanged(remoteEndpointSummary, "Remote MCP is ready. This phone maintains the relay connection itself.");
             } else {
                 setState(remoteState, relayStatus.toUpperCase(), AMBER);
-                remoteEndpointSummary.setText("Relay is configured but not currently connected. Local access remains available.");
+                setTextIfChanged(remoteEndpointSummary, "Relay is configured but not currently connected. Local access remains available.");
             }
             if (relayUrlInput != null && !relayUrlInput.hasFocus() && !TextUtils.equals(relayUrlInput.getText().toString(), relayUrl)) {
                 relayUrlInput.setText(relayUrl);
             }
         }
 
-        if (devLocalEndpoint != null) devLocalEndpoint.setText(orDash(localEndpoint));
-        if (devRemoteEndpoint != null) devRemoteEndpoint.setText(orDash(remoteEndpoint));
+        if (devLocalEndpoint != null) setTextIfChanged(devLocalEndpoint, orDash(localEndpoint));
+        if (devRemoteEndpoint != null) setTextIfChanged(devRemoteEndpoint, orDash(remoteEndpoint));
         if (devRelayStatus != null) {
-            devRelayStatus.setText(relayStatus.toUpperCase());
+            setTextIfChanged(devRelayStatus, relayStatus.toUpperCase());
             applyTextColor(devRelayStatus, relayConnected ? GREEN : AMBER);
         }
-        if (devRelayUrl != null) devRelayUrl.setText(orDash(relayUrl));
-        if (devBearer != null) devBearer.setText(maskSecret(token));
+        if (devRelayUrl != null) setTextIfChanged(devRelayUrl, orDash(relayUrl));
+        if (devBearer != null) setTextIfChanged(devBearer, maskSecret(token));
         if (devRuntime != null) {
             long calls = prefs.getLong(McpNodeService.KEY_CALL_COUNT, 0L);
-            devRuntime.setText((running ? "RUNNING" : "STOPPED") + " · tool calls " + calls + " · app " + version + "/" + versionCode);
+            setTextIfChanged(devRuntime, (running ? "RUNNING" : "STOPPED") + " · tool calls " + calls + " · app " + version + "/" + versionCode);
             applyTextColor(devRuntime, running ? GREEN : RED);
         }
-        if (devRecent != null) devRecent.setText(prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet"));
+        if (devRecent != null) setTextIfChanged(devRecent, prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet"));
     }
 
     private void setState(TextView view, String value, int color) {
-        view.setText(value);
+        setTextIfChanged(view, value);
         applyTextColor(view, color);
+    }
+
+    private static void setTextIfChanged(TextView view, CharSequence value) {
+        if (view == null) return;
+        CharSequence next = value == null ? "" : value;
+        if (!TextUtils.equals(view.getText(), next)) {
+            view.setText(next);
+        }
     }
 
     private CapabilitySummary capabilitySummary() {
@@ -2164,6 +2232,27 @@ public final class DashboardActivity extends Activity {
     private void restartNode() {
         stopNode();
         handler.postDelayed(this::startNode, 700L);
+    }
+
+    private void confirmResetRelayIdentity() {
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Reset Relay identity?")
+                .setMessage("PickPico will create a new Remote MCP URL for this phone. Existing integrations using the old URL will stop working. Local settings and data are kept.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Reset", (dialog, which) -> resetRelayIdentity())
+                .show();
+    }
+
+    private void resetRelayIdentity() {
+        if (McpNodeService.isNodeRunning()) {
+            Intent intent = new Intent(this, McpNodeService.class)
+                    .setAction(McpNodeService.ACTION_RESET_RELAY_IDENTITY);
+            startService(intent);
+        } else {
+            McpNodeService.resetRelayIdentity(this);
+        }
+        Toast.makeText(this, "Relay identity reset. A new Remote MCP URL will be created.", Toast.LENGTH_LONG).show();
+        handler.postDelayed(this::refreshStatus, 500L);
     }
 
     private void copyConnection() {

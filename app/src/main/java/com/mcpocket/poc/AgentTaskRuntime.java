@@ -63,6 +63,7 @@ final class AgentTaskRuntime {
         }
 
         tasks.put(taskId, task);
+        HomePulse.task(task);
         trim();
         return copy(task);
     }
@@ -96,6 +97,7 @@ final class AgentTaskRuntime {
         }
 
         task.put("updatedAt", Instant.now().toString());
+        HomePulse.task(task);
         return copy(task);
     }
 

@@ -27,6 +27,7 @@ public final class McpHttpServerTest {
     private int port;
     private AtomicInteger capabilityStateProbeCount;
     private final AtomicBoolean failPhoneStatus = new AtomicBoolean();
+    private final AtomicBoolean uiUnavailable = new AtomicBoolean();
 
     @Before
     public void setUp() throws Exception {
@@ -38,6 +39,10 @@ public final class McpHttpServerTest {
             @Override
             public JSONObject capabilityState(String commandId) throws org.json.JSONException {
                 capabilityStateProbeCount.incrementAndGet();
+                if (uiUnavailable.get() && commandId.startsWith("ui.")) {
+                    return new JSONObject().put("available", false).put("state", "setup_required")
+                            .put("requiresSetup", true).put("reason", "Accessibility is off");
+                }
                 return McpToolActions.super.capabilityState(commandId);
             }
 
@@ -513,7 +518,8 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(59, listed.getInt("count"));
+        assertEquals(60, listed.getInt("count"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("guide.get"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
         assertTrue(listed.getJSONArray("commands").toString().contains("policy.status"));
@@ -613,7 +619,7 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(59, capabilityList.getInt("count"));
+        assertEquals(60, capabilityList.getInt("count"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("phone.home"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
@@ -847,6 +853,44 @@ public final class McpHttpServerTest {
                 .getJSONObject("result")
                 .getJSONObject("structuredContent")
                 .getInt("bytesWritten"));
+    }
+
+    @Test
+    public void thinGuideDiscoveryAndReadReflectLiveSetupWithoutExecutingUi() throws Exception {
+        uiUnavailable.set(true);
+        JSONObject search = callThin("capability_search", new JSONObject()
+                .put("query", "幫我開啟App操作").put("availableOnly", true).put("limit", 1));
+        JSONArray guides = search.getJSONObject("structuredContent").getJSONArray("guides");
+        assertTrue(guides.length() > 0);
+        assertTrue(search.getJSONObject("structuredContent").getJSONArray("matches").length() <= 1);
+        JSONObject read = guides.getJSONObject(0).getJSONObject("readWith");
+        JSONObject response = callThin(read.getString("tool"), read.getJSONObject("arguments"));
+        assertTrue(!response.getBoolean("isError"));
+        JSONObject guide = response.getJSONObject("structuredContent").getJSONObject("result");
+        assertTrue(guide.getJSONArray("capabilityStates").toString().contains("setup_required"));
+        assertTrue(guide.has("decisions"));
+        // Every referenced capability must remain discoverable with an input schema.
+        JSONArray ids = guide.getJSONArray("capabilityIds");
+        for (int i = 0; i < ids.length(); i++) {
+            JSONObject found = callThin("capability_search", new JSONObject().put("query", ids.getString(i)).put("limit", 1))
+                    .getJSONObject("structuredContent").getJSONArray("matches").getJSONObject(0);
+            assertEquals(ids.getString(i), found.getString("id"));
+            assertTrue(found.has("inputSchema"));
+        }
+        uiUnavailable.set(false);
+        JSONObject refreshed = callThin(read.getString("tool"), read.getJSONObject("arguments"))
+                .getJSONObject("structuredContent").getJSONObject("result");
+        assertTrue(!refreshed.getJSONArray("capabilityStates").toString().contains("setup_required"));
+        assertTrue(callThin("command_run", new JSONObject().put("commandId", "guide.get")
+                .put("arguments", new JSONObject().put("guideId", "missing"))).getBoolean("isError"));
+    }
+
+    private JSONObject callThin(String name, JSONObject arguments) throws Exception {
+        HttpResult response = post(new JSONObject().put("jsonrpc", "2.0").put("id", 900)
+                .put("method", "tools/call").put("params", new JSONObject().put("name", name)
+                        .put("arguments", arguments)).toString(), thinHeaders());
+        assertEquals(200, response.status);
+        return new JSONObject(response.body).getJSONObject("result");
     }
 
     private Map<String, String> authorizedHeaders() {

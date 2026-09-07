@@ -513,52 +513,52 @@ public final class MainActivity extends Activity {
                     .apply();
         }
         String error = prefs.getString(McpNodeService.KEY_ERROR, "");
-        statusView.setText(running ? "RUNNING" : (TextUtils.isEmpty(error) ? "STOPPED" : "ERROR: " + error));
+        setTextIfChanged(statusView, running ? "RUNNING" : (TextUtils.isEmpty(error) ? "STOPPED" : "ERROR: " + error));
         statusView.setTextColor(running ? Color.rgb(0, 120, 60) : Color.rgb(170, 35, 35));
-        endpointView.setText(orDash(prefs.getString(McpNodeService.KEY_ENDPOINT, "")));
-        remoteEndpointView.setText(orDash(prefs.getString(McpNodeService.KEY_REMOTE_ENDPOINT, "")));
+        setTextIfChanged(endpointView, orDash(prefs.getString(McpNodeService.KEY_ENDPOINT, "")));
+        setTextIfChanged(remoteEndpointView, orDash(prefs.getString(McpNodeService.KEY_REMOTE_ENDPOINT, "")));
         String relayBaseUrl = prefs.getString(McpNodeService.KEY_RELAY_BASE_URL, "");
         if (relayUrlInput != null
                 && !relayUrlInput.hasFocus()
                 && !TextUtils.equals(relayUrlInput.getText().toString(), relayBaseUrl)) {
             relayUrlInput.setText(relayBaseUrl);
         }
-        String relayStatus = prefs.getString(McpNodeService.KEY_RELAY_STATUS, "disabled");
-        relayStatusView.setText(relayStatus.toUpperCase());
+        String relayStatus = McpNodeService.relayStatus(prefs);
+        setTextIfChanged(relayStatusView, relayStatus.toUpperCase());
         relayStatusView.setTextColor("connected".equals(relayStatus)
                 ? Color.rgb(0, 120, 60)
                 : Color.rgb(150, 90, 0));
-        tokenView.setText(orDash(prefs.getString(McpNodeService.KEY_TOKEN, "")));
+        setTextIfChanged(tokenView, orDash(prefs.getString(McpNodeService.KEY_TOKEN, "")));
         String recent = prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet");
         long calls = prefs.getLong(McpNodeService.KEY_CALL_COUNT, 0L);
-        recentView.setText(getString(R.string.tool_calls_format, recent, calls));
+        setTextIfChanged(recentView, getString(R.string.tool_calls_format, recent, calls));
         DevicePolicyManager policy = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         ComponentName admin = new ComponentName(this, McpDeviceAdminReceiver.class);
         boolean remoteLockEnabled = policy != null && policy.isAdminActive(admin);
-        remoteLockView.setText(remoteLockEnabled ? "ENABLED" : "NOT ENABLED");
+        setTextIfChanged(remoteLockView, remoteLockEnabled ? "ENABLED" : "NOT ENABLED");
         remoteLockView.setTextColor(remoteLockEnabled ? Color.rgb(0, 120, 60) : Color.rgb(170, 35, 35));
         enableRemoteLockButton.setEnabled(!remoteLockEnabled);
 
         boolean notificationAccess = McpNotificationListenerService.hasAccess(this);
-        notificationAccessView.setText(notificationAccess ? "ENABLED" : "NOT ENABLED");
+        setTextIfChanged(notificationAccessView, notificationAccess ? "ENABLED" : "NOT ENABLED");
         notificationAccessView.setTextColor(notificationAccess
                 ? Color.rgb(0, 120, 60)
                 : Color.rgb(170, 35, 35));
         enableNotificationAccessButton.setEnabled(!notificationAccess);
 
         boolean accessibilityAccess = McpAccessibilityService.hasAccess(this);
-        accessibilityAccessView.setText(accessibilityAccess ? "ENABLED" : "NOT ENABLED");
+        setTextIfChanged(accessibilityAccessView, accessibilityAccess ? "ENABLED" : "NOT ENABLED");
         accessibilityAccessView.setTextColor(accessibilityAccess
                 ? Color.rgb(0, 120, 60)
                 : Color.rgb(170, 35, 35));
         enableAccessibilityButton.setEnabled(!accessibilityAccess);
 
         boolean screenCaptureActive = ScreenCaptureService.isActive();
-        screenCaptureAccessView.setText(screenCaptureActive ? "ACTIVE" : "NOT ACTIVE");
+        setTextIfChanged(screenCaptureAccessView, screenCaptureActive ? "ACTIVE" : "NOT ACTIVE");
         screenCaptureAccessView.setTextColor(screenCaptureActive
                 ? Color.rgb(0, 120, 60)
                 : Color.rgb(150, 90, 0));
-        screenCaptureButton.setText(screenCaptureActive
+        setTextIfChanged(screenCaptureButton, screenCaptureActive
                 ? "STOP SCREEN CAPTURE SESSION"
                 : "START SCREEN CAPTURE SESSION");
 
@@ -694,5 +694,13 @@ public final class MainActivity extends Activity {
 
     private static String orDash(String value) {
         return TextUtils.isEmpty(value) ? "—" : value;
+    }
+
+    private static void setTextIfChanged(TextView view, CharSequence value) {
+        if (view == null) return;
+        CharSequence next = value == null ? "" : value;
+        if (!TextUtils.equals(view.getText(), next)) {
+            view.setText(next);
+        }
     }
 }
