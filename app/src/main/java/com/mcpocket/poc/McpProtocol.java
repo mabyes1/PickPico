@@ -108,7 +108,7 @@ final class McpProtocol {
 
     private static String instructions(String toolProfile) {
         if (McpToolRegistry.PROFILE_THIN.equals(toolProfile)) {
-            return "PickPico is a dynamic Mobile Agent Node. The small top-level MCP tool list is a stable gateway, "
+            return "PickPico is a dynamic real-world Mobile Agent Node. The small top-level MCP tool list is a stable gateway, "
                     + "not the complete device capability set. Before saying that a phone, app, screen, sensor, file, "
                     + "contact, calendar, notification, physical-world, or human-assisted action cannot be performed, "
                     + "call capability_search first. Execute discovered abilities with command_run. Representative "
@@ -116,8 +116,8 @@ final class McpProtocol {
                     + "notification.reply, app.launch, location.get, workspace.read, and process.exec; examples are not exhaustive. "
                     + "Capability results report available/setup-required/disabled state, so guide required human setup rather than refusing prematurely.";
         }
-        return "PickPico is a user-started Android Mobile Agent Node. It lets an external Agent execute work, "
-                + "sense through phone hardware, and interact with people nearby. The full compatibility profile "
+        return "PickPico is a user-started real-world Mobile Agent Node for Android. It lets an external Agent execute work, "
+                + "sense through phone hardware, operate apps, and interact with people nearby. The full compatibility profile "
                 + "exposes direct tools plus the dynamic capability runtime.";
     }
 
