@@ -69,10 +69,19 @@ final class HomePulse {
     static synchronized Snapshot snapshot(boolean node, boolean configured, String relay, JSONObject pending, long now) {
         Snapshot s = new Snapshot();
         JSONObject active = null;
+        JSONObject recentTask = null;
         int activeTasks = 0;
         for (JSONObject task : tasks.values()) {
             String status = task.optString("status");
-            if (status.equals("completed") || status.equals("cancelled")) continue;
+            if (status.equals("completed") || status.equals("cancelled")) {
+                try {
+                    if (now - Instant.parse(task.optString("updatedAt")).toEpochMilli() <= 30000
+                            && (recentTask == null || task.optString("updatedAt").compareTo(recentTask.optString("updatedAt")) > 0)) {
+                        recentTask = task;
+                    }
+                } catch (Exception ignored) { }
+                continue;
+            }
             if (status.equals("failed")) {
                 try { if (now - Instant.parse(task.optString("updatedAt")).toEpochMilli() > 15000) continue; }
                 catch (Exception ignored) { continue; }
@@ -91,7 +100,8 @@ final class HomePulse {
         s.connection = !node ? "Node is stopped" : !configured ? "Local connection" : relay.equals("connected") ? "Connected through Relay" : "Remote access unavailable";
         if (pending != null) {
             s.mode = "waiting"; s.label = "WAITING"; s.title = "Waiting for your help";
-            s.agent = value(pending, "agent", "Agent"); s.flow = "human.help";
+            String activeAgent = active == null || activeTasks > 1 ? "Agent" : value(active, "agent", "Agent");
+            s.agent = value(pending, "agent", activeAgent); s.flow = "human.help";
             s.action = "help";
             s.actionTitle = pending.optString("requestType").equals("approval") ? "Approval required" : "Your help is needed";
             s.actionDetail = value(pending, "title", "An agent is waiting for your response.");
@@ -121,6 +131,12 @@ final class HomePulse {
             s.mode = "blocked"; s.label = "BLOCKED"; s.title = "An action needs attention";
             s.flow = last + " → failed"; s.action = "task"; s.actionTitle = "Action did not finish";
             s.actionDetail = "Check Activity for the latest context."; s.button = "Review issue";
+        } else if (recentTask != null) {
+            s.mode = "idle"; s.label = "READY";
+            s.title = value(recentTask, "title", value(recentTask, "objective", "Task completed"));
+            s.agent = value(recentTask, "agent", "Agent");
+            s.flow = "Task completed";
+            s.recent = true;
         }
         if (s.mode.equals("idle") && !s.recent) s.agent = "PickPico";
         s.agentState = s.agent + " · " + (s.mode.equals("running") ? "Running" : s.mode.equals("waiting") ? "Waiting" : s.mode.equals("connecting") ? "Starting" : s.mode.equals("blocked") ? "Blocked" : "Ready");

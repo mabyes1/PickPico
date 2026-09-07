@@ -38,13 +38,25 @@ public final class HomePulseTest {
         HomePulse.reset();
         assertEquals("idle", state(true, "connected", null).mode);
     }
-    @Test public void tasksShowRealIdentityAndTerminalTasksClear() throws Exception {
-        JSONObject task = new JSONObject().put("taskId", "t").put("status", "running").put("agent", "Codex").put("title", "Inspect the board");
+    @Test public void tasksKeepRealIdentityThroughRecentCompletion() throws Exception {
+        String now = java.time.Instant.now().toString();
+        JSONObject task = new JSONObject().put("taskId", "t").put("status", "running").put("agent", "Codex").put("title", "Inspect the board").put("updatedAt", now);
         HomePulse.task(task);
         assertEquals("Codex · Running", state(true, "connected", null).agentState);
         assertEquals("Inspect the board", state(true, "connected", null).title);
-        task.put("status", "completed"); HomePulse.task(task);
+        task.put("status", "completed").put("updatedAt", java.time.Instant.now().toString()); HomePulse.task(task);
         assertEquals("idle", state(true, "connected", null).mode);
+        assertEquals("Codex", state(true, "connected", null).agent);
+        assertEquals("Inspect the board", state(true, "connected", null).title);
+        assertTrue(state(true, "connected", null).recent);
+    }
+
+    @Test public void pendingHumanHelpKeepsActiveTaskIdentity() throws Exception {
+        HomePulse.task(new JSONObject().put("taskId", "t").put("status", "running")
+                .put("agent", "GPT-5.6 Sol").put("title", "Inspect UI").put("updatedAt", java.time.Instant.now().toString()));
+        HomePulse.Snapshot s = state(true, "connected", new JSONObject().put("title", "Please confirm"));
+        assertEquals("GPT-5.6 Sol", s.agent);
+        assertEquals("waiting", s.mode);
     }
     @Test public void failureHasBoundedLifetimeAndConnectingNeedsNoButton() {
         long command = HomePulse.begin("ui.inspect"); HomePulse.finish(command, true);
