@@ -4,7 +4,7 @@
 
 ## Primary demo
 
-主 Demo 應該在 2–3 分鐘內證明三件事：PickPico 是遠端 Agent node、能動態發現並使用手機能力、AI 遇到物理世界阻礙時能向人類求助後繼續。
+主 Demo 應該在 2–3 分鐘內證明三件事：PickPico 是 Agent 進入真實世界的 Mobile Agent Node、能動態發現並使用手機能力、AI 遇到物理世界阻礙時能向人類求助後繼續。
 
 ### 0. 上場前
 

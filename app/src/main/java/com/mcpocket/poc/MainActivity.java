@@ -109,7 +109,7 @@ public final class MainActivity extends Activity {
 
         TextView title = text("PickPico", 28, Typeface.BOLD);
         root.addView(title);
-        TextView subtitle = text("Android Mobile Agent Node", 15, Typeface.NORMAL);
+        TextView subtitle = text("Real-world Mobile Agent Node", 15, Typeface.NORMAL);
         subtitle.setTextColor(Color.DKGRAY);
         subtitle.setPadding(0, dp(4), 0, dp(22));
         root.addView(subtitle);

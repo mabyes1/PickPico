@@ -4,7 +4,7 @@ This structure follows Product & Experience Guideline 1.3. It changes how existi
 
 ## Product model
 
-PickPico is an Android-first Mobile Agent Node. The UI should answer four questions in this order:
+PickPico is an Android-first real-world Mobile Agent Node: the phone is the Agent's sensing, interaction, execution, and human-handoff node in the physical world. The UI should answer four questions in this order:
 
 1. Is the Node available to an agent?
 2. What needs the owner's attention?

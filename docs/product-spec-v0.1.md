@@ -4,7 +4,7 @@
 
 ## PickPico 負責什麼
 
-PickPico 是 Android 上供外部 Agent 使用的 MCP 服務。外部 Agent 決定要做什麼，PickPico 提供手機能力、執行結果、核准請求與人工協助介面。
+PickPico 是 Android 上的 real-world Mobile Agent Node。外部 Agent 決定要做什麼，PickPico 把手機的感知、App 操作、執行環境與 HUMAN HELP 接進同一個工作流程，讓 Agent 能透過真實手機觀察環境、採取行動並在需要時向人求助。
 
 目前 APK 支援 Android 8.0 以上的 ARM64 裝置，包含 Node.js 執行環境。沒有內建通用本地語言模型，也沒有 iOS 版本。Node.js 能執行程式，不等於手機已內建會自主思考的 Agent。
 

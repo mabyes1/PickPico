@@ -8,9 +8,11 @@
 
 # PickPico
 
-> **Give your agent a phone.**
+> **Bring your agent into the real world.**
 
-**讓 AI 看見現場、操作手機、執行程式，遇到難題直接找你。**
+**Turn your phone into a real-world agent node.**
+
+**讓手機成為 AI Agent 進入真實世界的節點：看見現場、操作裝置、執行程式，必要時向你求助。**
 
 FUTUREMODE × SITCON Hackathon 2026 · **AI Agents & Automation**
 
@@ -20,9 +22,9 @@ FUTUREMODE × SITCON Hackathon 2026 · **AI Agents & Automation**
 
 它可能需要看一眼設備面板、拍一張照片、讀取手機通知、打開 App 完成幾個操作，甚至只需要請旁邊的人按一下按鈕。這些事情對人類來說很簡單，對只活在瀏覽器或伺服器裡的 Agent 卻可能變成任務中斷點。
 
-**PickPico 把 Android 手機變成 AI Agent 可以直接使用的行動節點。**
+**PickPico 把 Android 手機變成 AI Agent 連接真實世界的行動節點。**
 
-手機本來就有相機、麥克風、定位、螢幕、網路、電池與運算能力，而且通常就在使用者身邊。PickPico 透過 MCP 把這些能力接進 Agent 的工作流程，讓 Agent 能自行探索手機目前可用的能力、執行操作，必要時再把最適合由人完成的那一步交給人類。
+手機本來就有相機、麥克風、定位、螢幕、網路、電池與運算能力，而且通常就在使用者身邊。PickPico 透過 MCP 把這些感知、操作與運算能力接進 Agent 的工作流程，讓原本只存在於瀏覽器、IDE 或雲端裡的 Agent，能透過一支真實手機觀察環境、操作 App、執行程式，並在必要時把最適合由人完成的那一步交給人類。
 
 ```text
 AI Agent
@@ -35,7 +37,7 @@ AI Agent
             └─ 回覆後繼續原本任務
 ```
 
-PickPico 的目標不是做另一個「遠端遙控手機」工具，而是讓手機成為 **Agent 走進真實世界的入口**。
+PickPico 的目標不是做另一個「遠端遙控手機」工具，也不只是讓 Agent 能操作 Android。它要讓手機成為 **Agent 進入真實世界的節點**：一個帶著感官、介面、運算能力，也始終與人類保持在同一個工作迴圈裡的 Mobile Agent Node。
 
 ## 核心功能
 
@@ -97,9 +99,9 @@ Agent 取得結果並繼續修正
 
 這讓「寫程式 → 真機測試 → 發現問題 → 再修改」形成更完整的 Agent 自迭代迴圈，尤其適合 UI、通知、鎖定畫面、相機、麥克風與其他只有真實手機環境才能完整驗證的行為。
 
-PickPico 並不是要宣稱手機開發從此不需要電腦，而是嘗試把原本高度 **PC-centric** 的開發流程往 **PC-optional** 推進：讓手機不再只是「被開發、被測試的裝置」，而是能直接參與 Agent 工作流程的開發節點。
+PickPico 並不是要宣稱手機開發從此不需要電腦，而是嘗試把原本高度 **PC-centric** 的開發流程往 **PC-optional** 推進：讓手機不再只是「被開發、被測試的裝置」，而是 Agent 可以直接觀察、操作並在上面執行工作的真實世界節點。
 
-> **Give your agent a phone, so it can build for phones.**
+> **The phone is not just a target. It becomes part of the agent loop.**
 
 ### 不需要 Root，也不用開 ADB
 
