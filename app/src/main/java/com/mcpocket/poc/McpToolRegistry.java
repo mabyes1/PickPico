@@ -18,6 +18,7 @@ final class McpToolRegistry {
     static {
         THIN_TOOLS.add("server_info");
         THIN_TOOLS.add("capability_search");
+        THIN_TOOLS.add("capability_list");
         THIN_TOOLS.add("capability_status");
         THIN_TOOLS.add("policy_status");
         THIN_TOOLS.add("command_run");
@@ -111,13 +112,13 @@ final class McpToolRegistry {
 
         register(
                 "capability_search",
-                "Search the connected PickPico device's dynamic abilities and adaptive operation guides. For multi-step app/UI tasks, search the task intent and read a relevant guide via command_run guide.get before acting. Guides explain tool sequencing, pitfalls, recovery and result verification. Returns capability IDs, live availability/setup state, risk metadata, input schemas, and short guide summaries. Use this before concluding that a device action cannot be performed.",
+                "Search the connected PickPico device's dynamic abilities and adaptive operation guides. For multi-step app/UI tasks, search the task intent and read a relevant guide via command_run guide.get before acting. Guides explain tool sequencing, pitfalls, recovery and result verification. Returns capability IDs, live availability/setup state, risk metadata, input schemas, and short guide summaries. If search returns no reasonable match, call capability_list before concluding that a device action is unsupported.",
                 capabilitySearchSchema(),
                 (arguments, callCount) -> runtime.search(arguments));
 
         register(
                 "capability_list",
-                "List all implemented PickPico capabilities with current Core/Hyper availability and setup state.",
+                "List all implemented PickPico capabilities with current Core/Hyper availability and setup state. This is the authoritative fallback when capability_search returns no reasonable match; use the discovered exact capability ID to search again for its input schema before an unfamiliar command_run.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> runtime.execute("capability.list", arguments, callCount));
 

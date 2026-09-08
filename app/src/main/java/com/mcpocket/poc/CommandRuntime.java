@@ -1041,9 +1041,10 @@ final class CommandRuntime {
                 .put("matches", result)
                 .put("count", result.length())
                 .put("totalCandidates", matches.size())
+                .put("fallbackRecommended", !query.isEmpty() && result.length() == 0)
                 .put("guides", OperationGuides.search(query, result))
                 .put("discoveryHint",
-                        "Capabilities are dynamic. For multi-step app/UI tasks, read a relevant guide with command_run guide.get before acting. Guides are advice, independent of capability filters; their tools may require setup. Search before concluding that an action is unsupported.");
+                        "Capabilities are dynamic. For multi-step app/UI tasks, read a relevant guide with command_run guide.get before acting. Guides are advice, independent of capability filters; their tools may require setup. Search is an optimization, not proof of absence: if no reasonable match is returned, call capability_list before concluding that an action is unsupported.");
     }
 
     JSONObject execute(String commandId, JSONObject arguments, long callCount) throws JSONException {

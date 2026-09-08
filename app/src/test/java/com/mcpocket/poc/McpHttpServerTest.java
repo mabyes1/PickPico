@@ -349,10 +349,11 @@ public final class McpHttpServerTest {
         assertEquals(200, list.status);
         JSONObject listed = new JSONObject(list.body).getJSONObject("result");
         JSONArray tools = listed.getJSONArray("tools");
-        assertEquals(10, tools.length());
+        assertEquals(11, tools.length());
         assertEquals("thin-v1", listed.getString("toolProfile"));
         String toolText = tools.toString();
         assertTrue(toolText.contains("capability_search"));
+        assertTrue(toolText.contains("capability_list"));
         assertTrue(toolText.contains("command_run"));
         assertTrue(toolText.contains("task_create"));
         assertTrue(toolText.contains("server_info"));
@@ -374,6 +375,29 @@ public final class McpHttpServerTest {
         assertTrue(discovery.getJSONArray("matches").getJSONObject(0).has("inputSchema"));
         assertTrue(discovery.getInt("totalCandidates") < 10);
         assertEquals(discovery.getInt("totalCandidates"), capabilityStateProbeCount.get());
+
+        HttpResult missedSearch = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":54,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_search\",\"arguments\":{" +
+                        "\"query\":\"zzzxxyy qqqvvv\"}}}",
+                thinHeaders());
+        assertEquals(200, missedSearch.status);
+        JSONObject missedDiscovery = new JSONObject(missedSearch.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertEquals(0, missedDiscovery.getJSONArray("matches").length());
+        assertTrue(missedDiscovery.getBoolean("fallbackRecommended"));
+        assertTrue(missedDiscovery.getString("discoveryHint").contains("capability_list"));
+
+        HttpResult fallbackList = post(
+                "{\"jsonrpc\":\"2.0\",\"id\":55,\"method\":\"tools/call\"," +
+                        "\"params\":{\"name\":\"capability_list\",\"arguments\":{}}}",
+                thinHeaders());
+        assertEquals(200, fallbackList.status);
+        JSONObject fallbackCatalog = new JSONObject(fallbackList.body)
+                .getJSONObject("result")
+                .getJSONObject("structuredContent");
+        assertTrue(fallbackCatalog.getJSONArray("capabilities").toString().contains("screen.capture"));
 
         HttpResult chineseSearch = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":531,\"method\":\"tools/call\"," +
