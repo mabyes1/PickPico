@@ -107,11 +107,19 @@ final class AndroidCapabilityRegistry {
                     "PickPico Accessibility Service is not enabled");
         }
         if ("screen.capture".equals(commandId)) {
+            boolean accessibilityCapture = McpAccessibilityService.canTakeScreenshot(context);
+            boolean projectionCapture = ScreenCaptureService.isActive();
+            if (accessibilityCapture || projectionCapture) {
+                return result
+                        .put("available", true)
+                        .put("state", "available")
+                        .put("captureMode", accessibilityCapture ? "accessibility" : "media_projection");
+            }
             return setupState(
                     result,
-                    ScreenCaptureService.isActive(),
-                    "media_projection",
-                    "No user-authorized MediaProjection screen-capture session is active");
+                    false,
+                    "accessibility_or_media_projection",
+                    "Enable PickPico Accessibility for on-demand screenshots, or start a user-authorized MediaProjection session");
         }
         if ("phone.lock".equals(commandId)) {
             DevicePolicyManager manager = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);

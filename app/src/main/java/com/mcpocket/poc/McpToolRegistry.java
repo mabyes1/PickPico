@@ -268,7 +268,7 @@ final class McpToolRegistry {
 
         register(
                 "screen_capture",
-                "Capture the current Android screen from an active user-authorized MediaProjection session. Returns native MCP image content and stores the file in the PickPico workspace.",
+                "Capture the current Android screen on demand through Hyper Mode Accessibility when available, with MediaProjection as fallback. Returns native MCP image content and stores the file in the PickPico workspace.",
                 CommandRuntime.screenCaptureSchema(),
                 (arguments, callCount) -> runtime.execute("screen.capture", arguments, callCount));
 

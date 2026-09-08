@@ -504,7 +504,7 @@ final class CommandRuntime {
 
         register(
                 "screen.capture",
-                "Capture the current Android screen from a user-authorized MediaProjection Hyper session and persist it in the PickPico workspace.",
+                "Capture the current Android screen on demand through Hyper Mode Accessibility when available, with an active user-authorized MediaProjection session as fallback, and persist it in the PickPico workspace.",
                 "ui",
                 "screen_read",
                 false,

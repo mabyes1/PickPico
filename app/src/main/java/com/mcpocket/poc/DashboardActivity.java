@@ -872,7 +872,7 @@ public final class DashboardActivity extends Activity {
         });
         addDivider(advancedCard);
 
-        screenCaptureSwitch = capabilityRow(advancedCard, "Screen Capture", "User-authorized live screen capture session.", checked -> {
+        screenCaptureSwitch = capabilityRow(advancedCard, "Live Screen Share", "Optional MediaProjection fallback. Hyper Mode can capture screenshots on demand through Accessibility.", checked -> {
             if (updatingUi) return;
             toggleScreenCapture();
         });

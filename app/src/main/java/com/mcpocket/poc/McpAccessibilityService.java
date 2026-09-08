@@ -4,11 +4,15 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.graphics.Path;
+import android.hardware.HardwareBuffer;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.view.Display;
 import android.view.ViewConfiguration;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -18,10 +22,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import android.util.Base64;
 
 /** Hyper Mode bridge for semantic cross-app Android UI inspection and actions. */
 public final class McpAccessibilityService extends AccessibilityService {
@@ -71,6 +80,144 @@ public final class McpAccessibilityService extends AccessibilityService {
             }
         }
         return false;
+    }
+
+    static boolean canTakeScreenshot(Context context) {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && activeInstance != null
+                && hasAccess(context);
+    }
+
+    static JSONObject screenCapture(JSONObject arguments, long callCount) throws JSONException {
+        McpAccessibilityService service = requireService();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return unavailable("Accessibility screenshots require Android 11 or newer", callCount);
+        }
+
+        int quality = clamp(arguments.optInt("quality", 82), 50, 100);
+        boolean returnContent = arguments.optBoolean("returnContent", true);
+        CountDownLatch latch = new CountDownLatch(1);
+        ScreenshotResult[] resultHolder = new ScreenshotResult[1];
+        int[] failureCode = new int[]{-1};
+
+        try {
+            service.takeScreenshot(
+                    Display.DEFAULT_DISPLAY,
+                    service.getMainExecutor(),
+                    new TakeScreenshotCallback() {
+                        @Override
+                        public void onSuccess(ScreenshotResult screenshotResult) {
+                            resultHolder[0] = screenshotResult;
+                            latch.countDown();
+                        }
+
+                        @Override
+                        public void onFailure(int errorCode) {
+                            failureCode[0] = errorCode;
+                            latch.countDown();
+                        }
+                    });
+        } catch (RuntimeException error) {
+            return new JSONObject()
+                    .put("captured", false)
+                    .put("error", "accessibility_screen_capture_failed")
+                    .put("message", error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage()))
+                    .put("captureMode", "accessibility")
+                    .put("toolCallCount", callCount);
+        }
+
+        try {
+            if (!latch.await(2500L, TimeUnit.MILLISECONDS)) {
+                return new JSONObject()
+                        .put("captured", false)
+                        .put("error", "accessibility_screen_capture_timeout")
+                        .put("captureMode", "accessibility")
+                        .put("toolCallCount", callCount);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return new JSONObject()
+                    .put("captured", false)
+                    .put("error", "accessibility_screen_capture_interrupted")
+                    .put("captureMode", "accessibility")
+                    .put("toolCallCount", callCount);
+        }
+
+        ScreenshotResult screenshotResult = resultHolder[0];
+        if (screenshotResult == null) {
+            return new JSONObject()
+                    .put("captured", false)
+                    .put("error", "accessibility_screen_capture_failed")
+                    .put("errorCode", failureCode[0])
+                    .put("captureMode", "accessibility")
+                    .put("toolCallCount", callCount);
+        }
+
+        HardwareBuffer buffer = screenshotResult.getHardwareBuffer();
+        Bitmap hardwareBitmap = null;
+        Bitmap bitmap = null;
+        try {
+            hardwareBitmap = Bitmap.wrapHardwareBuffer(buffer, screenshotResult.getColorSpace());
+            if (hardwareBitmap == null) {
+                throw new IllegalStateException("Android returned an unreadable screenshot buffer");
+            }
+            bitmap = hardwareBitmap.copy(Bitmap.Config.ARGB_8888, false);
+            if (bitmap == null) {
+                throw new IllegalStateException("Unable to copy accessibility screenshot bitmap");
+            }
+
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes)) {
+                throw new IllegalStateException("Unable to encode accessibility screenshot as JPEG");
+            }
+            byte[] jpeg = bytes.toByteArray();
+            String relativePath = "captures/screen-" + System.currentTimeMillis() + ".jpg";
+            File root = new File(service.getFilesDir(), "workspaces");
+            File output = new File(root, relativePath);
+            File parent = output.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+                throw new IllegalStateException("Unable to create screen capture directory");
+            }
+            try (FileOutputStream stream = new FileOutputStream(output, false)) {
+                stream.write(jpeg);
+                stream.getFD().sync();
+            }
+
+            JSONObject result = new JSONObject()
+                    .put("captured", true)
+                    .put("width", bitmap.getWidth())
+                    .put("height", bitmap.getHeight())
+                    .put("mimeType", "image/jpeg")
+                    .put("path", relativePath)
+                    .put("sizeBytes", jpeg.length)
+                    .put("freshFrame", true)
+                    .put("frameAgeMs", 0)
+                    .put("captureMode", "accessibility")
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+            if (returnContent) {
+                result.put("_mcpContent", new JSONArray()
+                        .put(new JSONObject()
+                                .put("type", "text")
+                                .put("text", ScreenFramePolicy.describe(true, 0L, relativePath)))
+                        .put(new JSONObject()
+                                .put("type", "image")
+                                .put("mimeType", "image/jpeg")
+                                .put("data", Base64.encodeToString(jpeg, Base64.NO_WRAP))));
+            }
+            return result;
+        } catch (Throwable error) {
+            return new JSONObject()
+                    .put("captured", false)
+                    .put("error", "accessibility_screen_capture_failed")
+                    .put("message", error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage()))
+                    .put("captureMode", "accessibility")
+                    .put("toolCallCount", callCount);
+        } finally {
+            if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+            if (hardwareBitmap != null && !hardwareBitmap.isRecycled()) hardwareBitmap.recycle();
+            if (buffer != null) buffer.close();
+        }
     }
 
     static JSONObject inspect(JSONObject arguments, long callCount) throws JSONException {

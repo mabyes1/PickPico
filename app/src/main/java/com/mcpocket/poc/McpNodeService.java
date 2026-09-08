@@ -1476,6 +1476,12 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public JSONObject screenCapture(JSONObject arguments, long callCount) throws JSONException {
+        if (McpAccessibilityService.canTakeScreenshot(this)) {
+            JSONObject accessibility = McpAccessibilityService.screenCapture(arguments, callCount);
+            if (accessibility.optBoolean("captured", false) || !ScreenCaptureService.isActive()) {
+                return accessibility;
+            }
+        }
         return ScreenCaptureService.capture(arguments, callCount);
     }
 

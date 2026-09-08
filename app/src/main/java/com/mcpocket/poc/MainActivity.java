@@ -243,7 +243,7 @@ public final class MainActivity extends Activity {
         root.addView(label("HYPER SCREEN CAPTURE / MEDIAPROJECTION"));
         root.addView(screenCaptureAccessView);
         TextView screenCaptureNote = text(
-                "Android requires the phone owner to confirm screen sharing. PickPico can use screenshots only while this user-authorized session is active.",
+                "Hyper Mode can take screenshots on demand through Accessibility. Live Screen Share is an optional MediaProjection fallback and still requires Android confirmation.",
                 13,
                 Typeface.NORMAL);
         screenCaptureNote.setTextColor(Color.DKGRAY);
