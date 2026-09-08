@@ -99,4 +99,44 @@ public final class HomePulseTest {
                 .put("updatedAt", java.time.Instant.now().toString()));
         assertEquals(PicoOrbState.READY, state(true, "connected", null).orbMode);
     }
+
+    @Test public void staleBlockedTaskStopsControllingPresenceButRemainsInHistory() throws Exception {
+        long now = System.currentTimeMillis();
+        String stale = java.time.Instant.ofEpochMilli(
+                now - AgentTaskRuntime.ACTIVE_PROJECTION_LEASE_MS - 1L).toString();
+        HomePulse.task(new JSONObject().put("taskId", "t").put("status", "blocked")
+                .put("agent", "ChatGPT").put("title", "Old blocked task").put("updatedAt", stale));
+
+        HomePulse.Snapshot snapshot = HomePulse.snapshot(true, true, "connected", null, now);
+        assertEquals("idle", snapshot.mode);
+        assertEquals(PicoOrbState.READY, snapshot.orbMode);
+        assertEquals(0, snapshot.activeTasks);
+        assertEquals(1, HomePulse.taskHistory().length());
+    }
+
+    @Test public void freshBlockedTaskKeepsControllingPresenceWithinLease() throws Exception {
+        long now = System.currentTimeMillis();
+        String fresh = java.time.Instant.ofEpochMilli(
+                now - AgentTaskRuntime.ACTIVE_PROJECTION_LEASE_MS + 1_000L).toString();
+        HomePulse.task(new JSONObject().put("taskId", "t").put("status", "blocked")
+                .put("agent", "ChatGPT").put("updatedAt", fresh));
+
+        HomePulse.Snapshot snapshot = HomePulse.snapshot(true, true, "connected", null, now);
+        assertEquals("blocked", snapshot.mode);
+        assertEquals(PicoOrbState.BLOCKED, snapshot.orbMode);
+        assertEquals(1, snapshot.activeTasks);
+    }
+
+    @Test public void staleWaitingTaskCannotPinHumanHelpWithoutRealPendingRequest() throws Exception {
+        long now = System.currentTimeMillis();
+        String stale = java.time.Instant.ofEpochMilli(
+                now - AgentTaskRuntime.ACTIVE_PROJECTION_LEASE_MS - 1L).toString();
+        HomePulse.task(new JSONObject().put("taskId", "t").put("status", "waiting_human")
+                .put("agent", "ChatGPT").put("updatedAt", stale));
+
+        assertEquals(PicoOrbState.READY,
+                HomePulse.snapshot(true, true, "connected", null, now).orbMode);
+        assertEquals(PicoOrbState.HUMAN_HELP,
+                HomePulse.snapshot(true, true, "connected", new JSONObject().put("title", "Still pending"), now).orbMode);
+    }
 }

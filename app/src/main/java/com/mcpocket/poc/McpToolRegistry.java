@@ -61,13 +61,13 @@ final class McpToolRegistry {
 
         register(
                 "task_runtime_info",
-                "Describe PickPico's Agent task runtime and current retained task lifecycle state.",
+                "Describe PickPico's Agent task runtime, active presentation lease, and current retained task lifecycle state.",
                 noArgumentsSchema(),
                 (arguments, callCount) -> tasks.info());
 
         register(
                 "task_create",
-                "Create a long-lived Agent task before multi-step phone work. Include agent (your actual name, e.g. Codex or Claude) and a short user-facing title. The phone displays these on Home. Keep task_update status accurate through running, waiting_human, blocked and completion.",
+                "Create a long-lived Agent task before multi-step phone work. Include agent (your actual name, e.g. Codex or Claude) and a short user-facing title. The phone displays these on Home. Non-terminal presence has a short lease so abandoned tasks cannot control the Pico orb forever; task_update renews that lease. Keep task_update status accurate through running, waiting_human, blocked and completion.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
@@ -81,7 +81,7 @@ final class McpToolRegistry {
 
         register(
                 "task_update",
-                "Update an Agent task state or append a progress/blocker note.",
+                "Update an Agent task state or append a progress/blocker note. Any non-terminal update renews the task's Home/Pico presence lease.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()

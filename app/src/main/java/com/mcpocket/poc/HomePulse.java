@@ -88,6 +88,8 @@ final class HomePulse {
             if (status.equals("failed")) {
                 try { if (now - Instant.parse(task.optString("updatedAt")).toEpochMilli() > 15000) continue; }
                 catch (Exception ignored) { continue; }
+            } else if (!AgentTaskRuntime.holdsProjectionLease(task, now)) {
+                continue;
             }
             activeTasks++;
             if (active == null || task.optString("updatedAt").compareTo(active.optString("updatedAt")) > 0) active = task;

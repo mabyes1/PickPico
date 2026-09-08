@@ -17,6 +17,7 @@ import java.util.UUID;
  */
 final class AgentTaskRuntime {
     private static final int MAX_TASKS = 50;
+    static final long ACTIVE_PROJECTION_LEASE_MS = 120_000L;
     private static final String[] VALID_STATES = new String[] {
             "created", "running", "blocked", "waiting_human", "completed", "failed", "cancelled"
     };
@@ -25,10 +26,14 @@ final class AgentTaskRuntime {
 
     synchronized JSONObject info() throws JSONException {
         int active = 0;
+        int stale = 0;
+        long now = System.currentTimeMillis();
         for (JSONObject task : tasks.values()) {
             String status = task.optString("status", "");
-            if (!isTerminal(status)) {
+            if (holdsProjectionLease(task, now)) {
                 active++;
+            } else if (!isTerminal(status)) {
+                stale++;
             }
         }
         return new JSONObject()
@@ -36,8 +41,10 @@ final class AgentTaskRuntime {
                 .put("role", "mobile_agent_node")
                 .put("taskLifecycle", true)
                 .put("taskStates", new JSONArray(VALID_STATES))
+                .put("activeProjectionLeaseMs", ACTIVE_PROJECTION_LEASE_MS)
                 .put("retainedTasks", tasks.size())
-                .put("activeTasks", active);
+                .put("activeTasks", active)
+                .put("staleTasks", stale);
     }
 
     synchronized JSONObject create(JSONObject arguments) throws JSONException {
@@ -55,6 +62,7 @@ final class AgentTaskRuntime {
                 .put("status", "created")
                 .put("createdAt", now)
                 .put("updatedAt", now)
+                .put("leaseExpiresAt", Instant.now().plusMillis(ACTIVE_PROJECTION_LEASE_MS).toString())
                 .put("notes", new JSONArray());
 
         JSONObject context = arguments.optJSONObject("context");
@@ -86,6 +94,7 @@ final class AgentTaskRuntime {
             task.put("status", status);
             if (isTerminal(status)) {
                 task.put("completedAt", Instant.now().toString());
+                task.put("leaseExpiresAt", JSONObject.NULL);
             }
         }
 
@@ -96,7 +105,11 @@ final class AgentTaskRuntime {
                     .put("text", note));
         }
 
-        task.put("updatedAt", Instant.now().toString());
+        Instant now = Instant.now();
+        task.put("updatedAt", now.toString());
+        if (!isTerminal(task.optString("status", ""))) {
+            task.put("leaseExpiresAt", now.plusMillis(ACTIVE_PROJECTION_LEASE_MS).toString());
+        }
         HomePulse.task(task);
         return copy(task);
     }
@@ -136,6 +149,22 @@ final class AgentTaskRuntime {
 
     private static boolean isTerminal(String state) {
         return "completed".equals(state) || "failed".equals(state) || "cancelled".equals(state);
+    }
+
+    /**
+     * Non-terminal task state is a presentation lease, not an eternal truth.
+     * If an Agent disappears without a terminal update, the task remains in history
+     * but stops controlling Home/Pico presence after the lease expires.
+     */
+    static boolean holdsProjectionLease(JSONObject task, long now) {
+        if (task == null || isTerminal(task.optString("status", ""))) return false;
+        try {
+            long updatedAt = Instant.parse(task.optString("updatedAt", "")).toEpochMilli();
+            long age = Math.max(0L, now - updatedAt);
+            return age <= ACTIVE_PROJECTION_LEASE_MS;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static String requireText(JSONObject arguments, String key, int min, int max) {
