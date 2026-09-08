@@ -183,14 +183,14 @@ public final class DashboardActivity extends Activity {
         configureWindow();
         setContentView(buildShell());
         requestNotificationPermissionIfNeeded();
-        handleLaunchIntent(getIntent());
+        showPage(requestedPage(getIntent()));
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleLaunchIntent(intent);
+        showPage(requestedPage(intent));
     }
 
     @Override
@@ -325,20 +325,8 @@ public final class DashboardActivity extends Activity {
     }
 
     private int requestedPage(Intent intent) {
-        String action = intent == null ? "" : intent.getAction();
-        if (LauncherShortcuts.ACTION_CAPABILITIES.equals(action)) return PAGE_CAPABILITIES;
-        if (LauncherShortcuts.ACTION_SETTINGS.equals(action)) return PAGE_SETTINGS;
         int page = intent == null ? PAGE_HOME : intent.getIntExtra(EXTRA_PAGE, PAGE_HOME);
         return page == PAGE_CAPABILITIES || page == PAGE_SETTINGS ? page : PAGE_HOME;
-    }
-
-    private void handleLaunchIntent(Intent intent) {
-        if (intent != null && LauncherShortcuts.ACTION_ACTIVITY.equals(intent.getAction())) {
-            showPage(PAGE_HOME);
-            openActivityPage();
-            return;
-        }
-        showPage(requestedPage(intent));
     }
 
     private LinearLayout buildBottomNav() {

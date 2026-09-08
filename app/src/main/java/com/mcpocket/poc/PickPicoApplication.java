@@ -2,7 +2,6 @@ package com.mcpocket.poc;
 
 import android.app.Activity;
 import android.app.Application;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 
@@ -21,10 +20,6 @@ public final class PickPicoApplication extends Application implements Applicatio
         processStartedElapsed = SystemClock.elapsedRealtime();
         processStartedAt = Instant.now().toString();
         registerActivityLifecycleCallbacks(this);
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P
-                || getPackageName().equals(Application.getProcessName())) {
-            LauncherShortcuts.publish(this);
-        }
     }
 
     static boolean isAppInForeground() {

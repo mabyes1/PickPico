@@ -9,6 +9,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -69,20 +70,29 @@ public final class McpAccessibilityService extends AccessibilityService {
 
     static JSONObject inspect(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
-        AccessibilityNodeInfo root = service.getRootInActiveWindow();
-        if (root == null) {
+        List<WindowRoot> roots = windowRoots(service);
+        if (roots.isEmpty()) {
             return unavailable("No active accessibility window/root is available", callCount);
         }
         int maxNodes = clamp(arguments.optInt("maxNodes", 200), 1, 1000);
         int maxDepth = clamp(arguments.optInt("maxDepth", 12), 1, 30);
         boolean includeInvisible = arguments.optBoolean("includeInvisible", false);
         JSONArray nodes = new JSONArray();
+        JSONArray windows = new JSONArray();
         Counter counter = new Counter(maxNodes);
-        appendNode(root, "0", 0, maxDepth, includeInvisible, nodes, counter);
+        boolean multiWindow = roots.size() > 1;
+        for (WindowRoot windowRoot : roots) {
+            if (counter.remaining <= 0) break;
+            String rootPath = multiWindow ? "w" + windowRoot.windowId + "/0" : "0";
+            appendNode(windowRoot.root, rootPath, 0, maxDepth, includeInvisible, nodes, counter);
+            windows.put(windowRoot.describe());
+        }
+        WindowRoot primary = roots.get(0);
         return new JSONObject()
                 .put("available", true)
-                .put("packageName", safe(root.getPackageName()))
-                .put("windowTitle", root.getWindow() == null ? "" : safe(root.getWindow().getTitle()))
+                .put("packageName", safe(primary.root.getPackageName()))
+                .put("windowTitle", primary.title)
+                .put("windows", windows)
                 .put("nodes", nodes)
                 .put("count", nodes.length())
                 .put("truncated", counter.truncated)
@@ -148,9 +158,7 @@ public final class McpAccessibilityService extends AccessibilityService {
     static JSONObject scroll(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
         JSONObject selector = arguments.optJSONObject("selector");
-        AccessibilityNodeInfo node = selector == null
-                ? findFirstScrollable(service.getRootInActiveWindow())
-                : findNode(service, selector);
+        AccessibilityNodeInfo node = selector == null ? findFirstScrollable(service) : findNode(service, selector);
         if (node == null) {
             return notFound(selector, callCount);
         }
@@ -259,24 +267,82 @@ public final class McpAccessibilityService extends AccessibilityService {
     }
 
     private static AccessibilityNodeInfo findNode(McpAccessibilityService service, JSONObject selector) {
-        AccessibilityNodeInfo root = service.getRootInActiveWindow();
-        if (root == null) {
+        List<WindowRoot> roots = windowRoots(service);
+        if (roots.isEmpty()) {
             return null;
         }
         if (selector == null || selector.length() == 0) {
-            return root;
+            return roots.get(0).root;
         }
         String path = selector.optString("path", "");
         if (!path.isEmpty()) {
-            AccessibilityNodeInfo byPath = nodeByPath(root, path);
-            if (byPath != null && matches(byPath, selector)) {
-                return byPath;
+            WindowPath windowPath = parseWindowPath(path);
+            if (windowPath != null) {
+                WindowRoot windowRoot = findWindowRoot(roots, windowPath.windowId);
+                AccessibilityNodeInfo byPath = windowRoot == null
+                        ? null
+                        : nodeByPath(windowRoot.root, windowPath.nodePath);
+                if (byPath != null && matches(byPath, selector)) {
+                    return byPath;
+                }
+            } else {
+                AccessibilityNodeInfo byPath = nodeByPath(roots.get(0).root, path);
+                if (byPath != null && matches(byPath, selector)) {
+                    return byPath;
+                }
             }
         }
         int wantedInstance = Math.max(0, selector.optInt("instance", 0));
         List<AccessibilityNodeInfo> matches = new ArrayList<>();
-        collectMatches(root, selector, matches, wantedInstance + 1);
+        for (WindowRoot root : roots) {
+            collectMatches(root.root, selector, matches, wantedInstance + 1);
+            if (matches.size() > wantedInstance) break;
+        }
         return matches.size() > wantedInstance ? matches.get(wantedInstance) : null;
+    }
+
+    private static List<WindowRoot> windowRoots(McpAccessibilityService service) {
+        List<WindowRoot> result = new ArrayList<>();
+        AccessibilityNodeInfo activeRoot = service.getRootInActiveWindow();
+        int activeWindowId = windowId(activeRoot);
+        if (activeRoot != null) {
+            result.add(new WindowRoot(activeRoot, activeRoot.getWindow()));
+        }
+        List<AccessibilityWindowInfo> windows = service.getWindows();
+        if (windows == null) return result;
+        for (AccessibilityWindowInfo window : windows) {
+            if (window == null) continue;
+            AccessibilityNodeInfo root = window.getRoot();
+            if (root == null) continue;
+            int id = window.getId();
+            if (id == activeWindowId) continue;
+            result.add(new WindowRoot(root, window));
+        }
+        return result;
+    }
+
+    private static int windowId(AccessibilityNodeInfo root) {
+        if (root == null || root.getWindow() == null) return Integer.MIN_VALUE;
+        return root.getWindow().getId();
+    }
+
+    private static WindowRoot findWindowRoot(List<WindowRoot> roots, int windowId) {
+        for (WindowRoot root : roots) {
+            if (root.windowId == windowId) return root;
+        }
+        return null;
+    }
+
+    private static WindowPath parseWindowPath(String path) {
+        if (path == null || path.length() < 4 || path.charAt(0) != 'w') return null;
+        int slash = path.indexOf('/');
+        if (slash <= 1 || slash >= path.length() - 1) return null;
+        try {
+            int windowId = Integer.parseInt(path.substring(1, slash));
+            return new WindowPath(windowId, path.substring(slash + 1));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private static AccessibilityNodeInfo nodeByPath(AccessibilityNodeInfo root, String path) {
@@ -345,6 +411,14 @@ public final class McpAccessibilityService extends AccessibilityService {
         return node;
     }
 
+    private static AccessibilityNodeInfo findFirstScrollable(McpAccessibilityService service) {
+        for (WindowRoot root : windowRoots(service)) {
+            AccessibilityNodeInfo found = findFirstScrollable(root.root);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private static AccessibilityNodeInfo findFirstScrollable(AccessibilityNodeInfo node) {
         if (node == null) {
             return null;
@@ -359,6 +433,47 @@ public final class McpAccessibilityService extends AccessibilityService {
             }
         }
         return null;
+    }
+
+    private static final class WindowRoot {
+        final AccessibilityNodeInfo root;
+        final int windowId;
+        final String title;
+        final int type;
+        final int layer;
+        final boolean active;
+        final boolean focused;
+
+        WindowRoot(AccessibilityNodeInfo root, AccessibilityWindowInfo window) {
+            this.root = root;
+            this.windowId = window == null ? windowId(root) : window.getId();
+            this.title = window == null ? "" : safe(window.getTitle());
+            this.type = window == null ? 0 : window.getType();
+            this.layer = window == null ? 0 : window.getLayer();
+            this.active = window != null && window.isActive();
+            this.focused = window != null && window.isFocused();
+        }
+
+        JSONObject describe() throws JSONException {
+            return new JSONObject()
+                    .put("id", windowId)
+                    .put("title", title)
+                    .put("type", type)
+                    .put("layer", layer)
+                    .put("active", active)
+                    .put("focused", focused)
+                    .put("packageName", safe(root.getPackageName()));
+        }
+    }
+
+    private static final class WindowPath {
+        final int windowId;
+        final String nodePath;
+
+        WindowPath(int windowId, String nodePath) {
+            this.windowId = windowId;
+            this.nodePath = nodePath;
+        }
     }
 
     private static JSONObject nodeActionResult(
