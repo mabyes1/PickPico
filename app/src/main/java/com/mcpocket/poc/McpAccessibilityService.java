@@ -1,12 +1,15 @@
 package com.mcpocket.poc;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
+import android.graphics.Path;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.view.ViewConfiguration;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -17,6 +20,8 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Hyper Mode bridge for semantic cross-app Android UI inspection and actions. */
 public final class McpAccessibilityService extends AccessibilityService {
@@ -124,7 +129,13 @@ public final class McpAccessibilityService extends AccessibilityService {
             boolean performed = clickable != null && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             return nodeActionResult(clickable == null ? node : clickable, action, performed, callCount);
         } else if ("long_click".equals(action)) {
-            androidAction = AccessibilityNodeInfo.ACTION_LONG_CLICK;
+            boolean performed = performTouchLongPress(service, node);
+            if (!performed) {
+                performed = node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);
+            }
+            JSONObject result = nodeActionResult(node, action, performed, callCount);
+            result.put("method", performed ? "touch_gesture_or_accessibility" : "failed");
+            return result;
         } else if ("focus".equals(action)) {
             androidAction = AccessibilityNodeInfo.ACTION_FOCUS;
         } else if ("accessibility_focus".equals(action)) {
@@ -134,6 +145,47 @@ public final class McpAccessibilityService extends AccessibilityService {
                     "ui.action action must be click, long_click, focus, accessibility_focus, back, home, or recents");
         }
         return nodeActionResult(node, action, node.performAction(androidAction), callCount);
+    }
+
+    private static boolean performTouchLongPress(McpAccessibilityService service, AccessibilityNodeInfo node) {
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        if (bounds.isEmpty()) return false;
+        float x = bounds.exactCenterX();
+        float y = bounds.exactCenterY();
+        Path path = new Path();
+        path.moveTo(x, y);
+        long duration = Math.max(650L, ViewConfiguration.getLongPressTimeout() + 150L);
+        GestureDescription gesture = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0L, duration))
+                .build();
+        CountDownLatch latch = new CountDownLatch(1);
+        boolean[] completed = new boolean[]{false};
+        boolean accepted;
+        try {
+            accepted = service.dispatchGesture(gesture, new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    completed[0] = true;
+                    latch.countDown();
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    latch.countDown();
+                }
+            }, null);
+        } catch (RuntimeException error) {
+            return false;
+        }
+        if (!accepted) return false;
+        try {
+            latch.await(duration + 1000L, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return completed[0];
     }
 
     static JSONObject type(JSONObject arguments, long callCount) throws JSONException {
