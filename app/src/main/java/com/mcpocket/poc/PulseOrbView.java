@@ -84,6 +84,10 @@ final class PulseOrbView extends View {
                     : mode.equals(PicoOrbState.HUMAN_HELP) ? .35f : 0f);
             fluid.setColorUniform("primary", accent);
             fluid.setColorUniform("secondary", secondary);
+            // Drawing helpers such as blocked/completed ripples use STROKE. Paint is stateful,
+            // so always restore the fluid body contract before drawing the next frame.
+            paint.setStyle(Paint.Style.FILL);
+            paint.setAlpha(255);
             paint.setShader(fluid);
             canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
             paint.setShader(null);
