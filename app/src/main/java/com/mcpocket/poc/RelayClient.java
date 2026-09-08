@@ -2,6 +2,9 @@ package com.mcpocket.poc;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -11,6 +14,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -51,6 +55,7 @@ final class RelayClient {
     private final Context context;
     private final String relayBaseUrl;
     private final Listener listener;
+    private final ConnectivityManager connectivityManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     // HUMAN HELP and picker calls wait for people. Keep spare workers available for
     // status and independent commands while an interactive request is pending.
@@ -69,14 +74,25 @@ final class RelayClient {
     private volatile WebSocket webSocket;
     private volatile boolean closed;
     private int reconnectAttempt;
+    private long reconnectAttemptCount;
     private volatile String pendingHeartbeatNonce;
     private volatile ScheduledFuture<?> heartbeatFuture;
     private volatile ScheduledFuture<?> heartbeatTimeoutFuture;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private Network activeNetwork;
+    private String currentNetworkType = "unknown";
+    private String connectionId = "";
+    private String relayConnectedAt = "";
+    private String lastRelayHeartbeatAt = "";
+    private String lastRelayPongAt = "";
+    private String lastRelayDisconnectAt = "";
+    private String lastRelayDisconnectReason = "";
 
     RelayClient(Context context, String relayBaseUrl, Listener listener) {
         this.context = context.getApplicationContext();
         this.relayBaseUrl = normalizeBaseUrl(relayBaseUrl);
         this.listener = listener;
+        this.connectivityManager = (ConnectivityManager) this.context.getSystemService(Context.CONNECTIVITY_SERVICE);
         SharedPreferences prefs = this.context.getSharedPreferences(McpNodeService.PREFS, Context.MODE_PRIVATE);
         this.nodeId = getOrCreateSecret(prefs, PREF_NODE_ID, 16);
         this.nodeSecret = getOrCreateSecret(prefs, PREF_NODE_SECRET, 32);
@@ -104,6 +120,7 @@ final class RelayClient {
         if (webSocket != null) return;
         closed = false;
         reconnectAttempt = 0;
+        registerNetworkCallback();
         connect();
     }
 
@@ -111,6 +128,7 @@ final class RelayClient {
         closed = true;
         mainHandler.removeCallbacksAndMessages(null);
         clearHeartbeatState();
+        unregisterNetworkCallback();
         WebSocket socket = webSocket;
         webSocket = null;
         if (socket != null) {
@@ -121,14 +139,32 @@ final class RelayClient {
         listener.onRelayState("stopped", "", "relay stopped");
     }
 
+    synchronized JSONObject diagnostics() throws JSONException {
+        String observedNetworkType = currentNetworkSnapshotType();
+        return new JSONObject()
+                .put("connectionId", connectionId)
+                .put("relayConnectedAt", relayConnectedAt)
+                .put("lastRelayHeartbeatAt", lastRelayHeartbeatAt)
+                .put("lastRelayPongAt", lastRelayPongAt)
+                .put("lastRelayDisconnectAt", lastRelayDisconnectAt)
+                .put("lastRelayDisconnectReason", lastRelayDisconnectReason)
+                .put("reconnectAttemptCount", reconnectAttemptCount)
+                .put("reconnectBackoffAttempt", reconnectAttempt)
+                .put("currentNetworkType", observedNetworkType)
+                .put("socketPresent", webSocket != null);
+    }
+
     private synchronized void connect() {
         if (closed || webSocket != null) {
             return;
         }
         listener.onRelayState("connecting", remoteEndpoint, "connecting to relay");
+        connectionId = UUID.randomUUID().toString();
+        relayConnectedAt = "";
         Request request = new Request.Builder()
                 .url(toWebSocketUrl(relayBaseUrl) + "/v1/nodes/" + nodeId + "/connect")
                 .header("X-PickPico-Relay-Secret", nodeSecret)
+                .header("X-PickPico-Connection-Id", connectionId)
                 .build();
         webSocket = client.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -172,6 +208,8 @@ final class RelayClient {
         webSocket = null;
         clearHeartbeatState();
         socket.cancel();
+        lastRelayDisconnectAt = Instant.now().toString();
+        lastRelayDisconnectReason = detail == null ? "" : detail;
         listener.onRelayState("disconnected", remoteEndpoint, detail);
         scheduleReconnect();
     }
@@ -181,6 +219,7 @@ final class RelayClient {
         int index = Math.min(reconnectAttempt, RECONNECT_DELAYS_MS.length - 1);
         long delay = RECONNECT_DELAYS_MS[index];
         reconnectAttempt++;
+        reconnectAttemptCount++;
         mainHandler.postDelayed(this::connect, delay);
     }
 
@@ -190,6 +229,7 @@ final class RelayClient {
         }
         String nonce = UUID.randomUUID().toString();
         pendingHeartbeatNonce = nonce;
+        lastRelayHeartbeatAt = Instant.now().toString();
         try {
             boolean queued = socket.send(new JSONObject()
                     .put("type", "ping")
@@ -265,7 +305,110 @@ final class RelayClient {
             timeout.cancel(false);
         }
         reconnectAttempt = 0;
+        if (relayConnectedAt.isEmpty()) {
+            relayConnectedAt = Instant.now().toString();
+        }
+        lastRelayPongAt = Instant.now().toString();
         listener.onRelayState("connected", remoteEndpoint, "relay heartbeat healthy");
+    }
+
+    private synchronized void registerNetworkCallback() {
+        if (connectivityManager == null || networkCallback != null) {
+            return;
+        }
+        refreshNetworkSnapshot();
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                handleNetworkAvailable(network);
+            }
+
+            @Override
+            public void onLost(Network network) {
+                handleNetworkLost(network);
+            }
+
+            @Override
+            public void onCapabilitiesChanged(Network network, NetworkCapabilities capabilities) {
+                synchronized (RelayClient.this) {
+                    if (activeNetwork != null && activeNetwork.equals(network)) {
+                        currentNetworkType = networkType(capabilities);
+                    }
+                }
+            }
+        };
+        try {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback);
+        } catch (RuntimeException ignored) {
+            networkCallback = null;
+        }
+    }
+
+    private synchronized void unregisterNetworkCallback() {
+        if (connectivityManager == null || networkCallback == null) {
+            return;
+        }
+        try {
+            connectivityManager.unregisterNetworkCallback(networkCallback);
+        } catch (RuntimeException ignored) {
+        }
+        networkCallback = null;
+    }
+
+    private synchronized void handleNetworkAvailable(Network network) {
+        if (closed) return;
+        Network previous = activeNetwork;
+        activeNetwork = network;
+        currentNetworkType = networkType(connectivityManager == null
+                ? null : connectivityManager.getNetworkCapabilities(network));
+        boolean changed = previous == null || !previous.equals(network);
+        if (webSocket == null) {
+            // A restored network should not sit behind a stale 30-second backoff.
+            mainHandler.post(this::connect);
+        } else if (changed) {
+            recover(webSocket, "active network changed to " + currentNetworkType);
+        }
+    }
+
+    private synchronized void handleNetworkLost(Network network) {
+        if (activeNetwork == null || !activeNetwork.equals(network)) {
+            return;
+        }
+        activeNetwork = null;
+        currentNetworkType = "none";
+        if (!closed && webSocket != null) {
+            recover(webSocket, "active network lost");
+        }
+    }
+
+    private synchronized void refreshNetworkSnapshot() {
+        if (connectivityManager == null) {
+            currentNetworkType = "unknown";
+            return;
+        }
+        Network network = connectivityManager.getActiveNetwork();
+        activeNetwork = network;
+        currentNetworkType = network == null
+                ? "none"
+                : networkType(connectivityManager.getNetworkCapabilities(network));
+    }
+
+    private String currentNetworkSnapshotType() {
+        if (connectivityManager == null) return currentNetworkType;
+        Network network = connectivityManager.getActiveNetwork();
+        return network == null
+                ? "none"
+                : networkType(connectivityManager.getNetworkCapabilities(network));
+    }
+
+    private static String networkType(NetworkCapabilities capabilities) {
+        if (capabilities == null) return "unknown";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return "vpn";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return "wifi";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "cellular";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "ethernet";
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)) return "bluetooth";
+        return "other";
     }
 
     private synchronized void handleRelayMessage(WebSocket socket, String text) {

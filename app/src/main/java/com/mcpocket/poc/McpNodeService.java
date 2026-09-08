@@ -112,6 +112,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private McpHttpServer server;
     private String endpoint = "";
     private long startedElapsed;
+    private String nodeStartedAt = "";
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean autoUpdateCheckRunning = new AtomicBoolean(false);
     private final Runnable autoUpdateCheckRunnable = this::runAutoUpdateCheck;
@@ -205,6 +206,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             server = new McpHttpServer(PORT, token, this);
             server.start();
             startedElapsed = SystemClock.elapsedRealtime();
+            nodeStartedAt = Instant.now().toString();
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(KEY_RUNNING, true)
                     .putBoolean(KEY_DESIRED_RUNNING, true)
@@ -540,7 +542,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public JSONObject serverInfo(long callCount) throws JSONException {
         refreshLocalEndpoint();
         long uptimeMs = startedElapsed == 0L ? 0L : SystemClock.elapsedRealtime() - startedElapsed;
-        return new JSONObject()
+        JSONObject result = new JSONObject()
                 .put("name", "PickPico")
                 .put("version", BuildConfig.VERSION_NAME)
                 .put("device", Build.MANUFACTURER + " " + Build.MODEL)
@@ -552,7 +554,14 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("relayStatus", relayStatus(getSharedPreferences(PREFS, MODE_PRIVATE)))
                 .put("workspaceRoot", workspaceRoot().getAbsolutePath())
                 .put("uptimeSeconds", uptimeMs / 1000L)
+                .put("nodeStartedAt", nodeStartedAt)
+                .put("processStartedAt", PickPicoApplication.processStartedAt())
+                .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
                 .put("toolCallCount", callCount);
+        if (relayClient != null) {
+            result.put("relay", relayClient.diagnostics());
+        }
+        return result;
     }
 
     @Override
@@ -598,6 +607,10 @@ public final class McpNodeService extends Service implements McpToolActions {
                                 .getString(KEY_REMOTE_ENDPOINT, ""))
                         .put("relayStatus", relayStatus(getSharedPreferences(PREFS, MODE_PRIVATE)))
                         .put("uptimeSeconds", uptimeMs / 1000L)
+                        .put("nodeStartedAt", nodeStartedAt)
+                        .put("processStartedAt", PickPicoApplication.processStartedAt())
+                        .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
+                        .put("relay", relayClient == null ? new JSONObject() : relayClient.diagnostics())
                         .put("toolCallCount", callCount));
     }
 

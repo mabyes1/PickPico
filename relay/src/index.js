@@ -148,11 +148,28 @@ export class NodeRelay extends DurableObject {
       const heartbeatAges = sockets
         .map((socket) => this.socketHeartbeatAgeMs(socket))
         .filter((value) => Number.isFinite(value));
+      const freshestSocket = selectHealthiestSocket(
+        sockets,
+        (candidate) => this.socketHeartbeatAgeMs(candidate),
+        Number.MAX_SAFE_INTEGER,
+      );
+      const activeAttachment = freshestSocket?.deserializeAttachment?.() || {};
+      const lastDisconnect = await this.ctx.storage.get("lastDisconnect") || {};
+      const activeHeartbeatAt = Number(activeAttachment.lastHeartbeatAt);
+      const lastHeartbeatAt = Number.isFinite(activeHeartbeatAt) && activeHeartbeatAt > 0
+        ? activeHeartbeatAt
+        : Number(lastDisconnect.lastHeartbeatAt) || null;
       return json({
         online: healthySockets.length > 0,
         connectedSockets: sockets.length,
         healthySockets: healthySockets.length,
         lastHeartbeatAgeMs: heartbeatAges.length ? Math.min(...heartbeatAges) : null,
+        lastNodeSeenAt: lastHeartbeatAt ? new Date(lastHeartbeatAt).toISOString() : null,
+        lastHeartbeatAt: lastHeartbeatAt ? new Date(lastHeartbeatAt).toISOString() : null,
+        connectionId: activeAttachment.connectionId || lastDisconnect.connectionId || null,
+        connectedAt: activeAttachment.connectedAt || lastDisconnect.connectedAt || null,
+        lastDisconnectAt: lastDisconnect.disconnectedAt || null,
+        disconnectReason: lastDisconnect.reason || null,
         pendingRequests: this.pending.size,
       });
     }
@@ -198,9 +215,14 @@ export class NodeRelay extends DurableObject {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
+    const requestedConnectionId = request.headers.get("X-PickPico-Connection-Id") || "";
+    const connectionId = /^[A-Za-z0-9_-]{8,128}$/.test(requestedConnectionId)
+      ? requestedConnectionId
+      : crypto.randomUUID();
     this.ctx.acceptWebSocket(server, ["node"]);
     server.serializeAttachment({
       role: "node",
+      connectionId,
       connectedAt: new Date().toISOString(),
       lastHeartbeatAt: Date.now(),
     });
@@ -352,12 +374,15 @@ export class NodeRelay extends DurableObject {
     });
   }
 
-  webSocketClose(ws, code, reason) {
+  async webSocketClose(ws, code, reason) {
     this.failPendingForSocket(ws, "node_disconnected");
+    await this.recordDisconnect(ws, `close:${code}${reason ? ` ${reason}` : ""}`);
   }
 
-  webSocketError(ws, error) {
+  async webSocketError(ws, error) {
     this.failPendingForSocket(ws, "node_disconnected");
+    const detail = error instanceof Error ? error.message : String(error || "unknown websocket error");
+    await this.recordDisconnect(ws, `error:${detail}`);
   }
 
   nodeSockets() {
@@ -373,6 +398,20 @@ export class NodeRelay extends DurableObject {
 
   isSocketHealthy(socket) {
     return socket.readyState === 1 && this.socketHeartbeatAgeMs(socket) <= HEARTBEAT_STALE_MS;
+  }
+
+  async recordDisconnect(socket, reason) {
+    const attachment = socket?.deserializeAttachment?.() || {};
+    try {
+      await this.ctx.storage.put("lastDisconnect", {
+        connectionId: attachment.connectionId || null,
+        connectedAt: attachment.connectedAt || null,
+        lastHeartbeatAt: Number(attachment.lastHeartbeatAt) || null,
+        disconnectedAt: new Date().toISOString(),
+        reason: reason || "unknown",
+      });
+    } catch (_) {
+    }
   }
 
   failPendingForSocket(socket, error) {

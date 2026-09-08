@@ -2,6 +2,8 @@ package com.mcpocket.poc;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.os.Handler;
 import android.os.Looper;
 import org.json.JSONObject;
@@ -23,14 +25,17 @@ public class RelayClientTest {
     private RelayClient relay;
     private RelayClient.Listener listener;
     private WebSocket socket;
+    private ConnectivityManager connectivityManager;
 
     @Before public void setUp() throws Exception {
         looper = mockStatic(Looper.class);
         handlers = mockConstruction(Handler.class);
         Context context = mock(Context.class);
         SharedPreferences prefs = mock(SharedPreferences.class);
+        connectivityManager = mock(ConnectivityManager.class);
         when(context.getApplicationContext()).thenReturn(context);
         when(context.getSharedPreferences(anyString(), anyInt())).thenReturn(prefs);
+        when(context.getSystemService(Context.CONNECTIVITY_SERVICE)).thenReturn(connectivityManager);
         when(prefs.getString(anyString(), anyString())).thenReturn("test-identity-already-created");
         listener = mock(RelayClient.Listener.class);
         relay = new RelayClient(context, "https://example.invalid", listener);
@@ -82,6 +87,22 @@ public class RelayClientTest {
         verify(handlers.constructed().get(0), never()).postDelayed(any(Runnable.class), anyLong());
     }
 
+    @Test public void losingActiveNetworkInvalidatesSocketAndStartsRecovery() throws Exception {
+        Network network = mock(Network.class);
+        field("activeNetwork").set(relay, network);
+
+        invoke("handleNetworkLost", new Class<?>[]{Network.class}, network);
+
+        assertNull(field("webSocket").get(relay));
+        verify(socket).cancel();
+        verify(listener).onRelayState(eq("disconnected"), anyString(), eq("active network lost"));
+        verify(handlers.constructed().get(0)).postDelayed(any(Runnable.class), eq(1000L));
+        JSONObject diagnostics = (JSONObject) invoke("diagnostics", new Class<?>[]{});
+        assertEquals("none", diagnostics.getString("currentNetworkType"));
+        assertEquals(1L, diagnostics.getLong("reconnectAttemptCount"));
+        assertEquals("active network lost", diagnostics.getString("lastRelayDisconnectReason"));
+    }
+
     @Test public void resetIdentityOnlyRemovesRelayIdentityKeys() {
         SharedPreferences prefs = mock(SharedPreferences.class);
         SharedPreferences.Editor editor = mock(SharedPreferences.Editor.class);
@@ -101,9 +122,9 @@ public class RelayClientTest {
         field.setAccessible(true);
         return field;
     }
-    private void invoke(String name, Class<?>[] types, Object... args) throws Exception {
+    private Object invoke(String name, Class<?>[] types, Object... args) throws Exception {
         Method method = RelayClient.class.getDeclaredMethod(name, types);
         method.setAccessible(true);
-        method.invoke(relay, args);
+        return method.invoke(relay, args);
     }
 }
