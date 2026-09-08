@@ -78,10 +78,9 @@ final class PulseOrbView extends View {
         if (Build.VERSION.SDK_INT >= 33 && fluid != null && canvas.isHardwareAccelerated()) {
             fluid.setFloatUniform("resolution", (float)getWidth(), (float)getHeight());
             fluid.setFloatUniform("time", t);
-            fluid.setFloatUniform("energy", mode.equals(PicoOrbState.BLOCKED) ? .72f
-                    : mode.equals(PicoOrbState.COMPLETED) || mode.equals(PicoOrbState.HUMAN_HELP) ? 1.08f : 1f);
-            fluid.setFloatUniform("tension", mode.equals(PicoOrbState.BLOCKED) ? 1f
-                    : mode.equals(PicoOrbState.RUNNING) ? .58f
+            fluid.setFloatUniform("energy",
+                    mode.equals(PicoOrbState.COMPLETED) || mode.equals(PicoOrbState.HUMAN_HELP) ? 1.08f : 1f);
+            fluid.setFloatUniform("tension", mode.equals(PicoOrbState.RUNNING) ? .58f
                     : mode.equals(PicoOrbState.HUMAN_HELP) ? .35f : 0f);
             fluid.setColorUniform("primary", accent);
             fluid.setColorUniform("secondary", secondary);
@@ -99,12 +98,11 @@ final class PulseOrbView extends View {
         float speed = mode.equals(PicoOrbState.RUNNING) ? 1.35f : connectionMode ? 1.25f : .42f;
         float breath = (float) Math.sin(t * speed);
         float r = Math.min(getWidth() * .33f, getHeight() * .37f) * (1 + .018f * breath);
-        boolean blocked = mode.equals(PicoOrbState.BLOCKED);
         int light = blend(accent, Color.WHITE, .84f);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(new RadialGradient(cx, cy, r * 1.48f,
-                new int[]{alpha(accent, blocked ? 25 : 66), alpha(accent, 22), Color.TRANSPARENT},
+                new int[]{alpha(accent, 66), alpha(accent, 22), Color.TRANSPARENT},
                 new float[]{0, .64f, 1}, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, r * 1.48f, paint);
 
@@ -117,9 +115,7 @@ final class PulseOrbView extends View {
         paint.setShader(new LinearGradient(cx - r, cy - r, cx + r * .4f, cy + r,
                 new int[]{blend(accent, Color.WHITE, .12f), accent, secondary, light},
                 new float[]{0, .36f, .69f, 1}, Shader.TileMode.CLAMP));
-        paint.setAlpha(blocked ? 135 : 255);
         canvas.drawCircle(cx, cy, r, paint);
-        paint.setAlpha(255);
 
         int saved = canvas.save();
         wave.reset(); wave.addCircle(cx, cy, r, Path.Direction.CW); canvas.clipPath(wave);
@@ -130,23 +126,23 @@ final class PulseOrbView extends View {
                     cx + r * .2f, cy + r * .88f, cx + r * 1.2f, cy + r * .12f + drift * r * .12f);
             wave.lineTo(cx + r * 1.2f, cy + r * 1.2f); wave.lineTo(cx - r * 1.2f, cy + r * 1.2f); wave.close();
             paint.setShader(new LinearGradient(cx, cy - r * .2f, cx, cy + r,
-                    alpha(light, blocked ? 30 : 68 + i * 22), alpha(light, blocked ? 48 : 215), Shader.TileMode.CLAMP));
+                    alpha(light, 68 + i * 22), alpha(light, 215), Shader.TileMode.CLAMP));
             canvas.drawPath(wave, paint);
         }
         paint.setShader(new RadialGradient(cx - r * .52f, cy + r * .38f, r * .95f,
-                new int[]{alpha(Color.WHITE, blocked ? 70 : 218), alpha(light, 60), Color.TRANSPARENT},
+                new int[]{alpha(Color.WHITE, 218), alpha(light, 60), Color.TRANSPARENT},
                 new float[]{0, .45f, 1}, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, r * 1.5f, paint);
         canvas.restoreToCount(saved);
 
         paint.setShader(null); paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(1.6f);
-        paint.setColor(alpha(light, blocked ? 50 : 135)); canvas.drawCircle(cx, cy, r, paint);
+        paint.setColor(alpha(light, 135)); canvas.drawCircle(cx, cy, r, paint);
         paint.setStyle(Paint.Style.FILL);
         for (int i = 0; i < 5; i++) {
             float orbitSpeed = mode.equals(PicoOrbState.RUNNING) ? 2.2f : .035f;
             double angle = i * 1.8 + t * orbitSpeed * (i % 2 == 0 ? 1 : -1);
             float orbit = r * (1.22f + (i % 2) * .14f);
-            paint.setColor(alpha(light, blocked ? 30 : 85 + i * 20));
+            paint.setColor(alpha(light, 85 + i * 20));
             canvas.drawCircle(cx + (float)Math.cos(angle) * orbit, cy + (float)Math.sin(angle) * orbit,
                     getResources().getDisplayMetrics().density * (i == 2 ? 2 : 1.1f), paint);
         }
