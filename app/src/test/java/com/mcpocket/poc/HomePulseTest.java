@@ -15,6 +15,7 @@ public final class HomePulseTest {
         assertEquals("Checking the camera feed", state(true, "connected", null).title);
         HomePulse.finish(command, false);
         assertEquals("idle", state(true, "connected", null).mode);
+        assertEquals(PicoOrbState.COMPLETED, state(true, "connected", null).orbMode);
         assertTrue(state(true, "connected", null).flow.startsWith("Last ·"));
     }
     @Test public void concurrentCommandsRemainActiveUntilBothFinish() {
@@ -28,6 +29,7 @@ public final class HomePulseTest {
     @Test public void humanRequestWinsOverConnectionFailure() throws Exception {
         HomePulse.Snapshot s = state(true, "disconnected", new JSONObject().put("title", "Turn the PCB over"));
         assertEquals("waiting", s.mode);
+        assertEquals(PicoOrbState.HUMAN_HELP, s.orbMode);
         assertEquals("help", s.action);
         assertEquals("Turn the PCB over", s.actionDetail);
         assertEquals("Remote access unavailable", s.connection);
@@ -35,6 +37,7 @@ public final class HomePulseTest {
     @Test public void stoppedNodeDoesNotShowOldTaskAsRunning() throws Exception {
         HomePulse.task(new JSONObject().put("taskId", "t").put("status", "running").put("agent", "Codex"));
         assertEquals("OFFLINE", state(false, "connected", null).label);
+        assertEquals(PicoOrbState.HIDDEN, state(false, "connected", null).orbMode);
         HomePulse.reset();
         assertEquals("idle", state(true, "connected", null).mode);
     }
@@ -58,11 +61,42 @@ public final class HomePulseTest {
         assertEquals("GPT-5.6 Sol", s.agent);
         assertEquals("waiting", s.mode);
     }
+
+    @Test public void waitingTaskTurnsOnHumanHelpOrbEvenBeforeARequestIsStored() throws Exception {
+        HomePulse.task(new JSONObject().put("taskId", "t").put("status", "waiting_human")
+                .put("agent", "Codex").put("updatedAt", java.time.Instant.now().toString()));
+        assertEquals(PicoOrbState.HUMAN_HELP, state(true, "connected", null).orbMode);
+    }
     @Test public void failureHasBoundedLifetimeAndConnectingNeedsNoButton() {
         long command = HomePulse.begin("ui.inspect"); HomePulse.finish(command, true);
         assertEquals("blocked", state(true, "connected", null).mode);
         assertEquals("idle", HomePulse.snapshot(true, true, "connected", null, System.currentTimeMillis()+16000).mode);
         assertEquals("connecting", state(true, "connecting", null).mode);
+        assertEquals(PicoOrbState.BLOCKED, state(true, "connecting", null).orbMode);
         assertEquals("", state(true, "connecting", null).action);
+    }
+
+    @Test public void connectingUsesConnectionOrbWhenNoHigherPriorityProblemExists() {
+        assertEquals(PicoOrbState.CONNECTING, state(true, "connecting", null).orbMode);
+    }
+
+    @Test public void successfulCommandReturnsFromGreenToReadyAfterFiveSeconds() {
+        long command = HomePulse.begin("ui.inspect");
+        HomePulse.finish(command, false);
+        long later = System.currentTimeMillis() + PicoOrbState.COMPLETED_VISIBLE_MS + 50L;
+        assertEquals(PicoOrbState.READY,
+                HomePulse.snapshot(true, true, "connected", null, later).orbMode);
+    }
+
+    @Test public void relayLossUsesConnectionAttentionWithoutCallingLocalOffline() {
+        HomePulse.Snapshot snapshot = state(true, "disconnected", null);
+        assertEquals(PicoOrbState.CONNECTION_ATTENTION, snapshot.orbMode);
+        assertEquals("Remote access unavailable", snapshot.connection);
+    }
+
+    @Test public void cancelledTaskDoesNotFlashCompletedGreen() throws Exception {
+        HomePulse.task(new JSONObject().put("taskId", "t").put("status", "cancelled")
+                .put("updatedAt", java.time.Instant.now().toString()));
+        assertEquals(PicoOrbState.READY, state(true, "connected", null).orbMode);
     }
 }

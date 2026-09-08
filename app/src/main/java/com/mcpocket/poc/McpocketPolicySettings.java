@@ -11,6 +11,9 @@ final class McpocketPolicySettings {
     static final String PREFS = "mcpocket_policy";
     static final String KEY_HYPER_MODE = "hyper_mode";
     static final String KEY_APPROVAL_MODE = "approval_mode";
+    static final String KEY_PICO_ORB_ENABLED = "pico_orb_enabled";
+    private static final String KEY_PICO_ORB_SIDE = "pico_orb_side";
+    private static final String KEY_PICO_ORB_Y_RATIO = "pico_orb_y_ratio";
 
     static final String APPROVAL_ASK = "ask";
     static final String APPROVAL_AUTO = "auto_approve";
@@ -25,6 +28,30 @@ final class McpocketPolicySettings {
 
     static void setHyperModeEnabled(Context context, boolean enabled) {
         preferences(context).edit().putBoolean(KEY_HYPER_MODE, enabled).apply();
+    }
+
+    static boolean isPicoOrbEnabled(Context context) {
+        return preferences(context).getBoolean(KEY_PICO_ORB_ENABLED, true);
+    }
+
+    static void setPicoOrbEnabled(Context context, boolean enabled) {
+        preferences(context).edit().putBoolean(KEY_PICO_ORB_ENABLED, enabled).apply();
+    }
+
+    static String picoOrbSide(Context context) {
+        String side = preferences(context).getString(KEY_PICO_ORB_SIDE, "right");
+        return "left".equals(side) ? "left" : "right";
+    }
+
+    static float picoOrbYRatio(Context context) {
+        return Math.max(0f, Math.min(1f, preferences(context).getFloat(KEY_PICO_ORB_Y_RATIO, .42f)));
+    }
+
+    static void savePicoOrbPosition(Context context, String side, float yRatio) {
+        preferences(context).edit()
+                .putString(KEY_PICO_ORB_SIDE, "left".equals(side) ? "left" : "right")
+                .putFloat(KEY_PICO_ORB_Y_RATIO, Math.max(0f, Math.min(1f, yRatio)))
+                .apply();
     }
 
     static String approvalMode(Context context) {

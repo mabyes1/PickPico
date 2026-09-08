@@ -76,7 +76,7 @@ public final class DashboardActivity extends Activity {
     static final int PAGE_HOME = 0;
     static final int PAGE_CAPABILITIES = 1;
     static final int PAGE_SETTINGS = 2;
-    private static final int PAGE_REMOTE = 3;
+    static final int PAGE_REMOTE = 3;
     private static final int PAGE_DEVELOPER = 4;
     private static final int PAGE_APPEARANCE = 5;
 
@@ -149,6 +149,7 @@ public final class DashboardActivity extends Activity {
     private TextView settingsVersionState;
     private TextView settingsUpdateState;
     private TextView updateAction;
+    private Switch picoOrbSwitch;
     private boolean updateCheckInProgress;
     private String updateCheckError;
     private Switch appearanceGradientSwitch;
@@ -205,6 +206,7 @@ public final class DashboardActivity extends Activity {
         if (pulseOrb != null) pulseOrb.setResumed(true);
         if (topBrandLogo != null) topBrandLogo.setResumed(currentPage == PAGE_HOME);
         refreshMediaForegroundTypesIfRunning();
+        refreshPicoOrbServiceIfRunning();
         handler.post(refreshTask);
     }
 
@@ -326,7 +328,7 @@ public final class DashboardActivity extends Activity {
 
     private int requestedPage(Intent intent) {
         int page = intent == null ? PAGE_HOME : intent.getIntExtra(EXTRA_PAGE, PAGE_HOME);
-        return page == PAGE_CAPABILITIES || page == PAGE_SETTINGS ? page : PAGE_HOME;
+        return page == PAGE_CAPABILITIES || page == PAGE_SETTINGS || page == PAGE_REMOTE ? page : PAGE_HOME;
     }
 
     private LinearLayout buildBottomNav() {
@@ -458,6 +460,7 @@ public final class DashboardActivity extends Activity {
         settingsVersionState = null;
         settingsUpdateState = null;
         updateAction = null;
+        picoOrbSwitch = null;
 
         relayUrlInput = null;
         remoteState = null;
@@ -929,6 +932,7 @@ public final class DashboardActivity extends Activity {
 
     private String capabilityGlyph(String title) {
         String value = title == null ? "" : title.toLowerCase(Locale.ROOT);
+        if (value.contains("pico ball")) return "●";
         if (value.contains("camera")) return "◉";
         if (value.contains("microphone")) return "◍";
         if (value.contains("location")) return "⌖";
@@ -975,6 +979,28 @@ public final class DashboardActivity extends Activity {
                 () -> showPage(PAGE_APPEARANCE));
         rowState(appearance, "CUSTOMIZE", DIM);
         root.addView(appearance, cardParams(7));
+
+        LinearLayout orbCard = glassCard(false);
+        picoOrbSwitch = capabilityRow(
+                orbCard,
+                "Pico ball",
+                "Keep the HOME fluid orb visible above other apps while the Node is running.",
+                checked -> {
+                    if (updatingUi) return;
+                    McpocketPolicySettings.setPicoOrbEnabled(this, checked);
+                    if (checked && !Settings.canDrawOverlays(this)) {
+                        try {
+                            startActivity(new Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:" + getPackageName())));
+                        } catch (RuntimeException error) {
+                            Toast.makeText(this, "Open Android settings and allow display over other apps", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    refreshPicoOrbServiceIfRunning();
+                    refreshStatus();
+                });
+        root.addView(orbCard, cardParams(7));
 
         TextView appHeading = sectionLabel("APP");
         appHeading.setPadding(0, dp(20), 0, dp(7));
@@ -1787,17 +1813,17 @@ public final class DashboardActivity extends Activity {
         JSONObject pending = null;
         try { pending = HumanHelpStore.latestWaiting(this); } catch (Exception ignored) { }
         HomePulse.Snapshot state = HomePulse.snapshot(running, configured, relay, pending, System.currentTimeMillis());
-        pulseOrb.setMode(state.mode);
+        pulseOrb.setMode(state.orbMode);
         setTextIfChanged(pulseTitle, state.title);
         setTextIfChanged(pulseAgent, state.activeTasks > 1 ? state.activeTasks + " agents" : state.agent);
         pulseAgent.setMaxWidth(dp(125));
         String badge = state.mode.equals("running") ? "Running" : state.mode.equals("waiting") ? "Waiting"
                 : state.mode.equals("blocked") ? "Blocked" : state.mode.equals("connecting") ? "Connecting" : state.recent ? "Just finished" : "Ready";
         setTextIfChanged(pulseBadge, " · " + badge);
-        applyTextColor(pulseBadge, state.mode.equals("blocked") || state.mode.equals("waiting") ? AMBER : GREEN);
+        applyTextColor(pulseBadge, PicoOrbState.primary(state.orbMode, GREEN));
         setTextIfChanged(pulseFlow, state.flow);
         setTextIfChanged(pulseState, "● " + state.label);
-        applyTextColor(pulseState, state.mode.equals("blocked") ? AMBER : state.mode.equals("waiting") ? AMBER : GREEN);
+        applyTextColor(pulseState, PicoOrbState.primary(state.orbMode, GREEN));
         setTextIfChanged(pulseConnection, !running ? "Node\nstopped" : !configured ? "Local\nconnection"
                 : "connected".equals(relay) ? "Connected\nthrough Relay" : "Relay\n" + (state.mode.equals("connecting") ? "connecting" : "disconnected"));
         if (running && !pulseCounting && System.currentTimeMillis() - pulseCountAt > 10000) {
@@ -1893,6 +1919,7 @@ public final class DashboardActivity extends Activity {
             if (backgroundLaunchSwitch != null) backgroundLaunchSwitch.setChecked(AgentAttention.canLaunchBackgroundActivities(this));
             if (accessibilitySwitch != null) accessibilitySwitch.setChecked(McpAccessibilityService.hasAccess(this));
             if (screenCaptureSwitch != null) screenCaptureSwitch.setChecked(ScreenCaptureService.isActive());
+            if (picoOrbSwitch != null) picoOrbSwitch.setChecked(McpocketPolicySettings.isPicoOrbEnabled(this));
         } finally {
             updatingUi = false;
         }
@@ -1916,6 +1943,12 @@ public final class DashboardActivity extends Activity {
                 accessibilitySwitch != null && accessibilitySwitch.isChecked() ? GREEN : AMBER);
         setCapabilityState(screenCaptureSwitch, screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? "READY" : "OFF",
                 screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? GREEN : DIM);
+        boolean picoOrbEnabled = McpocketPolicySettings.isPicoOrbEnabled(this);
+        boolean picoOrbAllowed = Settings.canDrawOverlays(this);
+        setCapabilityState(
+                picoOrbSwitch,
+                !picoOrbEnabled ? "OFF" : picoOrbAllowed ? "READY" : "SETUP REQUIRED",
+                !picoOrbEnabled ? DIM : picoOrbAllowed ? GREEN : AMBER);
         if (screenCaptureDetail != null) {
             setState(screenCaptureDetail,
                     ScreenCaptureService.isActive() ? "ACTIVE SESSION" : "NOT ACTIVE",
@@ -2169,6 +2202,16 @@ public final class DashboardActivity extends Activity {
             startService(intent);
         } catch (Throwable ignored) {
             // Keep the base node alive if Android declines a foreground-type refresh.
+        }
+    }
+
+    private void refreshPicoOrbServiceIfRunning() {
+        if (!McpNodeService.isNodeRunning()) return;
+        Intent intent = new Intent(this, McpNodeService.class)
+                .setAction(McpNodeService.ACTION_REFRESH_PICO_ORB);
+        try {
+            startService(intent);
+        } catch (RuntimeException ignored) {
         }
     }
 

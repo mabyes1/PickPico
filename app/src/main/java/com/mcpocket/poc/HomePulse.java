@@ -70,14 +70,17 @@ final class HomePulse {
         Snapshot s = new Snapshot();
         JSONObject active = null;
         JSONObject recentTask = null;
+        long recentTaskAgeMs = Long.MAX_VALUE;
         int activeTasks = 0;
         for (JSONObject task : tasks.values()) {
             String status = task.optString("status");
             if (status.equals("completed") || status.equals("cancelled")) {
                 try {
-                    if (now - Instant.parse(task.optString("updatedAt")).toEpochMilli() <= 30000
+                    long age = now - Instant.parse(task.optString("updatedAt")).toEpochMilli();
+                    if (age <= 30000
                             && (recentTask == null || task.optString("updatedAt").compareTo(recentTask.optString("updatedAt")) > 0)) {
                         recentTask = task;
+                        recentTaskAgeMs = age;
                     }
                 } catch (Exception ignored) { }
                 continue;
@@ -141,6 +144,25 @@ final class HomePulse {
         if (s.mode.equals("idle") && !s.recent) s.agent = "PickPico";
         s.agentState = s.agent + " · " + (s.mode.equals("running") ? "Running" : s.mode.equals("waiting") ? "Waiting" : s.mode.equals("connecting") ? "Starting" : s.mode.equals("blocked") ? "Blocked" : "Ready");
         if (node && pending == null && activeTasks > 1) s.agentState = activeTasks + " agent tasks · " + (s.mode.equals("blocked") ? "Blocked" : s.mode.equals("waiting") ? "Waiting" : "Active");
+        boolean activeBlocked = active != null && (active.optString("status").equals("blocked")
+                || active.optString("status").equals("failed"));
+        boolean activeWaiting = active != null && active.optString("status").equals("waiting_human");
+        boolean recentFailure = lastFailed && now - lastFinished < 15000;
+        boolean connecting = configured && (relay.equals("connecting") || relay.equals("starting") || relay.equals("reconnecting"));
+        boolean completedRecently = (!lastFailed && lastFinished > 0 && now - lastFinished <= PicoOrbState.COMPLETED_VISIBLE_MS)
+                || (recentTask != null
+                && recentTask.optString("status").equals("completed")
+                && recentTaskAgeMs <= PicoOrbState.COMPLETED_VISIBLE_MS);
+        boolean connectionAttention = configured && !relay.equals("connected") && !connecting;
+        s.orbMode = PicoOrbState.resolve(
+                node,
+                pending != null || activeWaiting,
+                activeBlocked || recentFailure,
+                !current.isEmpty() || (active != null && !activeWaiting && !activeBlocked),
+                connecting,
+                completedRecently,
+                connectionAttention);
+        s.pendingRequestId = pending == null ? "" : pending.optString("requestId", "");
         return s;
     }
 
@@ -187,6 +209,8 @@ final class HomePulse {
 
     static final class Snapshot {
         String mode = "idle", label = "READY", title = "No active agent tasks";
+        String orbMode = PicoOrbState.READY;
+        String pendingRequestId = "";
         String agent, agentState, flow, connection;
         String action = "", actionTitle = "", actionDetail = "", button = "";
         int activeTasks;

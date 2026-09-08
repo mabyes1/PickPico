@@ -24,6 +24,7 @@ final class PulseOrbView extends View {
     private PickPicoTheme.State theme;
     private RuntimeShader fluid;
     private long lastFrame;
+    private long modeStartedAt = SystemClock.uptimeMillis();
     private float flowTime;
     private String mode = "idle";
     private boolean resumed;
@@ -44,7 +45,13 @@ final class PulseOrbView extends View {
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
 
-    void setMode(String value) { if (!mode.equals(value)) { mode = value; invalidate(); } }
+    void setMode(String value) {
+        if (!mode.equals(value)) {
+            mode = value;
+            modeStartedAt = SystemClock.uptimeMillis();
+            invalidate();
+        }
+    }
     void setResumed(boolean value) { resumed = value; lastFrame = 0; if (value) invalidate(); }
     void setTheme(PickPicoTheme.State value) { theme = value; invalidate(); }
 
@@ -52,30 +59,46 @@ final class PulseOrbView extends View {
         super.onDraw(canvas);
         boolean animate = resumed && isShown() && getWindowVisibility() == VISIBLE && ValueAnimator.areAnimatorsEnabled();
         long now = SystemClock.uptimeMillis();
+        boolean connectionMode = mode.equals(PicoOrbState.CONNECTING) || mode.equals(PicoOrbState.CONNECTION_ATTENTION);
+        float timeScale = mode.equals(PicoOrbState.RUNNING) ? 1.9f
+                : connectionMode ? 1.1f
+                : mode.equals(PicoOrbState.HUMAN_HELP) ? 1.25f
+                : mode.equals(PicoOrbState.BLOCKED) ? .55f : .7f;
         if (animate && lastFrame != 0) flowTime += Math.min(0.05f, (now - lastFrame) / 1000f)
-                * (mode.equals("running") ? 1.45f : mode.equals("connecting") ? 1.1f : .7f);
+                * timeScale;
         lastFrame = animate ? now : 0;
         float t = flowTime;
+        int accent = PicoOrbState.primary(mode, theme.colorA);
+        int secondary = PicoOrbState.secondary(mode, theme.gradient ? theme.colorB : theme.colorA);
+        float pulseScale = heartbeatScale(t);
+        int pulseSave = canvas.save();
+        if (pulseScale != 1f) {
+            canvas.scale(pulseScale, pulseScale, getWidth() * .5f, getHeight() * .5f);
+        }
         if (Build.VERSION.SDK_INT >= 33 && fluid != null && canvas.isHardwareAccelerated()) {
             fluid.setFloatUniform("resolution", (float)getWidth(), (float)getHeight());
             fluid.setFloatUniform("time", t);
-            fluid.setFloatUniform("energy", mode.equals("blocked") ? .64f : 1f);
-            fluid.setFloatUniform("tension", mode.equals("blocked") ? 1f : 0f);
-            fluid.setColorUniform("primary", theme.colorA);
-            fluid.setColorUniform("secondary", theme.gradient ? theme.colorB : theme.colorA);
+            fluid.setFloatUniform("energy", mode.equals(PicoOrbState.BLOCKED) ? .72f
+                    : mode.equals(PicoOrbState.COMPLETED) || mode.equals(PicoOrbState.HUMAN_HELP) ? 1.08f : 1f);
+            fluid.setFloatUniform("tension", mode.equals(PicoOrbState.BLOCKED) ? 1f
+                    : mode.equals(PicoOrbState.RUNNING) ? .58f
+                    : mode.equals(PicoOrbState.HUMAN_HELP) ? .35f : 0f);
+            fluid.setColorUniform("primary", accent);
+            fluid.setColorUniform("secondary", secondary);
             paint.setShader(fluid);
             canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
             paint.setShader(null);
-            drawSparks(canvas, t);
+            drawSparks(canvas, t, accent);
+            drawCompletedRipple(canvas, now);
+            canvas.restoreToCount(pulseSave);
             if (animate) postInvalidateOnAnimation();
             return;
         }
         float cx = getWidth() / 2f, cy = getHeight() / 2f;
-        float speed = mode.equals("running") ? .85f : mode.equals("connecting") ? 1.25f : .42f;
+        float speed = mode.equals(PicoOrbState.RUNNING) ? 1.35f : connectionMode ? 1.25f : .42f;
         float breath = (float) Math.sin(t * speed);
         float r = Math.min(getWidth() * .33f, getHeight() * .37f) * (1 + .018f * breath);
-        int accent = theme.colorA, secondary = theme.gradient ? theme.colorB : theme.colorA;
-        boolean blocked = mode.equals("blocked");
+        boolean blocked = mode.equals(PicoOrbState.BLOCKED);
         int light = blend(accent, Color.WHITE, .84f);
 
         paint.setStyle(Paint.Style.FILL);
@@ -85,7 +108,7 @@ final class PulseOrbView extends View {
         canvas.drawCircle(cx, cy, r * 1.48f, paint);
 
         paint.setShader(null); paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(getResources().getDisplayMetrics().density * .65f);
-        paint.setColor(alpha(accent, mode.equals("waiting") ? 96 : 32));
+        paint.setColor(alpha(accent, mode.equals(PicoOrbState.HUMAN_HELP) ? 112 : 32));
         canvas.drawCircle(cx, cy, r * 1.23f + breath * 2, paint);
         paint.setColor(alpha(accent, 18)); canvas.drawCircle(cx, cy, r * 1.38f, paint);
 
@@ -119,29 +142,63 @@ final class PulseOrbView extends View {
         paint.setColor(alpha(light, blocked ? 50 : 135)); canvas.drawCircle(cx, cy, r, paint);
         paint.setStyle(Paint.Style.FILL);
         for (int i = 0; i < 5; i++) {
-            double angle = i * 1.8 + t * .035 * (i % 2 == 0 ? 1 : -1);
+            float orbitSpeed = mode.equals(PicoOrbState.RUNNING) ? 2.2f : .035f;
+            double angle = i * 1.8 + t * orbitSpeed * (i % 2 == 0 ? 1 : -1);
             float orbit = r * (1.22f + (i % 2) * .14f);
             paint.setColor(alpha(light, blocked ? 30 : 85 + i * 20));
             canvas.drawCircle(cx + (float)Math.cos(angle) * orbit, cy + (float)Math.sin(angle) * orbit,
                     getResources().getDisplayMetrics().density * (i == 2 ? 2 : 1.1f), paint);
         }
-        if (animate) postInvalidateDelayed(mode.equals("running") ? 33L : 50L);
+        drawCompletedRipple(canvas, now);
+        canvas.restoreToCount(pulseSave);
+        if (animate) postInvalidateDelayed(mode.equals(PicoOrbState.RUNNING) || mode.equals(PicoOrbState.HUMAN_HELP) ? 33L : 50L);
     }
 
-    private void drawSparks(Canvas canvas, float time) {
+    private float heartbeatScale(float time) {
+        if (!mode.equals(PicoOrbState.HUMAN_HELP)) return 1f;
+        float phase = time % 1.65f;
+        float first = gaussian(phase, .17f, .075f);
+        float second = gaussian(phase, .48f, .09f);
+        return 1f + .045f * first + .032f * second;
+    }
+
+    private static float gaussian(float value, float center, float width) {
+        float normalized = (value - center) / width;
+        return (float) Math.exp(-normalized * normalized);
+    }
+
+    private void drawSparks(Canvas canvas, float time, int accent) {
         float r = Math.min(getWidth() * .335f, getHeight() * .397f);
         paint.setStyle(Paint.Style.FILL);
+        float orbitSpeed = mode.equals(PicoOrbState.RUNNING) ? 2.35f : .04f;
         for (int i = 0; i < 6; i++) {
-            double angle = i * 2.39996 + time * .04;
+            double direction = i % 2 == 0 ? 1d : -1d;
+            double angle = i * 2.39996 + time * orbitSpeed * direction;
             float orbit = r * (i % 2 == 0 ? 1.255f : 1.43f);
             float x = getWidth() * .5f + (float)Math.cos(angle) * orbit;
             float y = getHeight() * .5f + (float)Math.sin(angle) * orbit;
             float size = getResources().getDisplayMetrics().density * (i == 1 ? 2 : 1);
-            paint.setShader(new RadialGradient(x, y, size * 4, alpha(theme.colorA, 130), Color.TRANSPARENT, Shader.TileMode.CLAMP));
+            paint.setShader(new RadialGradient(x, y, size * 4, alpha(accent, 130), Color.TRANSPARENT, Shader.TileMode.CLAMP));
             canvas.drawCircle(x, y, size * 4, paint);
-            paint.setShader(null); paint.setColor(alpha(blend(theme.colorA, Color.WHITE, .5f), 175));
+            paint.setShader(null); paint.setColor(alpha(blend(accent, Color.WHITE, .5f), 175));
             canvas.drawCircle(x, y, size, paint);
         }
+    }
+
+    private void drawCompletedRipple(Canvas canvas, long now) {
+        if (!mode.equals(PicoOrbState.COMPLETED)) return;
+        float elapsed = Math.max(0f, (now - modeStartedAt) / 1000f);
+        if (elapsed > .9f) return;
+        float progress = elapsed / .9f;
+        float eased = 1f - (1f - progress) * (1f - progress);
+        float base = Math.min(getWidth() * .335f, getHeight() * .397f);
+        float radius = base * (1.02f + eased * .78f);
+        int alpha = (int) (185f * (1f - progress));
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(getResources().getDisplayMetrics().density * 1.6f);
+        paint.setColor(alpha(Color.WHITE, alpha));
+        canvas.drawCircle(getWidth() * .5f, getHeight() * .5f, radius, paint);
     }
 
     private static int alpha(int color, int alpha) { return (color & 0xffffff) | (alpha << 24); }

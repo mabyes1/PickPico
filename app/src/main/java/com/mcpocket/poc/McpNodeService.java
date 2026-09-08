@@ -76,6 +76,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String ACTION_RESET_RELAY_IDENTITY = "com.mcpocket.poc.action.RESET_RELAY_IDENTITY";
     public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
+    public static final String ACTION_REFRESH_PICO_ORB = "com.mcpocket.poc.action.REFRESH_PICO_ORB";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_ENABLE_MEDIA_FGS = "enableMediaForegroundCapabilities";
 
@@ -142,6 +143,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     };
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
+    private PicoOrbOverlayController picoOrbOverlay;
 
     @Override
     public void onCreate() {
@@ -150,6 +152,8 @@ public final class McpNodeService extends Service implements McpToolActions {
         createNotificationChannel();
         deviceCapabilities = new AndroidDeviceCapabilities(this, workspaceRoot());
         buttonBridge = new BleButtonBridge(this);
+        picoOrbOverlay = new PicoOrbOverlayController(this, this::picoOrbSnapshot);
+        picoOrbOverlay.start();
     }
 
     @Override
@@ -187,6 +191,10 @@ public final class McpNodeService extends Service implements McpToolActions {
             }
             return START_NOT_STICKY;
         }
+        if (ACTION_REFRESH_PICO_ORB.equals(action)) {
+            if (picoOrbOverlay != null) picoOrbOverlay.refreshNow();
+            return START_NOT_STICKY;
+        }
         if (!ACTION_START.equals(action) || server != null || nodeActive) {
             return START_NOT_STICKY;
         }
@@ -200,6 +208,7 @@ public final class McpNodeService extends Service implements McpToolActions {
 
         mediaForegroundRequested = intent.getBooleanExtra(EXTRA_ENABLE_MEDIA_FGS, false);
         nodeActive = true;
+        if (picoOrbOverlay != null) picoOrbOverlay.refreshNow();
         startAsForeground("Starting local MCP server…");
         try {
             endpoint = "http://" + findLanAddress() + ":" + PORT + "/mcp";
@@ -247,6 +256,10 @@ public final class McpNodeService extends Service implements McpToolActions {
         activeAgentCommandCount = 0;
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
+        if (picoOrbOverlay != null) {
+            picoOrbOverlay.destroy();
+            picoOrbOverlay = null;
+        }
         stopAlertSound();
         stopAllProcessSessions();
         if (buttonBridge != null) {
@@ -264,6 +277,17 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_RUNNING, false).apply();
         super.onDestroy();
+    }
+
+    private HomePulse.Snapshot picoOrbSnapshot() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        boolean relayConfigured = !TextUtils.isEmpty(prefs.getString(KEY_RELAY_BASE_URL, ""));
+        JSONObject pending = null;
+        try {
+            pending = HumanHelpStore.latestWaiting(this);
+        } catch (Exception ignored) {
+        }
+        return HomePulse.snapshot(nodeActive, relayConfigured, relayStatus(prefs), pending, System.currentTimeMillis());
     }
 
     @Override
