@@ -70,7 +70,7 @@ final class PulseOrbView extends View {
         float t = flowTime;
         int accent = PicoOrbState.primary(mode, theme.colorA);
         int secondary = PicoOrbState.secondary(mode, theme.gradient ? theme.colorB : theme.colorA);
-        float pulseScale = heartbeatScale(t);
+        float pulseScale = heartbeatScale(t) * blockedAlertScale(now);
         int pulseSave = canvas.save();
         if (pulseScale != 1f) {
             canvas.scale(pulseScale, pulseScale, getWidth() * .5f, getHeight() * .5f);
@@ -89,6 +89,7 @@ final class PulseOrbView extends View {
             canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
             paint.setShader(null);
             drawSparks(canvas, t, accent);
+            drawBlockedAlert(canvas, now, accent);
             drawCompletedRipple(canvas, now);
             canvas.restoreToCount(pulseSave);
             if (animate) postInvalidateOnAnimation();
@@ -149,6 +150,7 @@ final class PulseOrbView extends View {
             canvas.drawCircle(cx + (float)Math.cos(angle) * orbit, cy + (float)Math.sin(angle) * orbit,
                     getResources().getDisplayMetrics().density * (i == 2 ? 2 : 1.1f), paint);
         }
+        drawBlockedAlert(canvas, now, accent);
         drawCompletedRipple(canvas, now);
         canvas.restoreToCount(pulseSave);
         if (animate) postInvalidateDelayed(mode.equals(PicoOrbState.RUNNING) || mode.equals(PicoOrbState.HUMAN_HELP) ? 33L : 50L);
@@ -167,6 +169,13 @@ final class PulseOrbView extends View {
         return (float) Math.exp(-normalized * normalized);
     }
 
+    private float blockedAlertScale(long now) {
+        if (!mode.equals(PicoOrbState.BLOCKED)) return 1f;
+        float elapsed = Math.max(0f, (now - modeStartedAt) / 1000f);
+        float throb = .5f + .5f * (float) Math.sin(elapsed * 2f * Math.PI / .92f);
+        return 1f - .026f * throb;
+    }
+
     private void drawSparks(Canvas canvas, float time, int accent) {
         float r = Math.min(getWidth() * .335f, getHeight() * .397f);
         paint.setStyle(Paint.Style.FILL);
@@ -183,6 +192,26 @@ final class PulseOrbView extends View {
             paint.setShader(null); paint.setColor(alpha(blend(accent, Color.WHITE, .5f), 175));
             canvas.drawCircle(x, y, size, paint);
         }
+    }
+
+    private void drawBlockedAlert(Canvas canvas, long now, int accent) {
+        if (!mode.equals(PicoOrbState.BLOCKED)) return;
+        float elapsed = Math.max(0f, (now - modeStartedAt) / 1000f);
+        float wave = .5f + .5f * (float) Math.sin(elapsed * 2f * Math.PI / .92f);
+        float inverse = 1f - wave;
+        float base = Math.min(getWidth() * .335f, getHeight() * .397f);
+
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(getResources().getDisplayMetrics().density * (1.15f + wave * .9f));
+        paint.setColor(alpha(accent, (int) (82f + wave * 145f)));
+        canvas.drawCircle(getWidth() * .5f, getHeight() * .5f,
+                base * (1.12f + wave * .09f), paint);
+
+        paint.setStrokeWidth(getResources().getDisplayMetrics().density * .8f);
+        paint.setColor(alpha(blend(accent, Color.WHITE, .28f), (int) (38f + inverse * 88f)));
+        canvas.drawCircle(getWidth() * .5f, getHeight() * .5f,
+                base * (1.34f + inverse * .045f), paint);
     }
 
     private void drawCompletedRipple(Canvas canvas, long now) {

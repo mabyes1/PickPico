@@ -26,11 +26,11 @@ public final class PicoOrbStateTest {
     }
 
     @Test public void semanticPaletteMatchesTheProductSpec() {
-        assertEquals(0xff20e3d2, PicoOrbState.primary(PicoOrbState.HUMAN_HELP, 0));
-        assertEquals(0xff35d07f, PicoOrbState.primary(PicoOrbState.COMPLETED, 0));
-        assertEquals(0xfff4e44d, PicoOrbState.primary(PicoOrbState.RUNNING, 0));
-        assertEquals(0xffff4d5a, PicoOrbState.primary(PicoOrbState.BLOCKED, 0));
-        assertEquals(0xffff9f43, PicoOrbState.primary(PicoOrbState.CONNECTING, 0));
-        assertEquals(0xffff9f43, PicoOrbState.primary(PicoOrbState.CONNECTION_ATTENTION, 0));
+        assertEquals(0xff5fae9b, PicoOrbState.primary(PicoOrbState.HUMAN_HELP, 0));
+        assertEquals(0xff6fa06d, PicoOrbState.primary(PicoOrbState.COMPLETED, 0));
+        assertEquals(0xffc9a84c, PicoOrbState.primary(PicoOrbState.RUNNING, 0));
+        assertEquals(0xffb6534f, PicoOrbState.primary(PicoOrbState.BLOCKED, 0));
+        assertEquals(0xffc9784a, PicoOrbState.primary(PicoOrbState.CONNECTING, 0));
+        assertEquals(0xffc9784a, PicoOrbState.primary(PicoOrbState.CONNECTION_ATTENTION, 0));
     }
 }

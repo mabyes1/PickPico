@@ -13,11 +13,11 @@ final class PicoOrbState {
 
     static final long COMPLETED_VISIBLE_MS = 5_000L;
 
-    static final int RED = 0xffff4d5a;
-    static final int ORANGE = 0xffff9f43;
-    static final int YELLOW = 0xfff4e44d;
-    static final int CYAN = 0xff20e3d2;
-    static final int GREEN = 0xff35d07f;
+    static final int RED = 0xffb6534f;
+    static final int ORANGE = 0xffc9784a;
+    static final int YELLOW = 0xffc9a84c;
+    static final int CYAN = 0xff5fae9b;
+    static final int GREEN = 0xff6fa06d;
 
     private PicoOrbState() {
     }
@@ -54,12 +54,12 @@ final class PicoOrbState {
 
     static int secondary(String mode, int themeColor) {
         switch (mode) {
-            case HUMAN_HELP: return 0xff7ff5ea;
-            case BLOCKED: return 0xffff8a91;
-            case RUNNING: return 0xfffff58a;
-            case CONNECTING: return 0xffffc278;
-            case COMPLETED: return 0xff8be8b8;
-            case CONNECTION_ATTENTION: return 0xffffc278;
+            case HUMAN_HELP: return 0xff8dc8b9;
+            case BLOCKED: return 0xffd68a82;
+            case RUNNING: return 0xffdac77a;
+            case CONNECTING: return 0xffd99b73;
+            case COMPLETED: return 0xff94ba8d;
+            case CONNECTION_ATTENTION: return 0xffd99b73;
             default: return themeColor;
         }
     }
