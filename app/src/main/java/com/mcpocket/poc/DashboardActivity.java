@@ -1815,7 +1815,7 @@ public final class DashboardActivity extends Activity {
         HomePulse.Snapshot state = HomePulse.snapshot(running, configured, relay, pending, System.currentTimeMillis());
         pulseOrb.setMode(state.orbMode);
         setTextIfChanged(pulseTitle, state.title);
-        setTextIfChanged(pulseAgent, state.activeTasks > 1 ? state.activeTasks + " agents" : state.agent);
+        setTextIfChanged(pulseAgent, state.agentLabel());
         pulseAgent.setMaxWidth(dp(125));
         String badge = state.mode.equals("running") ? "Running" : state.mode.equals("waiting") ? "Waiting"
                 : state.mode.equals("blocked") ? "Blocked" : state.mode.equals("connecting") ? "Connecting" : state.recent ? "Just finished" : "Ready";

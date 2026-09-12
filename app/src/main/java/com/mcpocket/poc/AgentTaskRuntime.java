@@ -50,7 +50,7 @@ final class AgentTaskRuntime {
     synchronized JSONObject create(JSONObject arguments) throws JSONException {
         String objective = requireText(arguments, "objective", 1, 4096);
         String title = optionalText(arguments, "title", 160);
-        String agent = optionalText(arguments, "agent", 160);
+        String agent = AgentIdentity.require(arguments);
 
         String taskId = "task-" + UUID.randomUUID();
         String now = Instant.now().toString();
@@ -58,7 +58,7 @@ final class AgentTaskRuntime {
                 .put("taskId", taskId)
                 .put("title", title.isEmpty() ? JSONObject.NULL : title)
                 .put("objective", objective)
-                .put("agent", agent.isEmpty() ? JSONObject.NULL : agent)
+                .put("agent", agent)
                 .put("status", "created")
                 .put("createdAt", now)
                 .put("updatedAt", now)

@@ -349,7 +349,8 @@ public final class McpHttpServerTest {
         assertEquals(200, list.status);
         JSONObject listed = new JSONObject(list.body).getJSONObject("result");
         JSONArray tools = listed.getJSONArray("tools");
-        assertEquals(11, tools.length());
+        assertEquals(12, tools.length());
+        assertTrue(tools.toString().contains("caller_register"));
         assertEquals("thin-v1", listed.getString("toolProfile"));
         String toolText = tools.toString();
         assertTrue(toolText.contains("capability_search"));
@@ -909,6 +910,37 @@ public final class McpHttpServerTest {
                 .put("arguments", new JSONObject().put("guideId", "missing"))).getBoolean("isError"));
     }
 
+    @Test public void callerRegistrationFlowsIntoTaskThroughThinGateway() throws Exception {
+        JSONObject registration = callThin("caller_register", new JSONObject().put("name", "Example")
+                .put("type", "app").put("packageName", "com.example.app"));
+        assertTrue(!registration.getBoolean("isError"));
+        String id = registration.getJSONObject("structuredContent").getString("callerId");
+        JSONObject task = callThin("task_create", new JSONObject().put("objective", "Return test").put("callerId", id));
+        assertTrue(!task.getBoolean("isError"));
+        JSONObject created = task.getJSONObject("structuredContent");
+        assertEquals("com.example.app", created.getJSONObject("context").getJSONObject("caller").getString("packageName"));
+        JSONObject updated = callThin("task_update", new JSONObject().put("taskId", created.getString("taskId")).put("status", "completed"));
+        assertEquals("Example", updated.getJSONObject("structuredContent").getJSONObject("context").getJSONObject("caller").getString("name"));
+        assertTrue(callThin("task_create", new JSONObject().put("objective", "bad").put("callerId", "unknown")).getBoolean("isError"));
+        assertTrue(callThin("task_create", new JSONObject().put("objective", "bad").put("callerId", id)
+                .put("context", new JSONObject().put("caller", new JSONObject()))).getBoolean("isError"));
+    }
+
+    @Test public void missingModelIsRejectedOverRealHttpForBothToolProfiles() throws Exception {
+        for (String name : new String[]{"command_run", "camera_capture", "task_create"}) {
+            JSONObject arguments = "task_create".equals(name) ? new JSONObject().put("objective", "test")
+                    : new JSONObject().put("commandId", "camera.capture");
+            String request = new JSONObject().put("jsonrpc", "2.0").put("id", 1001)
+                    .put("method", "tools/call").put("params", new JSONObject().put("name", name)
+                            .put("arguments", arguments)).toString();
+            HttpResult response = postRaw(request, "camera_capture".equals(name) ? authorizedHeaders() : thinHeaders());
+            assertEquals(200, response.status);
+            JSONObject result = new JSONObject(response.body).getJSONObject("result");
+            assertTrue(result.getBoolean("isError"));
+            assertTrue(result.toString().contains("agent is required"));
+        }
+    }
+
     private JSONObject callThin(String name, JSONObject arguments) throws Exception {
         HttpResult response = post(new JSONObject().put("jsonrpc", "2.0").put("id", 900)
                 .put("method", "tools/call").put("params", new JSONObject().put("name", name)
@@ -930,6 +962,25 @@ public final class McpHttpServerTest {
     }
 
     private HttpResult post(String body, Map<String, String> headers) throws Exception {
+        // Existing protocol regressions use an identified test caller. Identity
+        // rejection tests use postRaw so missing metadata is never auto-filled.
+        try {
+            JSONObject request = new JSONObject(body);
+            if ("tools/call".equals(request.optString("method"))) {
+                JSONObject params = request.optJSONObject("params");
+                if (params != null) {
+                    JSONObject arguments = params.optJSONObject("arguments");
+                    if (arguments == null) arguments = new JSONObject();
+                    if (!arguments.has("agent")) arguments.put("agent", "Test Model 1.0");
+                    params.put("arguments", arguments);
+                    body = request.toString();
+                }
+            }
+        } catch (org.json.JSONException ignored) { /* Preserve malformed-JSON tests. */ }
+        return postRaw(body, headers);
+    }
+
+    private HttpResult postRaw(String body, Map<String, String> headers) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(
                 "http://127.0.0.1:" + port + "/mcp").openConnection();
         connection.setRequestMethod("POST");

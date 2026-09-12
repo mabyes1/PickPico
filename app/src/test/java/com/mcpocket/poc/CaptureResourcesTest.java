@@ -10,6 +10,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.*;
 
 public final class CaptureResourcesTest {
+    @Test public void callbackRacingWithTimeoutClosesBufferExactlyOnce() throws Exception {
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            for (int attempt = 0; attempt < 100; attempt++) {
+                CaptureResources resources = new CaptureResources();
+                AtomicInteger closes = new AtomicInteger();
+                CountDownLatch start = new CountDownLatch(1);
+                java.util.concurrent.Future<?> callback = executor.submit(() -> {
+                    start.await();
+                    resources.add(() -> closes.incrementAndGet());
+                    return null;
+                });
+                java.util.concurrent.Future<?> timeout = executor.submit(() -> {
+                    start.await();
+                    resources.close();
+                    return null;
+                });
+                start.countDown();
+                callback.get(2, TimeUnit.SECONDS);
+                timeout.get(2, TimeUnit.SECONDS);
+                resources.close();
+                assertEquals(1, closes.get());
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     @Test public void timeoutClosesLateCameraAndLateSession() {
         CaptureResources resources = new CaptureResources();
         resources.close();

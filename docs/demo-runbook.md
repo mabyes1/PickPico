@@ -50,6 +50,7 @@ command_run("screen.capture")
 
 ```json
 {
+  "agent": "<填入實際模型名稱與版本>",
   "commandId": "human.help",
   "arguments": {
     "title": "幫我確認現場狀態",

@@ -164,8 +164,15 @@ final class McpHttpServer {
 
             String toolProfile = request.header("x-pickpico-tool-profile");
             McpProtocol.Response response;
-            try {
+            try (RelayRequestScope scope = RelayRequestScope.enter(request.header(RelayRequestScope.HEADER))) {
+                // A fully received POST may still have waited in this server's
+                // worker queue after its originating Relay connection was lost.
                 response = protocol.handle(json, protocolVersion, toolProfile);
+            } catch (RelayRequestScope.CancelledException error) {
+                JSONObject body = McpProtocol.error(json.opt("id"), -32000, error.getMessage());
+                writeText(output, 409, "Conflict", "application/json; charset=utf-8",
+                        body.toString(), corsHeaders(origin));
+                return;
             } catch (Exception error) {
                 String message = error.getMessage();
                 if (message == null || message.trim().isEmpty()) {

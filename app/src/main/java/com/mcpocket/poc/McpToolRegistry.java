@@ -25,6 +25,7 @@ final class McpToolRegistry {
         THIN_TOOLS.add("command_status");
         THIN_TOOLS.add("task_runtime_info");
         THIN_TOOLS.add("task_create");
+        THIN_TOOLS.add("caller_register");
         THIN_TOOLS.add("task_update");
         THIN_TOOLS.add("task_status");
     }
@@ -37,12 +38,14 @@ final class McpToolRegistry {
         final String description;
         final JSONObject inputSchema;
         final Handler handler;
+        final boolean requiresIdentity;
 
         Tool(String name, String description, JSONObject inputSchema, Handler handler) {
             this.name = name;
             this.description = description;
             this.inputSchema = inputSchema;
             this.handler = handler;
+            this.requiresIdentity = requiresAgent(name);
         }
 
         JSONObject describe() throws JSONException {
@@ -58,6 +61,19 @@ final class McpToolRegistry {
     McpToolRegistry(McpToolActions actions) throws JSONException {
         CommandRuntime runtime = new CommandRuntime(actions);
         AgentTaskRuntime tasks = new AgentTaskRuntime();
+        CallerRegistry callers = new CallerRegistry();
+
+        register("caller_register",
+                "Register an explicit return destination for the Pico orb before task_create. Use only your known Android package or HTTPS conversation URL; never guess from the foreground app or client name. For desktop/remote callers without a phone destination use type remote and omit destinations. Pass the returned callerId to task_create. Optional; ordinary phone commands need no registration.",
+                new JSONObject().put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("name", new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 80))
+                                .put("type", new JSONObject().put("type", "string").put("enum", new JSONArray().put("app").put("remote")))
+                                .put("packageName", new JSONObject().put("type", "string").put("maxLength", 255))
+                                .put("returnUrl", new JSONObject().put("type", "string").put("maxLength", 4096)))
+                        .put("required", new JSONArray().put("name").put("type"))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> callers.register(arguments));
 
         register(
                 "task_runtime_info",
@@ -67,17 +83,30 @@ final class McpToolRegistry {
 
         register(
                 "task_create",
-                "Create a long-lived Agent task before multi-step phone work. Include agent (your actual name, e.g. Codex or Claude) and a short user-facing title. The phone displays these on Home. Non-terminal presence has a short lease so abandoned tasks cannot control the Pico orb forever; task_update renews that lease. Keep task_update status accurate through running, waiting_human, blocked and completion.",
+                "Create a long-lived Agent task before multi-step phone work. agent is mandatory: provide your actual model name/version for Home/Pico, not merely a client name. Include a short user-facing title. Non-terminal presence has a short lease; task_update renews it. Keep task status accurate through running, waiting_human, blocked and completion.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
                                 .put("objective", new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 4096))
                                 .put("title", new JSONObject().put("type", "string").put("maxLength", 160))
-                                .put("agent", new JSONObject().put("type", "string").put("maxLength", 160))
-                                .put("context", new JSONObject().put("type", "object")))
-                        .put("required", new JSONArray().put("objective"))
+                                .put("agent", AgentIdentity.schema())
+                                .put("callerId", new JSONObject().put("type", "string").put("maxLength", 128)
+                                        .put("description", "Optional ID returned by caller_register. Register your known return destination first to enable the Pico orb return button. Do not combine with context.caller."))
+                                .put("context", new JSONObject().put("type", "object")
+                                        .put("description", "Optional task context. caller: {name, type: app|remote, packageName, returnUrl}. Supply an explicit Android package or HTTPS return URL for the Pico orb return button; never guess from the foreground app.")))
+                        .put("required", new JSONArray().put("objective").put("agent"))
                         .put("additionalProperties", false),
-                (arguments, callCount) -> tasks.create(arguments));
+                (arguments, callCount) -> {
+                    JSONObject supplied = new JSONObject(arguments.toString());
+                    if (supplied.has("callerId")) {
+                        JSONObject context = supplied.optJSONObject("context");
+                        if (context == null) context = new JSONObject();
+                        if (context.has("caller")) throw new CommandRuntime.CommandInputException("Use callerId or context.caller, not both");
+                        context.put("caller", callers.resolve(supplied.optString("callerId", "")));
+                        supplied.put("context", context);
+                    }
+                    return tasks.create(supplied);
+                });
 
         register(
                 "task_update",
@@ -112,7 +141,7 @@ final class McpToolRegistry {
 
         register(
                 "capability_search",
-                "Search the connected PickPico device's dynamic abilities and adaptive operation guides. For multi-step app/UI tasks, search the task intent and read a relevant guide via command_run guide.get before acting. Guides explain tool sequencing, pitfalls, recovery and result verification. Returns capability IDs, live availability/setup state, risk metadata, input schemas, and short guide summaries. If search returns no reasonable match, call capability_list before concluding that a device action is unsupported.",
+                "Search the connected PickPico device's dynamic abilities and adaptive operation guides. For multi-step app/UI tasks, search the task intent and read a relevant guide via command_run guide.get before acting. Guides explain tool sequencing, pitfalls, recovery and result verification. Returns capability IDs, live availability/setup state, operation metadata, input schemas, and short guide summaries. Static capability metadata describes the operation itself; actual risk depends on the target app, data, and concrete action. If search returns no reasonable match, call capability_list before concluding that a device action is unsupported.",
                 capabilitySearchSchema(),
                 (arguments, callCount) -> runtime.search(arguments));
 
@@ -136,7 +165,7 @@ final class McpToolRegistry {
 
         register(
                 "command_run",
-                "Execute one dynamic PickPico capability by ID. Representative capabilities include screen.capture, camera.capture, ui.inspect, ui.action, human.help, notification.reply, app.launch, location.get, workspace.read, and process.exec; these are examples, not the complete set. Use capability_search before unfamiliar device operations or when the exact ID/schema is not already known. Native image/audio results are returned directly when a capability produces media.",
+                "Execute one PickPico capability by its previously discovered capability ID and arguments. The capability's own metadata defines its availability, risk level, side effects, and input schema. Use capability_search first when the exact capability ID or schema is not known.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
@@ -375,8 +404,14 @@ final class McpToolRegistry {
         if (arguments == null) {
             arguments = new JSONObject();
         }
-        try {
-            JSONObject structured = tool.handler.call(arguments, callCount);
+        try (AgentIdentity identity = AgentIdentity.enter(
+                tool.requiresIdentity ? AgentIdentity.require(arguments) : "")) {
+            JSONObject invocation = new JSONObject(arguments.toString());
+            if (tool.requiresIdentity) {
+                if ("task_create".equals(name)) invocation.put("agent", AgentIdentity.current());
+                else invocation.remove("agent"); // Display metadata is not a capability argument.
+            }
+            JSONObject structured = tool.handler.call(invocation, callCount);
             JSONObject publicStructured = new JSONObject(structured.toString());
             JSONArray content = publicStructured.optJSONArray("_mcpContent");
             publicStructured.remove("_mcpContent");
@@ -388,8 +423,12 @@ final class McpToolRegistry {
             return new JSONObject()
                     .put("content", content)
                     .put("structuredContent", publicStructured)
-                    .put("isError", false);
-        } catch (ToolInputException | CommandRuntime.CommandInputException error) {
+                    // command_status can successfully retrieve a failed execution.
+                    // Preserve that execution's flags inside structuredContent only.
+                    .put("isError", !"command_status".equals(name)
+                            && publicStructured.optBoolean("isError", false));
+        } catch (ToolInputException | CommandRuntime.CommandInputException
+                 | RelayRequestScope.CancelledException error) {
             return toolError(error.getMessage(), modern);
         } catch (Exception error) {
             String message = error.getMessage();
@@ -402,9 +441,25 @@ final class McpToolRegistry {
         }
     }
 
-    private void register(String name, String description, JSONObject inputSchema, Handler handler) {
+    private static boolean requiresAgent(String name) {
+        // Discovery/status for the task system remain usable before identification.
+        // Both the Thin command gateway and legacy direct device tools require it.
+        return "task_create".equals(name) || "command_run".equals(name)
+                || (!THIN_TOOLS.contains(name) && !"command_list".equals(name));
+    }
+
+    private void register(String name, String description, JSONObject inputSchema, Handler handler) throws JSONException {
         if (tools.containsKey(name)) {
             throw new IllegalArgumentException("Duplicate MCP tool: " + name);
+        }
+        if (requiresAgent(name)) {
+            inputSchema.getJSONObject("properties").put("agent", AgentIdentity.schema());
+            JSONArray required = inputSchema.optJSONArray("required");
+            if (required == null) required = new JSONArray();
+            boolean present = false;
+            for (int i = 0; i < required.length(); i++) if ("agent".equals(required.optString(i))) present = true;
+            if (!present) required.put("agent");
+            inputSchema.put("required", required);
         }
         tools.put(name, new Tool(name, description, inputSchema, handler));
     }

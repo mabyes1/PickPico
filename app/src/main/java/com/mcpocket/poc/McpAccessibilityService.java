@@ -94,6 +94,22 @@ public final class McpAccessibilityService extends AccessibilityService {
             return unavailable("Accessibility screenshots require Android 11 or newer", callCount);
         }
 
+        return screenCapture(service, arguments, callCount, 2500L);
+    }
+
+    @android.annotation.TargetApi(30)
+    static JSONObject screenCapture(McpAccessibilityService service, JSONObject arguments,
+                                    long callCount, long timeoutMs) throws JSONException {
+        try (CaptureResources resources = new CaptureResources()) {
+            return screenCaptureWithResources(service, arguments, callCount, timeoutMs, resources);
+        }
+    }
+
+    @android.annotation.TargetApi(30)
+    private static JSONObject screenCaptureWithResources(
+            McpAccessibilityService service, JSONObject arguments, long callCount,
+            long timeoutMs, CaptureResources resources) throws JSONException {
+
         int quality = clamp(arguments.optInt("quality", 82), 50, 100);
         boolean returnContent = arguments.optBoolean("returnContent", true);
         CountDownLatch latch = new CountDownLatch(1);
@@ -107,7 +123,12 @@ public final class McpAccessibilityService extends AccessibilityService {
                     new TakeScreenshotCallback() {
                         @Override
                         public void onSuccess(ScreenshotResult screenshotResult) {
-                            resultHolder[0] = screenshotResult;
+                            // add() closes late resources immediately after a timeout
+                            // or interruption. A delivered result stays owned until
+                            // bitmap conversion and encoding have both finished.
+                            if (resources.add(screenshotResult.getHardwareBuffer())) {
+                                resultHolder[0] = screenshotResult;
+                            }
                             latch.countDown();
                         }
 
@@ -127,7 +148,7 @@ public final class McpAccessibilityService extends AccessibilityService {
         }
 
         try {
-            if (!latch.await(2500L, TimeUnit.MILLISECONDS)) {
+            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
                 return new JSONObject()
                         .put("captured", false)
                         .put("error", "accessibility_screen_capture_timeout")
@@ -216,7 +237,7 @@ public final class McpAccessibilityService extends AccessibilityService {
         } finally {
             if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
             if (hardwareBitmap != null && !hardwareBitmap.isRecycled()) hardwareBitmap.recycle();
-            if (buffer != null) buffer.close();
+            // HardwareBuffer belongs to CaptureResources, including early returns.
         }
     }
 

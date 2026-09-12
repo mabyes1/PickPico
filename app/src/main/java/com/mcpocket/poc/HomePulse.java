@@ -9,6 +9,7 @@ import java.time.Instant;
 /** Process-local, bounded observation of real work. Never infers execution from inbox history. */
 final class HomePulse {
     private static final LinkedHashMap<Long, String> commands = new LinkedHashMap<>();
+    private static final LinkedHashMap<Long, String> commandAgents = new LinkedHashMap<>();
     private static final LinkedHashMap<String, JSONObject> tasks = new LinkedHashMap<>();
     private static final LinkedHashSet<String> capabilityIds = new LinkedHashSet<>();
     private static final LinkedHashMap<Long, JSONObject> events = new LinkedHashMap<>();
@@ -16,24 +17,32 @@ final class HomePulse {
     static synchronized String[] capabilities() { return capabilityIds.toArray(new String[0]); }
     private static long sequence;
     private static String previous = "", last = "";
+    private static String lastAgent = "";
     private static long lastFinished;
     private static boolean lastFailed;
 
     static synchronized long begin(String command) {
+        return begin(command, "");
+    }
+
+    static synchronized long begin(String command, String agent) {
         long id = ++sequence;
         commands.put(id, command);
+        commandAgents.put(id, agent == null ? "" : agent);
         return id;
     }
 
     static synchronized void finish(long id, boolean failed) {
         String command = commands.remove(id);
         if (command == null) return;
+        String agent = commandAgents.remove(id);
+        lastAgent = agent == null ? "" : agent;
         previous = last;
         last = command;
         lastFailed = failed;
         lastFinished = System.currentTimeMillis();
         try {
-            events.put(id, new JSONObject().put("command", command).put("failed", failed)
+            events.put(id, new JSONObject().put("command", command).put("failed", failed).put("agent", lastAgent)
                     .put("at", Instant.ofEpochMilli(lastFinished).toString()));
             while (events.size() > 50) events.remove(events.keySet().iterator().next());
         } catch (Exception ignored) { }
@@ -64,6 +73,7 @@ final class HomePulse {
 
     static synchronized void reset() {
         commands.clear(); tasks.clear(); events.clear(); previous = ""; last = ""; lastFinished = 0; lastFailed = false;
+        commandAgents.clear(); lastAgent = "";
     }
 
     static synchronized Snapshot snapshot(boolean node, boolean configured, String relay, JSONObject pending, long now) {
@@ -71,9 +81,12 @@ final class HomePulse {
         JSONObject active = null;
         JSONObject recentTask = null;
         long recentTaskAgeMs = Long.MAX_VALUE;
+        String latestTaskUpdate = "";
         int activeTasks = 0;
         for (JSONObject task : tasks.values()) {
             String status = task.optString("status");
+            String taskUpdatedAt = task.optString("updatedAt", "");
+            if (taskUpdatedAt.compareTo(latestTaskUpdate) > 0) latestTaskUpdate = taskUpdatedAt;
             if (status.equals("completed") || status.equals("cancelled")) {
                 try {
                     long age = now - Instant.parse(task.optString("updatedAt")).toEpochMilli();
@@ -95,18 +108,28 @@ final class HomePulse {
             if (active == null || task.optString("updatedAt").compareTo(active.optString("updatedAt")) > 0) active = task;
         }
         s.activeTasks = activeTasks;
-        // Commands have no task/agent association in the protocol. Do not invent one.
+        // A command carries its own model identity, never borrowed from a concurrent task.
         String current = "";
-        for (String command : commands.values()) current = command;
+        String currentAgent = "";
+        for (Long id : commands.keySet()) {
+            current = commands.get(id);
+            currentAgent = commandAgents.get(id);
+        }
         s.agent = active == null || activeTasks > 1 ? "Agent" : value(active, "agent", "Agent");
+        s.identifiedWork = !current.isEmpty() && !currentAgent.isEmpty();
+        if (!current.isEmpty() && !currentAgent.isEmpty()) s.agent = currentAgent;
         s.flow = !current.isEmpty() ? current : (now - lastFinished < 12000 && !last.isEmpty() ? "Last · " + last : "Waiting for an agent task");
         s.recent = current.isEmpty() && now - lastFinished < 12000 && !last.isEmpty();
+        if (current.isEmpty() && active == null && now - lastFinished < 15000 && !lastAgent.isEmpty()) {
+            s.agent = lastAgent;
+        }
         if (s.recent && !previous.isEmpty()) s.flow = "Recent · " + previous + " → " + last;
         s.connection = !node ? "Node is stopped" : !configured ? "Local connection" : relay.equals("connected") ? "Connected through Relay" : "Remote access unavailable";
         if (pending != null) {
             s.mode = "waiting"; s.label = "WAITING"; s.title = "Waiting for your help";
             String activeAgent = active == null || activeTasks > 1 ? "Agent" : value(active, "agent", "Agent");
             s.agent = value(pending, "agent", activeAgent); s.flow = "human.help";
+            s.identifiedWork = !value(pending, "agent", "").isEmpty();
             s.action = "help";
             s.actionTitle = pending.optString("requestType").equals("approval") ? "Approval required" : "Your help is needed";
             s.actionDetail = value(pending, "title", "An agent is waiting for your response.");
@@ -145,7 +168,7 @@ final class HomePulse {
         }
         if (s.mode.equals("idle") && !s.recent) s.agent = "PickPico";
         s.agentState = s.agent + " · " + (s.mode.equals("running") ? "Running" : s.mode.equals("waiting") ? "Waiting" : s.mode.equals("connecting") ? "Starting" : s.mode.equals("blocked") ? "Blocked" : "Ready");
-        if (node && pending == null && activeTasks > 1) s.agentState = activeTasks + " agent tasks · " + (s.mode.equals("blocked") ? "Blocked" : s.mode.equals("waiting") ? "Waiting" : "Active");
+        if (node && pending == null && activeTasks > 1 && !s.identifiedWork) s.agentState = activeTasks + " agent tasks · " + (s.mode.equals("blocked") ? "Blocked" : s.mode.equals("waiting") ? "Waiting" : "Active");
         boolean activeBlocked = active != null && (active.optString("status").equals("blocked")
                 || active.optString("status").equals("failed"));
         boolean activeWaiting = active != null && active.optString("status").equals("waiting_human");
@@ -165,6 +188,12 @@ final class HomePulse {
                 completedRecently,
                 connectionAttention);
         s.pendingRequestId = pending == null ? "" : pending.optString("requestId", "");
+        s.wakeKey = sequence + "|" + latestTaskUpdate + "|" + s.pendingRequestId;
+        // Standalone commands and help requests are not associated with a task.
+        // Never inherit another concurrent task's return destination.
+        if (node && pending == null && current.isEmpty() && activeTasks <= 1) {
+            s.caller = CallerReturnTarget.fromTask(active != null ? active : recentTask);
+        }
         return s;
     }
 
@@ -213,9 +242,13 @@ final class HomePulse {
         String mode = "idle", label = "READY", title = "No active agent tasks";
         String orbMode = PicoOrbState.READY;
         String pendingRequestId = "";
+        String wakeKey = "";
+        CallerReturnTarget caller = CallerReturnTarget.unknown();
         String agent, agentState, flow, connection;
         String action = "", actionTitle = "", actionDetail = "", button = "";
         int activeTasks;
         boolean recent;
+        boolean identifiedWork;
+        String agentLabel() { return activeTasks > 1 && !identifiedWork ? activeTasks + " agents" : agent; }
     }
 }

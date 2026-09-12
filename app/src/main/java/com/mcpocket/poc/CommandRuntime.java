@@ -359,7 +359,7 @@ final class CommandRuntime {
                 "notification.list",
                 "List currently active Android notifications visible to MCPocket's Notification Listener.",
                 "notification",
-                "personal_data_read",
+                "read_only",
                 false,
                 notificationListSchema(),
                 (arguments, callCount) -> actions.notificationList(arguments, callCount));
@@ -368,7 +368,7 @@ final class CommandRuntime {
                 "notification.get",
                 "Return one active Android notification by notification key.",
                 "notification",
-                "personal_data_read",
+                "read_only",
                 false,
                 notificationKeySchema(),
                 (arguments, callCount) -> {
@@ -398,7 +398,7 @@ final class CommandRuntime {
                 "notification.actions",
                 "List action buttons and RemoteInput reply capabilities exposed by one active Android notification.",
                 "notification",
-                "personal_data_read",
+                "read_only",
                 false,
                 notificationKeySchema(),
                 (arguments, callCount) -> actions.notificationActions(arguments, callCount));
@@ -443,7 +443,7 @@ final class CommandRuntime {
                 "ui.inspect",
                 "Inspect the current Android accessibility UI tree and return semantic nodes with paths, text, IDs, bounds, and actions.",
                 "ui",
-                "personal_data_read",
+                "read_only",
                 false,
                 uiInspectSchema(),
                 (arguments, callCount) -> actions.uiInspect(arguments, callCount));
@@ -506,7 +506,7 @@ final class CommandRuntime {
                 "screen.capture",
                 "Capture the current Android screen on demand through Hyper Mode Accessibility when available, with an active user-authorized MediaProjection session as fallback, and persist it in the PickPico workspace.",
                 "ui",
-                "screen_read",
+                "read_only",
                 false,
                 screenCaptureSchema(),
                 (arguments, callCount) -> {
@@ -560,7 +560,7 @@ final class CommandRuntime {
                 "location.get",
                 "Get the phone's current location with timestamp and accuracy. Returns setup guidance when location permission is unavailable.",
                 "location",
-                "sensitive_sensor_read",
+                "read_only",
                 false,
                 locationGetSchema(),
                 (arguments, callCount) -> {
@@ -575,7 +575,7 @@ final class CommandRuntime {
                 "clipboard.get",
                 "Read plain text from the Android clipboard when Android permits PickPico clipboard access.",
                 "clipboard",
-                "personal_data_read",
+                "read_only",
                 false,
                 noArgumentsSchema(),
                 (arguments, callCount) -> actions.clipboardGet(callCount));
@@ -599,7 +599,7 @@ final class CommandRuntime {
                 "contacts.search",
                 "Search the owner's Android contacts by display name and return stable contact IDs.",
                 "contacts",
-                "personal_data_read",
+                "read_only",
                 false,
                 contactsSearchSchema(),
                 (arguments, callCount) -> {
@@ -618,7 +618,7 @@ final class CommandRuntime {
                 "contacts.get",
                 "Read one Android contact including phone numbers and email addresses.",
                 "contacts",
-                "personal_data_read",
+                "read_only",
                 false,
                 contactGetSchema(),
                 (arguments, callCount) -> {
@@ -630,7 +630,7 @@ final class CommandRuntime {
                 "calendar.list",
                 "List Android calendar events in a time range and return available calendar IDs for future writes.",
                 "calendar",
-                "personal_data_read",
+                "read_only",
                 false,
                 calendarListSchema(),
                 (arguments, callCount) -> {
@@ -653,7 +653,7 @@ final class CommandRuntime {
                 "calendar.get",
                 "Read one Android calendar event by event ID.",
                 "calendar",
-                "personal_data_read",
+                "read_only",
                 false,
                 calendarEventIdSchema(),
                 (arguments, callCount) -> {
@@ -1071,7 +1071,8 @@ final class CommandRuntime {
             JSONObject execution = new JSONObject()
                     .put("executionId", executionId)
                     .put("commandId", commandId)
-                    .put("status", "completed")
+                    .put("status", result.optBoolean("isError", false) ? "failed" : "completed")
+                    .put("isError", result.optBoolean("isError", false))
                     .put("startedAt", startedAt)
                     .put("completedAt", Instant.now().toString())
                     .put("result", publicResult);
@@ -1081,7 +1082,7 @@ final class CommandRuntime {
                 execution.put("_mcpContent", mediaContent);
             }
             return execution;
-        } catch (CommandInputException error) {
+        } catch (CommandInputException | RelayRequestScope.CancelledException error) {
             JSONObject execution = new JSONObject()
                     .put("executionId", executionId)
                     .put("commandId", commandId)
@@ -1275,13 +1276,14 @@ final class CommandRuntime {
     }
 
     private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
+        RelayRequestScope.checkCurrent();
         // Every capability funnels through here. Android uses these lifecycle
         // hooks to keep the display awake for the whole Agent operation and to
         // renew a short idle lease after the command finishes. The finish hook
         // matters for commands such as phone.wake that turn the display on only
         // after the start hook has already observed a sleeping device.
         actions.onAgentCommandStarted(command.id);
-        long pulseId = HomePulse.begin(command.id);
+        long pulseId = HomePulse.begin(command.id, AgentIdentity.current());
         boolean pulseFailed = true;
         try {
             if (requiresApproval(command)) {
@@ -1297,12 +1299,14 @@ final class CommandRuntime {
                             "Human approval not granted for " + command.id + " (" + status + ")");
                 }
             }
+            // Approval may have waited across a network change. Do not execute
+            // the old operation just because a human eventually approved it.
+            RelayRequestScope.checkCurrent();
             JSONObject result = command.handler.call(arguments, callCount);
-            String resultStatus = result.optString("status", "");
-            pulseFailed = result.optBoolean("isError", false) || resultStatus.equals("failed")
-                    || resultStatus.equals("error") || resultStatus.equals("rejected")
-                    || (result.has("success") && !result.optBoolean("success"));
-            return result;
+            if (result == null) throw new IllegalStateException("Command returned no result: " + command.id);
+            pulseFailed = CommandOutcome.isFailure(command.id, result);
+            if (!AgentIdentity.current().isEmpty()) result.put("agent", AgentIdentity.current());
+            return result.put("isError", pulseFailed);
         } finally {
             HomePulse.finish(pulseId, pulseFailed);
             actions.onAgentCommandFinished(command.id);
@@ -1442,12 +1446,13 @@ final class CommandRuntime {
                         .put("stdin", new JSONObject()
                                 .put("type", "string")
                                 .put("maxLength", 65536)
-                                .put("description", "Optional UTF-8 stdin payload."))
+                                .put("description", "Optional UTF-8 stdin payload, sent asynchronously under the startup deadline. stdinState/stdinError report delivery."))
                         .put("timeoutMs", new JSONObject()
                                 .put("type", "integer")
                                 .put("minimum", 100)
                                 .put("maximum", 120000)
-                                .put("default", 30000))
+                                .put("default", 30000)
+                                .put("description", "Shared startup/stdin/process deadline for foreground execution. With background=true, bounds startup and stdin delivery only; a successfully started server stays alive until stopped. Cleanup may add a short bounded grace period."))
                         .put("maxOutputBytes", new JSONObject()
                                 .put("type", "integer")
                                 .put("minimum", 1024)

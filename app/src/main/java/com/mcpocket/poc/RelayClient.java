@@ -15,14 +15,21 @@ import org.json.JSONObject;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.Call;
 import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -44,6 +51,7 @@ final class RelayClient {
 
     interface Listener {
         void onRelayState(String status, String remoteEndpoint, String detail);
+        void onLoopbackProxyFailure(String requestId, Exception error);
     }
 
     private static final String PREF_NODE_ID = "relay_node_id";
@@ -59,7 +67,11 @@ final class RelayClient {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     // HUMAN HELP and picker calls wait for people. Keep spare workers available for
     // status and independent commands while an interactive request is pending.
-    private final ExecutorService requestExecutor = Executors.newFixedThreadPool(4);
+    private final ExecutorService requestExecutor;
+    private final Call.Factory loopbackCalls;
+    // Accessed only under this client's monitor. Socket identity is the request's
+    // connection generation; a reconnected socket never inherits old work.
+    private final Map<String, PendingProxy> pendingProxies = new LinkedHashMap<>();
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -87,11 +99,25 @@ final class RelayClient {
     private String lastRelayPongAt = "";
     private String lastRelayDisconnectAt = "";
     private String lastRelayDisconnectReason = "";
+    private String lastLoopbackProxyErrorAt = "";
+    private String lastLoopbackProxyErrorType = "";
+    private String lastLoopbackProxyErrorMessage = "";
+    private String lastLoopbackProxyRequestId = "";
+    private volatile boolean loopbackHealthy = true;
 
     RelayClient(Context context, String relayBaseUrl, Listener listener) {
+        this(context, relayBaseUrl, listener, Executors.newFixedThreadPool(4), null);
+    }
+
+    RelayClient(Context context, String relayBaseUrl, Listener listener,
+                ExecutorService requestExecutor, Call.Factory loopbackCalls) {
         this.context = context.getApplicationContext();
         this.relayBaseUrl = normalizeBaseUrl(relayBaseUrl);
         this.listener = listener;
+        this.requestExecutor = requestExecutor;
+        // Retrying a lost POST can repeat a side effect whose response was lost.
+        this.loopbackCalls = loopbackCalls != null ? loopbackCalls
+                : client.newBuilder().retryOnConnectionFailure(false).build();
         this.connectivityManager = (ConnectivityManager) this.context.getSystemService(Context.CONNECTIVITY_SERVICE);
         SharedPreferences prefs = this.context.getSharedPreferences(McpNodeService.PREFS, Context.MODE_PRIVATE);
         this.nodeId = getOrCreateSecret(prefs, PREF_NODE_ID, 16);
@@ -131,6 +157,7 @@ final class RelayClient {
         unregisterNetworkCallback();
         WebSocket socket = webSocket;
         webSocket = null;
+        cancelPendingProxies(null);
         if (socket != null) {
             socket.close(1000, "PickPico node stopped");
         }
@@ -148,6 +175,11 @@ final class RelayClient {
                 .put("lastRelayPongAt", lastRelayPongAt)
                 .put("lastRelayDisconnectAt", lastRelayDisconnectAt)
                 .put("lastRelayDisconnectReason", lastRelayDisconnectReason)
+                .put("lastLoopbackProxyErrorAt", lastLoopbackProxyErrorAt)
+                .put("lastLoopbackProxyErrorType", lastLoopbackProxyErrorType)
+                .put("lastLoopbackProxyErrorMessage", lastLoopbackProxyErrorMessage)
+                .put("lastLoopbackProxyRequestId", lastLoopbackProxyRequestId)
+                .put("loopbackHealthy", loopbackHealthy)
                 .put("reconnectAttemptCount", reconnectAttemptCount)
                 .put("reconnectBackoffAttempt", reconnectAttempt)
                 .put("currentNetworkType", observedNetworkType)
@@ -206,6 +238,7 @@ final class RelayClient {
     private synchronized void recover(WebSocket socket, String detail) {
         if (closed || socket != webSocket) return;
         webSocket = null;
+        cancelPendingProxies(socket);
         clearHeartbeatState();
         socket.cancel();
         lastRelayDisconnectAt = Instant.now().toString();
@@ -443,20 +476,66 @@ final class RelayClient {
             recover(socket, "relay acknowledgement failed");
             return;
         }
-        requestExecutor.execute(() -> proxyToLoopback(socket, envelope));
+        // A duplicate transport envelope must not enqueue the same request twice.
+        if (pendingProxies.containsKey(requestId)) return;
+        PendingProxy pending = new PendingProxy(socket, envelope, requestId);
+        pending.work = new FutureTask<>(() -> {
+            try {
+                proxyToLoopback(pending);
+            } finally {
+                pending.lease.close();
+                synchronized (RelayClient.this) {
+                    if (pendingProxies.get(requestId) == pending) pendingProxies.remove(requestId);
+                }
+            }
+            return null;
+        });
+        pendingProxies.put(requestId, pending);
+        try {
+            requestExecutor.execute(pending.work);
+        } catch (RejectedExecutionException error) {
+            pendingProxies.remove(requestId);
+            pending.lease.close();
+            pending.work.cancel(false);
+            recover(socket, "relay request executor stopped");
+        }
     }
 
-    private void proxyToLoopback(WebSocket socket, JSONObject envelope) {
-        String requestId = envelope.optString("requestId", "");
-        if (requestId.isEmpty()) {
-            return;
+    private boolean isCurrentProxy(PendingProxy pending) {
+        // Caller must hold this client's monitor.
+        return !closed && webSocket == pending.socket
+                && pendingProxies.get(pending.requestId) == pending;
+    }
+
+    private void cancelPendingProxies(WebSocket socket) {
+        // Caller must hold this client's monitor. null cancels all generations.
+        Iterator<PendingProxy> iterator = pendingProxies.values().iterator();
+        while (iterator.hasNext()) {
+            PendingProxy pending = iterator.next();
+            if (socket != null && pending.socket != socket) continue;
+            iterator.remove();
+            pending.lease.close();
+            pending.work.cancel(false);
+            if (pending.call != null) pending.call.cancel();
         }
+        if (requestExecutor instanceof ThreadPoolExecutor) {
+            ((ThreadPoolExecutor) requestExecutor).purge();
+        }
+    }
+
+    private void proxyToLoopback(PendingProxy pending) {
+        synchronized (this) {
+            if (!isCurrentProxy(pending)) return;
+        }
+        String requestId = pending.requestId;
+        JSONObject envelope = pending.envelope;
         try {
             String bodyText = envelope.optString("body", "");
             JSONObject incomingHeaders = envelope.optJSONObject("headers");
             String contentType = header(incomingHeaders, "content-type", "application/json; charset=utf-8");
             Request.Builder request = new Request.Builder()
                     .url("http://127.0.0.1:8765/mcp")
+                    .header(RelayRequestScope.HEADER, pending.lease.id)
                     .post(RequestBody.create(bodyText, MediaType.parse(contentType)));
 
             String localToken = context
@@ -471,7 +550,19 @@ final class RelayClient {
             copyHeader(incomingHeaders, request, "mcp-name");
             copyHeader(incomingHeaders, request, "x-pickpico-tool-profile");
 
-            try (Response response = client.newCall(request.build()).execute()) {
+            Call call;
+            synchronized (this) {
+                if (!isCurrentProxy(pending)) return;
+                call = loopbackCalls.newCall(request.build());
+                if (!isCurrentProxy(pending)) {
+                    call.cancel();
+                    return;
+                }
+                // Register before releasing the lock. A concurrent disconnect can
+                // now cancel even a Call whose execute() has not started yet.
+                pending.call = call;
+            }
+            try (Response response = call.execute()) {
                 String responseBody = response.body() == null ? "" : response.body().string();
                 JSONObject responseHeaders = new JSONObject();
                 putHeader(response.headers(), responseHeaders, "Content-Type");
@@ -482,25 +573,62 @@ final class RelayClient {
                         .put("status", response.code())
                         .put("headers", responseHeaders)
                         .put("body", responseBody);
-                if (!socket.send(result.toString())) {
-                    recover(socket, "relay response could not be queued");
+                synchronized (this) {
+                    if (!isCurrentProxy(pending) || call.isCanceled()) return;
+                    loopbackHealthy = true;
+                    if (!pending.socket.send(result.toString())) {
+                        recover(pending.socket, "relay response could not be queued");
+                    }
                 }
             }
         } catch (Exception error) {
-            try {
-                socket.send(new JSONObject()
-                        .put("type", "response")
-                        .put("requestId", requestId)
-                        .put("status", 502)
-                        .put("headers", new JSONObject().put("content-type", "application/json"))
-                        .put("body", new JSONObject()
-                                .put("error", "loopback_proxy_failed")
-                                .put("message", error.getClass().getSimpleName())
-                                .toString())
-                        .toString());
-            } catch (JSONException ignored) {
+            synchronized (this) {
+                // Disconnect cancellation is expected; it must not mark the new
+                // connection unhealthy or trigger a local MCP server restart.
+                if (!isCurrentProxy(pending)
+                        || (pending.call != null && pending.call.isCanceled())) return;
+                loopbackHealthy = false;
+                recordLoopbackProxyError(requestId, error);
+                listener.onLoopbackProxyFailure(requestId, error);
+                try {
+                    pending.socket.send(new JSONObject()
+                            .put("type", "response")
+                            .put("requestId", requestId)
+                            .put("status", 502)
+                            .put("headers", new JSONObject().put("content-type", "application/json"))
+                            .put("body", new JSONObject()
+                                    .put("error", "loopback_proxy_failed")
+                                    .put("executionState", "unknown")
+                                    .put("message", error.getClass().getSimpleName())
+                                    .toString())
+                            .toString());
+                } catch (JSONException ignored) {
+                }
             }
         }
+    }
+
+    private static final class PendingProxy {
+        final WebSocket socket;
+        final JSONObject envelope;
+        final String requestId;
+        final RelayRequestScope.Lease lease = RelayRequestScope.createLease();
+        FutureTask<Void> work;
+        Call call;
+
+        PendingProxy(WebSocket socket, JSONObject envelope, String requestId) {
+            this.socket = socket;
+            this.envelope = envelope;
+            this.requestId = requestId;
+        }
+    }
+
+    private synchronized void recordLoopbackProxyError(String requestId, Exception error) {
+        lastLoopbackProxyErrorAt = Instant.now().toString();
+        lastLoopbackProxyRequestId = requestId == null ? "" : requestId;
+        lastLoopbackProxyErrorType = error == null ? "unknown" : error.getClass().getName();
+        String message = error == null ? "" : error.getMessage();
+        lastLoopbackProxyErrorMessage = message == null ? "" : message;
     }
 
     private static void copyHeader(JSONObject headers, Request.Builder request, String lowerName) {

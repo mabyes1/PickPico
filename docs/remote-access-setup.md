@@ -47,6 +47,7 @@
 
 ```json
 {
+  "agent": "<填入實際模型名稱與版本>",
   "commandId": "phone.status",
   "arguments": {}
 }

@@ -20,6 +20,7 @@ final class PicoOrbPanelView extends LinearLayout {
     private final TextView title;
     private final TextView detail;
     private final TextView action;
+    private final TextView returnAction;
     private Runnable dismissAction;
 
     PicoOrbPanelView(Context context) {
@@ -42,9 +43,18 @@ final class PicoOrbPanelView extends LinearLayout {
         action = text("OPEN  →", 11, Typeface.BOLD, Color.WHITE);
         action.setGravity(Gravity.CENTER);
         addView(action, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40)));
+        returnAction = text("", 11, Typeface.BOLD, Color.WHITE);
+        returnAction.setGravity(Gravity.CENTER);
+        returnAction.setPadding(0, dp(8), 0, 0);
+        addView(returnAction, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        // Keep caller-return plumbing available for future hosts that can provide a
+        // trustworthy destination. Most AI hosts cannot identify their own Android
+        // app or exact return screen, and the orb already overlays the current app,
+        // so exposing this row today would promise precision we cannot guarantee.
+        returnAction.setVisibility(GONE);
     }
 
-    void bind(HomePulse.Snapshot snapshot, int themeColor, Runnable primaryAction) {
+    void bind(HomePulse.Snapshot snapshot, int themeColor, Runnable primaryAction, Runnable returnToCaller) {
         int accent = PicoOrbState.primary(snapshot.orbMode, themeColor);
         GradientDrawable panel = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
@@ -67,6 +77,10 @@ final class PicoOrbPanelView extends LinearLayout {
         action.setBackground(button);
         action.setTextColor(Color.luminance(accent) > .5f ? Color.rgb(23, 27, 30) : Color.WHITE);
         action.setOnClickListener(view -> primaryAction.run());
+        returnAction.setText(snapshot.caller.label());
+        returnAction.setEnabled(snapshot.caller.available());
+        returnAction.setAlpha(snapshot.caller.available() ? 1f : .5f);
+        returnAction.setOnClickListener(view -> returnToCaller.run());
     }
 
     void setDismissAction(Runnable dismissAction) {

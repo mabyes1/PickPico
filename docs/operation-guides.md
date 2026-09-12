@@ -4,7 +4,7 @@
 AI 依任務選擇指南，透過 `command_run` 讀取完整內容：
 
 ```json
-{"commandId":"guide.get","arguments":{"guideId":"app.operate"}}
+{"agent":"<填入實際模型名稱與版本>","commandId":"guide.get","arguments":{"guideId":"app.operate"}}
 ```
 
 目前提供三份指南：

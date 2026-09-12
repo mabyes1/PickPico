@@ -74,7 +74,9 @@ final class OperationGuides {
 
     private static JSONObject summary(String[] guide) throws JSONException {
         return new JSONObject().put("id", guide[0]).put("title", guide[1]).put("summary", guide[2])
-                .put("readWith", new JSONObject().put("tool", "command_run").put("arguments",
+                .put("readWith", new JSONObject().put("tool", "command_run")
+                        .put("requiredCallerArguments", new JSONArray().put("agent"))
+                        .put("instruction", "Add your actual model name/version as agent alongside commandId before calling this template.").put("arguments",
                         new JSONObject().put("commandId", "guide.get").put("arguments", new JSONObject().put("guideId", guide[0]))));
     }
 

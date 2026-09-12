@@ -81,6 +81,7 @@ final class HumanHelpStore {
         JSONObject request = new JSONObject()
                 .put("requestId", requestId)
                 .put("requestType", requestType)
+                .put("agent", AgentIdentity.current())
                 .put("status", "waiting_human")
                 .put("title", arguments.optString("title", "AI needs your help"))
                 .put("instruction", arguments.optString("instruction", ""))

@@ -117,6 +117,20 @@ public class RelayClientTest {
         verify(editor, never()).clear();
     }
 
+    @Test public void loopbackProxyFailureIsExposedInDiagnostics() throws Exception {
+        invoke(
+                "recordLoopbackProxyError",
+                new Class<?>[]{String.class, Exception.class},
+                "request-123",
+                new java.net.ConnectException("Connection refused"));
+
+        JSONObject diagnostics = (JSONObject) invoke("diagnostics", new Class<?>[]{});
+        assertEquals("request-123", diagnostics.getString("lastLoopbackProxyRequestId"));
+        assertEquals("java.net.ConnectException", diagnostics.getString("lastLoopbackProxyErrorType"));
+        assertEquals("Connection refused", diagnostics.getString("lastLoopbackProxyErrorMessage"));
+        assertFalse(diagnostics.getString("lastLoopbackProxyErrorAt").isEmpty());
+    }
+
     private Field field(String name) throws Exception {
         Field field = RelayClient.class.getDeclaredField(name);
         field.setAccessible(true);

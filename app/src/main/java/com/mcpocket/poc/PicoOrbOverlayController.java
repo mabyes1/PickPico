@@ -24,7 +24,7 @@ final class PicoOrbOverlayController {
 
     private static final long REFRESH_MS = 250L;
     private static final int PANEL_WIDTH_DP = 260;
-    private static final int PANEL_ESTIMATED_HEIGHT_DP = 184;
+    private static final int PANEL_ESTIMATED_HEIGHT_DP = 232;
 
     private final Context context;
     private final StateSource source;
@@ -48,10 +48,14 @@ final class PicoOrbOverlayController {
     private WindowManager.LayoutParams orbParams;
     private PicoOrbPanelView panelWindow;
     private WindowManager.LayoutParams panelParams;
+    private PicoOrbDismissTargetView dismissTarget;
+    private WindowManager.LayoutParams dismissTargetParams;
     private HomePulse.Snapshot latest;
     private String side;
     private boolean destroyed;
     private boolean dragging;
+    private boolean temporarilyHidden;
+    private String hiddenWakeKey = "";
     private float downRawX;
     private float downRawY;
     private int downWindowX;
@@ -81,6 +85,15 @@ final class PicoOrbOverlayController {
         if (destroyed || windowManager == null) return;
         HomePulse.Snapshot snapshot = source.snapshot();
         latest = snapshot;
+        if (temporarilyHidden) {
+            if (snapshot != null && hiddenWakeKey.equals(snapshot.wakeKey)) {
+                removePanel();
+                removeOrb();
+                return;
+            }
+            temporarilyHidden = false;
+            hiddenWakeKey = "";
+        }
         boolean allowed = snapshot != null
                 && !PicoOrbState.HIDDEN.equals(snapshot.orbMode)
                 && McpocketPolicySettings.isPicoOrbEnabled(context)
@@ -104,6 +117,7 @@ final class PicoOrbOverlayController {
         destroyed = true;
         handler.removeCallbacks(refreshTask);
         removePanel();
+        removeDismissTarget();
         removeOrb();
     }
 
@@ -156,23 +170,28 @@ final class PicoOrbOverlayController {
                 if (!dragging && Math.hypot(dx, dy) > touchSlop) {
                     dragging = true;
                     removePanel();
+                    showDismissTarget();
                 }
                 if (dragging) {
                     int[] screen = screenSize();
                     orbParams.x = clamp(downWindowX + Math.round(dx), edgeMargin, screen[0] - orbSize - edgeMargin);
                     orbParams.y = clamp(downWindowY + Math.round(dy), topMargin, screen[1] - orbSize - bottomMargin);
                     updateOrbLayout();
+                    updateDismissTargetState();
                 }
                 return true;
             case MotionEvent.ACTION_UP:
                 if (dragging) {
-                    snapAndSave();
+                    if (isOverDismissTarget()) temporarilyHide();
+                    else snapAndSave();
                 } else {
                     view.performClick();
                 }
+                removeDismissTarget();
                 dragging = false;
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                removeDismissTarget();
                 dragging = false;
                 return true;
             default:
@@ -221,7 +240,8 @@ final class PicoOrbOverlayController {
 
     private void updatePanel(HomePulse.Snapshot snapshot) {
         if (panelWindow == null) return;
-        panelWindow.bind(snapshot, PickPicoTheme.load(context).colorA, this::openPrimary);
+        panelWindow.bind(snapshot, PickPicoTheme.load(context).colorA, this::openPrimary,
+                () -> openCaller(snapshot.caller));
         positionPanel();
         try {
             windowManager.updateViewLayout(panelWindow, panelParams);
@@ -257,6 +277,27 @@ final class PicoOrbOverlayController {
         }
     }
 
+    private void openCaller(CallerReturnTarget caller) {
+        if (!caller.available()) return;
+        try {
+            Intent intent = null;
+            if (!caller.url.isEmpty()) {
+                intent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(caller.url));
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                if (!caller.packageName.isEmpty()) intent.setPackage(caller.packageName);
+            } else if (!caller.packageName.isEmpty()) {
+                intent = context.getPackageManager().getLaunchIntentForPackage(caller.packageName);
+            }
+            if (intent == null) throw new android.content.ActivityNotFoundException();
+            // Preserve the caller's existing activity stack.
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            removePanel();
+        } catch (RuntimeException error) {
+            android.widget.Toast.makeText(context, "無法開啟呼叫端，請確認 App 已安裝或連結可用", android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void launch(Intent intent) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -279,6 +320,56 @@ final class PicoOrbOverlayController {
         McpocketPolicySettings.savePicoOrbPosition(context, side, ratio);
     }
 
+    private void temporarilyHide() {
+        temporarilyHidden = true;
+        hiddenWakeKey = latest == null ? "" : latest.wakeKey;
+        removePanel();
+        removeDismissTarget();
+        removeOrb();
+    }
+
+    private void showDismissTarget() {
+        if (dismissTarget != null || windowManager == null) return;
+        try {
+            int size = dp(76);
+            int[] screen = screenSize();
+            dismissTarget = new PicoOrbDismissTargetView(context);
+            dismissTargetParams = new WindowManager.LayoutParams(size, size,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT);
+            dismissTargetParams.gravity = Gravity.TOP | Gravity.START;
+            dismissTargetParams.x = (screen[0] - size) / 2;
+            dismissTargetParams.y = screen[1] - size - bottomMargin;
+            windowManager.addView(dismissTarget, dismissTargetParams);
+        } catch (RuntimeException error) {
+            removeDismissTarget();
+        }
+    }
+
+    private void updateDismissTargetState() {
+        if (dismissTarget != null) dismissTarget.setArmed(isOverDismissTarget());
+    }
+
+    private boolean isOverDismissTarget() {
+        if (dismissTargetParams == null || orbParams == null) return false;
+        float orbCenterX = orbParams.x + orbSize / 2f;
+        float orbCenterY = orbParams.y + orbSize / 2f;
+        float targetCenterX = dismissTargetParams.x + dismissTargetParams.width / 2f;
+        float targetCenterY = dismissTargetParams.y + dismissTargetParams.height / 2f;
+        return Math.hypot(orbCenterX - targetCenterX, orbCenterY - targetCenterY) <= dp(62);
+    }
+
+    private void removeDismissTarget() {
+        PicoOrbDismissTargetView target = dismissTarget;
+        dismissTarget = null;
+        dismissTargetParams = null;
+        if (target == null || windowManager == null) return;
+        try { windowManager.removeView(target); } catch (RuntimeException ignored) { }
+    }
+
     private void positionForCurrentDisplay(boolean force) {
         if (orbParams == null) return;
         int[] screen = screenSize();
@@ -297,15 +388,21 @@ final class PicoOrbOverlayController {
         if (panelParams == null || orbParams == null) return;
         int[] screen = screenSize();
         int panelWidth = panelParams.width;
+        int panelHeight = dp(PANEL_ESTIMATED_HEIGHT_DP);
+        if (panelWindow != null) {
+            panelWindow.measure(View.MeasureSpec.makeMeasureSpec(panelWidth, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            panelHeight = panelWindow.getMeasuredHeight();
+        }
         int gap = dp(3);
         panelParams.x = "left".equals(side)
                 ? orbParams.x + orbSize + gap
                 : orbParams.x - panelWidth - gap;
         panelParams.x = clamp(panelParams.x, edgeMargin, screen[0] - panelWidth - edgeMargin);
         panelParams.y = clamp(
-                orbParams.y + orbSize / 2 - dp(PANEL_ESTIMATED_HEIGHT_DP) / 2,
+                orbParams.y + orbSize / 2 - panelHeight / 2,
                 topMargin,
-                screen[1] - dp(PANEL_ESTIMATED_HEIGHT_DP) - bottomMargin);
+                screen[1] - panelHeight - bottomMargin);
     }
 
     private void updateOrbLayout() {

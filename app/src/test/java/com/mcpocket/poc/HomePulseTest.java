@@ -139,4 +139,22 @@ public final class HomePulseTest {
         assertEquals(PicoOrbState.HUMAN_HELP,
                 HomePulse.snapshot(true, true, "connected", new JSONObject().put("title", "Still pending"), now).orbMode);
     }
+    @Test public void wakeKeyChangesForNewCallsAndTaskUpdates() throws Exception {
+        String idle = HomePulse.snapshot(true, true, "connected", null, 1L).wakeKey;
+        long command = HomePulse.begin("ui.inspect");
+        String called = HomePulse.snapshot(true, true, "connected", null, 2L).wakeKey;
+        assertNotEquals(idle, called);
+        HomePulse.finish(command, false);
+        assertEquals(called, HomePulse.snapshot(true, true, "connected", null, 3L).wakeKey);
+
+        JSONObject task = new JSONObject().put("taskId", "wake").put("status", "running")
+                .put("updatedAt", "2026-01-01T00:00:00Z");
+        HomePulse.task(task);
+        String firstUpdate = HomePulse.snapshot(true, true, "connected", null, 4L).wakeKey;
+        task.put("updatedAt", "2026-01-01T00:00:01Z");
+        HomePulse.task(task);
+        assertNotEquals(firstUpdate, HomePulse.snapshot(true, true, "connected", null, 5L).wakeKey);
+        assertNotEquals(firstUpdate, HomePulse.snapshot(true, true, "connected",
+                new JSONObject().put("requestId", "help-1"), 5L).wakeKey);
+    }
 }
