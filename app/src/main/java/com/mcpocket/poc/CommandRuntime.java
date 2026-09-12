@@ -951,9 +951,6 @@ final class CommandRuntime {
     JSONObject list() throws JSONException {
         JSONArray result = new JSONArray();
         for (Command command : commands.values()) {
-            if (!actions.isCommandExposed(command.id)) {
-                continue;
-            }
             JSONObject described = command.describe();
             described.put("group", AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
             result.put(described);
@@ -976,7 +973,6 @@ final class CommandRuntime {
         String exactId = commands.containsKey(query) ? query : "";
         java.util.Set<String> preferred = CapabilityIndex.preferred(query);
         for (Command command : commands.values()) {
-            if (!actions.isCommandExposed(command.id)) continue;
             if (!exactId.isEmpty() && !exactId.equals(command.id)) continue;
             if (exactId.isEmpty() && !preferred.isEmpty() && !preferred.contains(command.id)) continue;
             if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
@@ -1146,11 +1142,8 @@ final class CommandRuntime {
         if (command == null) {
             throw new CommandInputException("Unknown command: " + commandId);
         }
-        if (!actions.isCommandExposed(commandId)) {
-            throw new CommandInputException(
-                    "Command is not currently available: " + commandId
-                            + ". Use capability.status to inspect setup or Hyper Mode requirements.");
-        }
+        // Known does not mean ready. invoke() validates input and reports live
+        // availability without hiding registered capabilities from discovery.
         return command;
     }
 
@@ -1410,7 +1403,6 @@ final class CommandRuntime {
     private JSONObject capabilityList(long callCount) throws JSONException {
         JSONArray capabilities = new JSONArray();
         for (Command command : commands.values()) {
-            if (!actions.isCommandExposed(command.id)) continue;
             JSONObject item = capabilityDescriptor(command);
             merge(item, compactState(actions.capabilityState(command.id)));
             capabilities.put(item);

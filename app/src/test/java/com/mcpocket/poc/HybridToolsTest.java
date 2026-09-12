@@ -85,4 +85,29 @@ public final class HybridToolsTest {
             if(t.getString("name").equals("phone_status")) assertTrue(t.getJSONObject("annotations").getBoolean("readOnlyHint"));
         }
     }
+
+    @Test public void unavailableCapabilitiesStayDiscoverableButCannotExecute() throws Exception {
+        when(actions.isCommandExposed("camera.capture")).thenReturn(false);
+        when(actions.isCommandExposed("microphone.record")).thenReturn(false);
+        JSONObject unavailable = new JSONObject().put("available", false).put("state", "setup_required")
+                .put("requiresSetup", true).put("setupType", "foreground_service_type").put("reason", "Open the app to refresh media access");
+        when(actions.capabilityState("camera.capture")).thenReturn(unavailable);
+        when(actions.capabilityState("microphone.record")).thenReturn(unavailable);
+        assertEquals(60, runtime.list().getInt("count"));
+        assertEquals(60, runtime.execute("capability.list", new JSONObject(), 1).getInt("count"));
+        assertEquals(60, runtime.search(new JSONObject()).getInt("totalCandidates"));
+        assertEquals(58, runtime.search(new JSONObject().put("availableOnly", true)).getInt("totalCandidates"));
+        JSONObject exact = runtime.search(new JSONObject().put("query", "camera.capture"));
+        assertEquals(1, exact.getInt("count"));
+        JSONObject match = exact.getJSONArray("matches").getJSONObject(0);
+        assertFalse(match.getBoolean("available")); assertTrue(match.getBoolean("requiresSetup"));
+        assertEquals("foreground_service_type", match.getString("setupType"));
+        assertTrue(match.has("inputSchema"));
+        clearInvocations(actions);
+        JSONObject rejected = runtime.run("camera.capture", new JSONObject(), 1);
+        assertTrue(rejected.getBoolean("isError"));
+        assertEquals("CAPABILITY_UNAVAILABLE", rejected.getJSONObject("result").getJSONObject("error").getString("code"));
+        verify(actions, never()).cameraCapture(any(), anyLong());
+        verify(actions, never()).onAgentCommandStarted(anyString());
+    }
 }

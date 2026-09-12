@@ -69,6 +69,34 @@ public final class AgentIdentityTest {
         assertEquals(unknown, task.getString("agent"));
     }
 
+    @Test public void publicIdentitySchemaIsPortableWhileRuntimeRejectsInvisibleNames() throws Exception {
+        for (String profile : new String[]{"thin-v1", "full"}) {
+            JSONArray listed = tools.list(false, profile).getJSONArray("tools");
+            for (int i = 0; i < listed.length(); i++) {
+                JSONObject schema = listed.getJSONObject(i).getJSONObject("inputSchema").getJSONObject("properties").optJSONObject("agent");
+                if (schema == null) continue;
+                assertFalse("Connector must not reinterpret an identity regex", schema.has("pattern"));
+                assertEquals("string", schema.getString("type"));
+                assertEquals(1, schema.getInt("minLength"));
+                assertEquals(160, schema.getInt("maxLength"));
+            }
+        }
+        when(actions.serverInfo(anyLong())).thenReturn(new JSONObject().put("version", "test"));
+        for (String identity : new String[]{"GPT-6", "Test Model 1.0", "unknown (model not exposed)"}) {
+            JSONObject result = call("command_run", new JSONObject().put("commandId", "node.info")
+                    .put("arguments", new JSONObject()).put("agent", identity), "thin-v1");
+            assertFalse(result.toString(), result.getBoolean("isError"));
+            assertEquals(identity, result.getJSONObject("structuredContent").getJSONObject("result").getString("agent"));
+        }
+        clearInvocations(actions);
+        for (String identity : new String[]{"", " \t\n", "\u3000\u00a0\u200b", "\u200d\u2060", "x".repeat(161)}) {
+            assertTrue(call("command_run", new JSONObject().put("commandId", "node.info")
+                    .put("agent", identity), "thin-v1").getBoolean("isError"));
+        }
+        verify(actions, never()).serverInfo(anyLong());
+        verify(actions, never()).onAgentCommandStarted(anyString());
+    }
+
     @Test public void bothCommandGatewayAndLegacyToolsRejectMissingIdentityBeforeActions() throws Exception {
         assertTrue(call("command_run", new JSONObject().put("commandId", "camera.capture"), "thin-v1").getBoolean("isError"));
         assertTrue(call("camera_capture", new JSONObject(), "full").getBoolean("isError"));

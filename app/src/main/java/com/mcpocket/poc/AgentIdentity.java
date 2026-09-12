@@ -43,8 +43,11 @@ final class AgentIdentity implements AutoCloseable {
     }
 
     static JSONObject schema() throws JSONException {
+        // Keep the public schema portable across connector validators. The
+        // runtime require() check is authoritative for visible/nonblank
+        // identity, including Unicode spaces, control and format characters.
         return new JSONObject().put("type", "string").put("minLength", 1)
-                .put("maxLength", 160).put("pattern", "\\S").put("description", DESCRIPTION);
+                .put("maxLength", 160).put("description", DESCRIPTION);
     }
 
     @Override public void close() {

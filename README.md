@@ -202,7 +202,7 @@ PickPico 提供 18 個常用能力的完整參數，加上 12 個管理／探索
 | 遠端連線 | 手機主動連線、固定能力網址、Wi-Fi／行動網路切換重連 |
 | 更新 | APK 下載、雜湊與簽章驗證、Android 安裝確認 |
 
-目前 Android source 版本：**0.16.75**（`versionCode 112`），支援 Android 8.0 以上的 `arm64-v8a` 裝置。
+目前 Android source 版本：**0.16.76**（`versionCode 113`），支援 Android 8.0 以上的 `arm64-v8a` 裝置。
 
 ## HUMAN HELP
 
