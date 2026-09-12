@@ -48,7 +48,7 @@ Hyper Mode 預設關閉。它是 PickPico 的功能開關，開啟後還要取�
 | 能力 | 指令 | 需要什麼 |
 | --- | --- | --- |
 | 讀取介面元素 | `ui.inspect` | 啟用 PickPico 無障礙服務；只能取得目標 App 暴露的介面資訊。 |
-| 點擊、輸入、捲動 | `ui.action`、`ui.type`、`ui.scroll` | 無障礙服務與可操作的目標元素；不是任意畫面都能可靠操作。 |
+| 點擊、輸入、捲動 | `ui.action`、`ui.type`、`ui.scroll` | 元件優先；元件缺失時用最新截圖定位點擊／滑動。無元件輸入需 Android 13+ 與已聚焦的輸入連線；每步重新觀察驗證，詳見 [操作原則](ui-operation-policy.md)。 |
 | 擷取螢幕 | `screen.capture` | 在 App 開啟 Screen Capture，並取得 Android MediaProjection 工作階段。 |
 | 其他 App 的通知 | `notification.list/get/dismiss/actions/invoke_action/reply` | 通知存取權；回覆或按鈕必須由原通知提供。 |
 | 鎖定手機 | `phone.lock` | 明確啟用裝置管理員功能。 |

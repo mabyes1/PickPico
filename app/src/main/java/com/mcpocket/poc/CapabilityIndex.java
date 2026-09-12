@@ -48,9 +48,9 @@ final class CapabilityIndex {
             case "notification.invoke_action": return "Invoke a discovered notification button";
             case "notification.reply": return "Send a reply via a notification";
             case "ui.inspect": return "Read the current UI and observationId";
-            case "ui.action": return "Click a unique UI target or back/home/recents";
-            case "ui.type": return "Replace or append text in a UI field";
-            case "ui.scroll": return "Scroll a UI container";
+            case "ui.action": return "Click/long-press a UI target or screenshot point; back/home/recents";
+            case "ui.type": return "Type via a UI selector or the focused input connection";
+            case "ui.scroll": return "Scroll a UI container or swipe between screenshot points";
             case "screen.capture": return "Take a screen image";
             case "app.list": return "Find installed apps and package names";
             case "app.launch": return "Open an installed app by package name";

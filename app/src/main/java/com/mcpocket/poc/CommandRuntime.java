@@ -450,7 +450,7 @@ final class CommandRuntime {
 
         register(
                 "ui.action",
-                "Perform a semantic Accessibility action on the current Android UI, or a global back/home/recents action.",
+                "Act on a unique UI selector, click/long_click a screenshot pixel point, or perform global back/home/recents. Point actions require a fresh screen.capture observationId.",
                 "ui",
                 "ui_action",
                 true,
@@ -469,22 +469,22 @@ final class CommandRuntime {
                     if (!"back".equals(action)
                             && !"home".equals(action)
                             && !"recents".equals(action)
-                            && arguments.optJSONObject("selector") == null) {
-                        throw new CommandInputException("ui.action requires selector for node actions");
+                            && arguments.optJSONObject("selector") == null && !arguments.has("point")) {
+                        throw new CommandInputException("ui.action requires selector or point");
                     }
                     return actions.uiAction(arguments, callCount);
                 });
 
         register(
                 "ui.type",
-                "Set or append text in an editable Android accessibility node selected by path, view ID, text, or content description.",
+                "Set/append text using a selector. Without a node, use focused=true with textMode insert/replace and a fresh screen.capture observationId after visually focusing the editor; requires Android 13+ input connection.",
                 "ui",
                 "ui_action",
                 true,
                 uiTypeSchema(),
                 (arguments, callCount) -> {
-                    if (arguments.optJSONObject("selector") == null) {
-                        throw new CommandInputException("ui.type requires selector");
+                    if (arguments.optJSONObject("selector") == null && !arguments.optBoolean("focused", false)) {
+                        throw new CommandInputException("ui.type requires selector or focused=true");
                     }
                     String text = arguments.optString("text", "");
                     if (text.length() > 8192) {
@@ -495,7 +495,7 @@ final class CommandRuntime {
 
         register(
                 "ui.scroll",
-                "Scroll an Android accessibility node forward/backward or by directional alias. When selector is omitted, use the first scrollable node.",
+                "Scroll a unique accessibility container, or swipe from start to end screenshot pixels using swipe and a fresh screen.capture observationId. Swipe direction is finger travel, not content travel.",
                 "ui",
                 "ui_action",
                 true,
@@ -1374,8 +1374,7 @@ final class CommandRuntime {
         if (id.equals("calendar.create") && args.has("calendarId")) validateNumericId(args.optString("calendarId"), "calendarId");
         if (id.equals("file.pick") || id.equals("media.pick")) validatePickerArguments(args);
         if (id.equals("share.send") && args.has("workspacePath")) validateWorkspacePath(args.optString("workspacePath"));
-        if (id.equals("ui.action") && !java.util.Arrays.asList("back", "home", "recents").contains(args.optString("action")) && !args.has("selector"))
-            throw new ToolSchemaValidator.Invalid("arguments.selector", "required for node actions");
+        VisualUiRequest.validate(id, args);
     }
 
     private boolean requiresApproval(Command command) {
@@ -1811,7 +1810,8 @@ final class CommandRuntime {
                                         .put("back")
                                         .put("home")
                                         .put("recents")))
-                        .put("selector", uiSelectorSchema()))
+                        .put("selector", uiSelectorSchema())
+                        .put("point", uiPointSchema()))
                 .put("required", new JSONArray().put("action"))
                 .put("additionalProperties", false);
     }
@@ -1822,13 +1822,17 @@ final class CommandRuntime {
                 .put("properties", new JSONObject()
                         .put("observationId", observationSchema())
                         .put("selector", uiSelectorSchema())
+                        .put("focused", new JSONObject().put("type", "boolean").put("default", false)
+                                .put("description", "Use the visually focused input connection without a selector, Android 13+. Capture after focusing; requires screen observationId and textMode, disallows append."))
+                        .put("textMode", new JSONObject().put("type", "string").put("enum", new JSONArray().put("insert").put("replace"))
+                                .put("description", "Focused input only: insert at cursor/selection, or replace all field text. Verify after dispatch; editor acceptance is not guaranteed."))
                         .put("text", new JSONObject()
                                 .put("type", "string")
                                 .put("maxLength", 8192))
                         .put("append", new JSONObject()
                                 .put("type", "boolean")
                                 .put("default", false)))
-                .put("required", new JSONArray().put("selector").put("text"))
+                .put("required", new JSONArray().put("text"))
                 .put("additionalProperties", false);
     }
 
@@ -1838,6 +1842,11 @@ final class CommandRuntime {
                 .put("properties", new JSONObject()
                         .put("observationId", observationSchema())
                         .put("selector", uiSelectorSchema())
+                        .put("swipe", new JSONObject().put("type", "object")
+                                .put("description", "Finger path in full screenshot pixels. Cannot combine with selector/direction.")
+                                .put("properties", new JSONObject().put("start", uiPointSchema()).put("end", uiPointSchema())
+                                        .put("durationMs", new JSONObject().put("type", "integer").put("minimum", 100).put("maximum", 3000).put("default", 400)))
+                                .put("required", new JSONArray().put("start").put("end")).put("additionalProperties", false))
                         .put("direction", new JSONObject()
                                 .put("type", "string")
                                 .put("enum", new JSONArray()
@@ -1869,7 +1878,16 @@ final class CommandRuntime {
 
     private static JSONObject observationSchema() throws JSONException {
         return new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 100)
-                .put("description", "One-action observationId from the latest ui_inspect. Re-inspect after any UI change.");
+                .put("description", "Selector/global actions: latest ui_inspect observationId. Point/swipe/focused-input: latest screen_capture observationId, valid for one action within 60s. Observe again after each action.");
+    }
+
+    private static JSONObject uiPointSchema() throws JSONException {
+        return new JSONObject().put("type", "object")
+                .put("description", "Absolute x/y pixels in the original full-display screenshot; (0,0) is top-left. Use returned width/height, not scaled preview coordinates.")
+                .put("properties", new JSONObject()
+                        .put("x", new JSONObject().put("type", "number").put("minimum", 0).put("maximum", 32767))
+                        .put("y", new JSONObject().put("type", "number").put("minimum", 0).put("maximum", 32767)))
+                .put("required", new JSONArray().put("x").put("y")).put("additionalProperties", false);
     }
 
     private static JSONObject uiSelectorSchema() throws JSONException {

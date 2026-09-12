@@ -1468,7 +1468,8 @@ public final class McpNodeService extends Service implements McpToolActions {
                 return accessibility;
             }
         }
-        return ScreenCaptureService.capture(arguments, callCount);
+        String visualContext = McpAccessibilityService.visualContext();
+        return McpAccessibilityService.attachVisualMetadata(ScreenCaptureService.capture(arguments, callCount), visualContext);
     }
 
     @Override

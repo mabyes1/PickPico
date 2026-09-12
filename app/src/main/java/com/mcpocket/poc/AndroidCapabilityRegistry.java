@@ -100,6 +100,9 @@ final class AndroidCapabilityRegistry {
                 || "ui.action".equals(commandId)
                 || "ui.type".equals(commandId)
                 || "ui.scroll".equals(commandId)) {
+            result.put("coordinateGesturesSupported", "ui.action".equals(commandId) || "ui.scroll".equals(commandId));
+            if ("ui.type".equals(commandId)) result.put("focusedInputSupported", Build.VERSION.SDK_INT >= 33)
+                    .put("focusedInputRequirement", "Android 13+, active input connection; see screen.capture focusedInput after focusing the field");
             return setupState(
                     result,
                     McpAccessibilityService.hasAccess(context),

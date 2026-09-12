@@ -41,6 +41,22 @@ public final class McpAccessibilityService extends AccessibilityService {
     protected void onServiceConnected() {
         super.onServiceConnected();
         activeInstance = this;
+        VisualUiController.invalidate();
+    }
+
+    @Override
+    @android.annotation.TargetApi(33)
+    public android.accessibilityservice.InputMethod onCreateInputMethod() {
+        return new android.accessibilityservice.InputMethod(this) {
+            @Override public void onStartInput(android.view.inputmethod.EditorInfo info, boolean restarting) {
+                super.onStartInput(info, restarting);
+                VisualUiController.editorChanged();
+            }
+            @Override public void onFinishInput() {
+                super.onFinishInput();
+                VisualUiController.editorChanged();
+            }
+        };
     }
 
     @Override
@@ -54,12 +70,14 @@ public final class McpAccessibilityService extends AccessibilityService {
 
     @Override
     public boolean onUnbind(Intent intent) {
+        VisualUiController.invalidate();
         activeInstance = null;
         return super.onUnbind(intent);
     }
 
     @Override
     public void onDestroy() {
+        VisualUiController.invalidate();
         activeInstance = null;
         super.onDestroy();
     }
@@ -89,13 +107,37 @@ public final class McpAccessibilityService extends AccessibilityService {
                 && hasAccess(context);
     }
 
-    static JSONObject screenCapture(JSONObject arguments, long callCount) throws JSONException {
+    static synchronized JSONObject screenCapture(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return unavailable("Accessibility screenshots require Android 11 or newer", callCount);
         }
 
-        return screenCapture(service, arguments, callCount, 2500L);
+        String context = VisualUiController.context(service);
+        JSONObject result = screenCapture(service, arguments, callCount, 2500L);
+        return attachVisualMetadata(result, context);
+    }
+
+    static String visualContext() {
+        return activeInstance == null ? "" : VisualUiController.context(activeInstance);
+    }
+
+    static synchronized JSONObject attachVisualMetadata(JSONObject result, String context) throws JSONException {
+        try { VisualUiController.attach(requireService(), result, context); }
+        catch (Exception error) {
+            VisualUiController.invalidate();
+            result.remove("observationId");
+            result.put("visualActionsAvailable", false).put("visualActionReason", "Unable to confirm screen/input context; capture again.");
+        }
+        JSONArray content = result.optJSONArray("_mcpContent");
+        if (content != null) {
+            JSONObject metadata = new JSONObject();
+            for (String key : new String[]{"observationId", "width", "height", "coordinateSpace", "displayId", "rotation",
+                    "visualActionsAvailable", "visualActionReason", "visualActionHint", "focusedInput"})
+                if (result.has(key)) metadata.put(key, result.get(key));
+            content.put(new JSONObject().put("type", "text").put("text", metadata.toString()));
+        }
+        return result;
     }
 
     @android.annotation.TargetApi(30)
@@ -307,6 +349,8 @@ public final class McpAccessibilityService extends AccessibilityService {
 
     static synchronized JSONObject action(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
+        if (arguments.has("point")) return visualOperation(service, arguments, callCount, "point");
+        VisualUiController.invalidate();
         requireObservation(service, arguments);
         String action = arguments.optString("action", "");
         if ("back".equals(action) || "home".equals(action) || "recents".equals(action)) {
@@ -331,10 +375,11 @@ public final class McpAccessibilityService extends AccessibilityService {
             boolean performed = clickable != null && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             return nodeActionResult(clickable == null ? node : clickable, action, performed, callCount);
         } else if ("long_click".equals(action)) {
-            boolean performed = performTouchLongPress(service, node);
-            if (!performed) {
+            JSONObject gesture = performTouchLongPress(service, node);
+            if ("unknown".equals(gesture.optString("status"))) return gesture.put("method", "touch_gesture").put("toolCallCount", callCount);
+            boolean performed = gesture.optBoolean("performed");
+            if (!performed && "gesture_not_accepted".equals(gesture.optString("error")))
                 performed = node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);
-            }
             JSONObject result = nodeActionResult(node, action, performed, callCount);
             result.put("method", performed ? "touch_gesture_or_accessibility" : "failed");
             return result;
@@ -349,49 +394,26 @@ public final class McpAccessibilityService extends AccessibilityService {
         return nodeActionResult(node, action, node.performAction(androidAction), callCount);
     }
 
-    private static boolean performTouchLongPress(McpAccessibilityService service, AccessibilityNodeInfo node) {
+    private static JSONObject performTouchLongPress(McpAccessibilityService service, AccessibilityNodeInfo node) throws JSONException {
         Rect bounds = new Rect();
         node.getBoundsInScreen(bounds);
-        if (bounds.isEmpty()) return false;
+        if (bounds.isEmpty()) return new JSONObject().put("performed", false).put("error", "gesture_not_accepted");
         float x = bounds.exactCenterX();
         float y = bounds.exactCenterY();
         Path path = new Path();
         path.moveTo(x, y);
-        long duration = Math.max(650L, ViewConfiguration.getLongPressTimeout() + 150L);
-        GestureDescription gesture = new GestureDescription.Builder()
-                .addStroke(new GestureDescription.StrokeDescription(path, 0L, duration))
-                .build();
-        CountDownLatch latch = new CountDownLatch(1);
-        boolean[] completed = new boolean[]{false};
-        boolean accepted;
         try {
-            accepted = service.dispatchGesture(gesture, new GestureResultCallback() {
-                @Override
-                public void onCompleted(GestureDescription gestureDescription) {
-                    completed[0] = true;
-                    latch.countDown();
-                }
-
-                @Override
-                public void onCancelled(GestureDescription gestureDescription) {
-                    latch.countDown();
-                }
-            }, null);
-        } catch (RuntimeException error) {
-            return false;
+            return VisualUiController.dispatch(service, path, VisualUiController.longPressDuration());
+        } catch (Exception error) {
+            return new JSONObject().put("status", "unknown").put("error", "gesture_dispatch_exception")
+                    .put("next", "Observe before retrying; the long press may have happened.");
         }
-        if (!accepted) return false;
-        try {
-            latch.await(duration + 1000L, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-        return completed[0];
     }
 
     static synchronized JSONObject type(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
+        if (arguments.optBoolean("focused", false)) return visualOperation(service, arguments, callCount, "type");
+        VisualUiController.invalidate();
         requireObservation(service, arguments);
         AccessibilityNodeInfo node = findNode(service, arguments.optJSONObject("selector"));
         if (node == null) {
@@ -412,6 +434,8 @@ public final class McpAccessibilityService extends AccessibilityService {
 
     static synchronized JSONObject scroll(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
+        if (arguments.has("swipe")) return visualOperation(service, arguments, callCount, "swipe");
+        VisualUiController.invalidate();
         requireObservation(service, arguments);
         JSONObject selector = arguments.optJSONObject("selector");
         AccessibilityNodeInfo node = selector == null ? findFirstScrollable(service) : findNode(service, selector);
@@ -440,6 +464,21 @@ public final class McpAccessibilityService extends AccessibilityService {
                     "PickPico Accessibility Service is not connected. Enable Hyper Mode and Accessibility access locally.");
         }
         return service;
+    }
+
+    private static JSONObject visualOperation(McpAccessibilityService service, JSONObject args, long count, String kind) throws JSONException {
+        try {
+            if ("type".equals(kind)) return VisualUiController.type(service, args, count);
+            return VisualUiController.gesture(service, args, "swipe".equals(kind), count);
+        } catch (CommandRuntime.CommandInputException error) {
+            throw error;
+        } catch (Exception error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            VisualUiController.invalidate();
+            return new JSONObject().put("status", "unknown").put("isError", true)
+                    .put("error", "visual_action_result_unknown").put("message", error.getClass().getSimpleName())
+                    .put("next", "Capture again before retrying; the action may have happened.");
+        }
     }
 
     private static void appendNode(
