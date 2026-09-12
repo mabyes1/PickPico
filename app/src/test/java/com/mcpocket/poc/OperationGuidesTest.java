@@ -15,7 +15,7 @@ public final class OperationGuidesTest {
 
     @Test public void exactToolLookupOffersGuidesButUnrelatedWorkDoesNot() throws Exception {
         JSONArray matches = new JSONArray().put(new JSONObject().put("id", "ui.type"));
-        assertTrue(has(OperationGuides.search("ui.type", matches), "ui.find_and_fill"));
+        assertEquals(0, OperationGuides.search("ui.type", matches).length());
         assertEquals(0, OperationGuides.search("append file", new JSONArray()
                 .put(new JSONObject().put("id", "workspace.write"))).length());
         assertEquals(0, OperationGuides.search("拍照", new JSONArray()

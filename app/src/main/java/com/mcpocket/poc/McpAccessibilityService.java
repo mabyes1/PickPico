@@ -35,6 +35,7 @@ import android.util.Base64;
 /** Hyper Mode bridge for semantic cross-app Android UI inspection and actions. */
 public final class McpAccessibilityService extends AccessibilityService {
     private static volatile McpAccessibilityService activeInstance;
+    private static final UiObservationStore OBSERVATIONS = new UiObservationStore();
 
     @Override
     protected void onServiceConnected() {
@@ -241,39 +242,72 @@ public final class McpAccessibilityService extends AccessibilityService {
         }
     }
 
-    static JSONObject inspect(JSONObject arguments, long callCount) throws JSONException {
+    static synchronized JSONObject inspect(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
-        List<WindowRoot> roots = windowRoots(service);
-        if (roots.isEmpty()) {
-            return unavailable("No active accessibility window/root is available", callCount);
+        JSONObject snapshot = snapshot(service, arguments.optBoolean("includeInvisible", false));
+        if (!snapshot.optBoolean("available")) return snapshot;
+        int maxNodes = arguments.optInt("maxNodes", 200);
+        int maxDepth = arguments.optInt("maxDepth", 12);
+        int offset = arguments.optInt("offset", 0);
+        boolean compact = arguments.optBoolean("compact", false);
+        String query = arguments.optString("query", "").toLowerCase(java.util.Locale.ROOT);
+        JSONArray all = snapshot.getJSONArray("nodes");
+        JSONArray result = new JSONArray();
+        int matched = 0;
+        for (int i = 0; i < all.length(); i++) {
+            JSONObject node = all.getJSONObject(i);
+            if (node.optInt("depth") > maxDepth) continue;
+            if (compact && !UiObservationStore.meaningful(node)) continue;
+            String searchable = (node.optString("text") + " " + node.optString("contentDescription") + " " + node.optString("viewId")).toLowerCase(java.util.Locale.ROOT);
+            if (!query.isEmpty() && !searchable.contains(query)) continue;
+            if (matched++ < offset) continue;
+            if (result.length() < maxNodes) result.put(compact ? UiObservationStore.compact(node) : node);
         }
-        int maxNodes = clamp(arguments.optInt("maxNodes", 200), 1, 1000);
-        int maxDepth = clamp(arguments.optInt("maxDepth", 12), 1, 30);
-        boolean includeInvisible = arguments.optBoolean("includeInvisible", false);
-        JSONArray nodes = new JSONArray();
-        JSONArray windows = new JSONArray();
-        Counter counter = new Counter(maxNodes);
-        boolean multiWindow = roots.size() > 1;
-        for (WindowRoot windowRoot : roots) {
-            if (counter.remaining <= 0) break;
-            String rootPath = multiWindow ? "w" + windowRoot.windowId + "/0" : "0";
-            appendNode(windowRoot.root, rootPath, 0, maxDepth, includeInvisible, nodes, counter);
-            windows.put(windowRoot.describe());
-        }
-        WindowRoot primary = roots.get(0);
-        return new JSONObject()
-                .put("available", true)
-                .put("packageName", safe(primary.root.getPackageName()))
-                .put("windowTitle", primary.title)
-                .put("windows", windows)
-                .put("nodes", nodes)
-                .put("count", nodes.length())
-                .put("truncated", counter.truncated)
-                .put("toolCallCount", callCount);
+        // The observation always fingerprints the same visible tree, regardless
+        // of the caller's query, page size or detail preferences.
+        JSONObject visible = arguments.optBoolean("includeInvisible", false) ? snapshot(service, false) : snapshot;
+        String observationId = OBSERVATIONS.record(fingerprint(visible), android.os.SystemClock.elapsedRealtime());
+        JSONObject response = new JSONObject().put("available", true)
+                .put("packageName", snapshot.optString("packageName"))
+                .put("windowTitle", snapshot.optString("windowTitle"))
+                .put("observationId", observationId).put("nodes", result).put("count", result.length())
+                .put("matchedCount", matched).put("truncated", offset + result.length() < matched || snapshot.optBoolean("truncated"));
+        if (offset + result.length() < matched) response.put("nextOffset", offset + result.length());
+        if (!compact) response.put("windows", snapshot.getJSONArray("windows"));
+        return response;
     }
 
-    static JSONObject action(JSONObject arguments, long callCount) throws JSONException {
+    private static JSONObject snapshot(McpAccessibilityService service, boolean includeInvisible) throws JSONException {
+        List<WindowRoot> roots = windowRoots(service);
+        if (roots.isEmpty()) return unavailable("No active accessibility window/root is available", 0);
+        JSONArray nodes = new JSONArray();
+        JSONArray windows = new JSONArray();
+        Counter counter = new Counter(4000);
+        boolean multiWindow = roots.size() > 1;
+        for (WindowRoot root : roots) {
+            if (counter.remaining <= 0) { counter.truncated = true; break; }
+            appendNode(root.root, multiWindow ? "w" + root.windowId + "/0" : "0", 0, 30, includeInvisible, nodes, counter);
+            windows.put(root.describe());
+        }
+        return new JSONObject().put("available", true).put("packageName", safe(roots.get(0).root.getPackageName()))
+                .put("windowTitle", roots.get(0).title).put("windows", windows).put("nodes", nodes).put("truncated", counter.truncated);
+    }
+
+    private static String fingerprint(JSONObject snapshot) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(snapshot.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return android.util.Base64.encodeToString(digest, android.util.Base64.NO_WRAP);
+        } catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+    }
+
+    private static void requireObservation(McpAccessibilityService service, JSONObject arguments) throws JSONException {
+        if (arguments.has("observationId")) OBSERVATIONS.consume(arguments.getString("observationId"),
+                fingerprint(snapshot(service, false)), android.os.SystemClock.elapsedRealtime());
+    }
+
+    static synchronized JSONObject action(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
+        requireObservation(service, arguments);
         String action = arguments.optString("action", "");
         if ("back".equals(action) || "home".equals(action) || "recents".equals(action)) {
             int globalAction = "back".equals(action)
@@ -356,8 +390,9 @@ public final class McpAccessibilityService extends AccessibilityService {
         return completed[0];
     }
 
-    static JSONObject type(JSONObject arguments, long callCount) throws JSONException {
+    static synchronized JSONObject type(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
+        requireObservation(service, arguments);
         AccessibilityNodeInfo node = findNode(service, arguments.optJSONObject("selector"));
         if (node == null) {
             return notFound(arguments.optJSONObject("selector"), callCount);
@@ -375,8 +410,9 @@ public final class McpAccessibilityService extends AccessibilityService {
         return result;
     }
 
-    static JSONObject scroll(JSONObject arguments, long callCount) throws JSONException {
+    static synchronized JSONObject scroll(JSONObject arguments, long callCount) throws JSONException {
         McpAccessibilityService service = requireService();
+        requireObservation(service, arguments);
         JSONObject selector = arguments.optJSONObject("selector");
         AccessibilityNodeInfo node = selector == null ? findFirstScrollable(service) : findNode(service, selector);
         if (node == null) {
@@ -488,36 +524,30 @@ public final class McpAccessibilityService extends AccessibilityService {
 
     private static AccessibilityNodeInfo findNode(McpAccessibilityService service, JSONObject selector) {
         List<WindowRoot> roots = windowRoots(service);
-        if (roots.isEmpty()) {
-            return null;
-        }
-        if (selector == null || selector.length() == 0) {
-            return roots.get(0).root;
-        }
+        if (roots.isEmpty()) return null;
+        if (selector == null || selector.length() == 0)
+            throw new CommandRuntime.CommandInputException("INVALID_SELECTOR: supply a path or identifying field from ui_inspect");
         String path = selector.optString("path", "");
         if (!path.isEmpty()) {
             WindowPath windowPath = parseWindowPath(path);
-            if (windowPath != null) {
-                WindowRoot windowRoot = findWindowRoot(roots, windowPath.windowId);
-                AccessibilityNodeInfo byPath = windowRoot == null
-                        ? null
-                        : nodeByPath(windowRoot.root, windowPath.nodePath);
-                if (byPath != null && matches(byPath, selector)) {
-                    return byPath;
-                }
-            } else {
-                AccessibilityNodeInfo byPath = nodeByPath(roots.get(0).root, path);
-                if (byPath != null && matches(byPath, selector)) {
-                    return byPath;
-                }
-            }
+            WindowRoot windowRoot = windowPath == null ? roots.get(0) : findWindowRoot(roots, windowPath.windowId);
+            AccessibilityNodeInfo byPath = windowRoot == null ? null : nodeByPath(windowRoot.root, windowPath == null ? path : windowPath.nodePath);
+            if (byPath != null && matches(byPath, selector)) return byPath;
+            // A supplied path is authoritative. Never fall back to an unrelated node.
+            return null;
         }
-        int wantedInstance = Math.max(0, selector.optInt("instance", 0));
+        boolean identifying = false;
+        for (String key : new String[]{"viewId", "text", "contentDescription", "className"}) identifying |= !selector.optString(key).isEmpty();
+        if (!identifying) throw new CommandRuntime.CommandInputException("INVALID_SELECTOR: instance alone does not identify a target");
+        int wantedInstance = selector.optInt("instance", 0);
+        int limit = selector.has("instance") ? wantedInstance + 1 : 2;
         List<AccessibilityNodeInfo> matches = new ArrayList<>();
         for (WindowRoot root : roots) {
-            collectMatches(root.root, selector, matches, wantedInstance + 1);
-            if (matches.size() > wantedInstance) break;
+            collectMatches(root.root, selector, matches, limit);
+            if (matches.size() >= limit) break;
         }
+        if (!selector.has("instance") && matches.size() > 1)
+            throw new CommandRuntime.CommandInputException("AMBIGUOUS_TARGET: multiple nodes match; use a unique path from ui_inspect; no action was performed");
         return matches.size() > wantedInstance ? matches.get(wantedInstance) : null;
     }
 
@@ -566,6 +596,7 @@ public final class McpAccessibilityService extends AccessibilityService {
     }
 
     private static AccessibilityNodeInfo nodeByPath(AccessibilityNodeInfo root, String path) {
+        if (path == null || !path.matches("0(?:/[0-9]+)*")) return null;
         String[] parts = path.split("/");
         AccessibilityNodeInfo current = root;
         int start = parts.length > 0 && "0".equals(parts[0]) ? 1 : 0;
@@ -632,11 +663,16 @@ public final class McpAccessibilityService extends AccessibilityService {
     }
 
     private static AccessibilityNodeInfo findFirstScrollable(McpAccessibilityService service) {
-        for (WindowRoot root : windowRoots(service)) {
-            AccessibilityNodeInfo found = findFirstScrollable(root.root);
-            if (found != null) return found;
-        }
-        return null;
+        List<AccessibilityNodeInfo> found = new ArrayList<>();
+        for (WindowRoot root : windowRoots(service)) collectScrollable(root.root, found, 0);
+        if (found.size() > 1) throw new CommandRuntime.CommandInputException("AMBIGUOUS_TARGET: multiple scroll containers; use a selector from ui_inspect");
+        return found.isEmpty() ? null : found.get(0);
+    }
+
+    private static void collectScrollable(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> found, int depth) {
+        if (node == null || depth > 30 || found.size() > 1) return;
+        if (node.isScrollable() && node.isVisibleToUser()) found.add(node);
+        for (int i = 0; i < node.getChildCount() && found.size() < 2; i++) collectScrollable(node.getChild(i), found, depth + 1);
     }
 
     private static AccessibilityNodeInfo findFirstScrollable(AccessibilityNodeInfo node) {

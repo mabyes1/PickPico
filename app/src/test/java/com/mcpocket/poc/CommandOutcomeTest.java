@@ -20,7 +20,13 @@ public final class CommandOutcomeTest {
     }
 
     private JSONObject call(String name, JSONObject arguments) throws Exception {
-        arguments = new JSONObject(arguments.toString()).put("agent", "Test Model 1.0");
+        arguments = new JSONObject(arguments.toString());
+        JSONArray listed = tools.list(false, "full").getJSONArray("tools");
+        for (int i = 0; i < listed.length(); i++) {
+            JSONObject tool = listed.getJSONObject(i);
+            if (name.equals(tool.getString("name")) && tool.getJSONObject("inputSchema").getJSONObject("properties").has("agent"))
+                arguments.put("agent", "Test Model 1.0");
+        }
         return tools.call(new JSONObject().put("name", name).put("arguments", arguments),
                 false, "full", 1L);
     }
@@ -118,5 +124,12 @@ public final class CommandOutcomeTest {
                 .put("timedOut", true).put("stdinError", "old input failure")));
         assertTrue(CommandOutcome.isFailure("process.stop", new JSONObject()
                 .put("sessionId", "test-session").put("running", true).put("stopRequested", true)));
+    }
+
+    @Test public void pendingAndRunningOperationsAreNotReportedCompleted() throws Exception {
+        assertEquals("waiting_user", CommandOutcome.executionStatus(new JSONObject().put("status", "pending_user_action")));
+        assertEquals("waiting_user", CommandOutcome.executionStatus(new JSONObject().put("requiresUserAction", true)));
+        assertEquals("running", CommandOutcome.executionStatus(new JSONObject().put("running", true)));
+        assertEquals("failed", CommandOutcome.executionStatus(new JSONObject().put("isError", true)));
     }
 }

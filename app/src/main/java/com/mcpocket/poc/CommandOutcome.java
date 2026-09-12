@@ -7,6 +7,17 @@ final class CommandOutcome {
     private CommandOutcome() {
     }
 
+    static String executionStatus(JSONObject result) {
+        String status = result.optString("status");
+        if ("unknown".equals(status)) return "unknown";
+        if (result.optBoolean("isError")) return "failed";
+        if ("waiting_human".equals(status)) return "waiting_human";
+        if ("pending_user_action".equals(status) || result.optBoolean("requiresUserAction")) return "waiting_user";
+        if (result.optBoolean("running") || "running".equals(status) || "queued".equals(status)
+                || "downloading".equals(status) || "installing".equals(status)) return "running";
+        return "completed";
+    }
+
     static boolean isFailure(String commandId, JSONObject result) {
         if (result == null) return true;
         // These commands describe state; a stopped process or a previous error

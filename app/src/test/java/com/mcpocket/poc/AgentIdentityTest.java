@@ -122,7 +122,7 @@ public final class AgentIdentityTest {
                     checked++;
                 }
             }
-            assertEquals("full".equals(profile) ? 3 : 2, checked);
+            assertEquals(3, checked);
         }
     }
 

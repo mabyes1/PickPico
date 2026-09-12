@@ -126,7 +126,11 @@ final class AgentTaskRuntime {
 
         JSONArray recent = new JSONArray();
         for (Map.Entry<String, JSONObject> entry : tasks.entrySet()) {
-            recent.put(copy(entry.getValue()));
+            JSONObject summary = new JSONObject();
+            JSONObject task = entry.getValue();
+            for (String key : new String[]{"taskId", "objective", "agent", "status", "createdAt", "updatedAt", "step", "progress", "blocker"})
+                if (task.has(key)) summary.put(key, task.opt(key));
+            recent.put(summary);
         }
         return new JSONObject().put("tasks", recent).put("count", recent.length());
     }

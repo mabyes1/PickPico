@@ -27,6 +27,7 @@ final class OperationGuides {
     static JSONArray search(String query, JSONArray capabilities) throws JSONException {
         String normalized = query == null ? "" : query.toLowerCase(Locale.ROOT);
         JSONArray result = new JSONArray();
+        if (normalized.matches("[a-z]+\\.[a-z_]+") && !normalized.equals("app.operate") && !normalized.equals("ui.find_and_fill") && !normalized.equals("ui.recover")) return result;
         for (String[] guide : GUIDES) {
             boolean matched = normalized.trim().isEmpty() || normalized.contains(guide[0]);
             for (String keyword : guide[3].split(" ")) {
@@ -45,6 +46,7 @@ final class OperationGuides {
                 }
             }
             if (matched) result.put(summary(guide));
+            if (result.length() == 1 && !normalized.trim().isEmpty()) break;
         }
         return result;
     }
@@ -53,13 +55,13 @@ final class OperationGuides {
         for (String[] guide : GUIDES) {
             if (!guide[0].equals(id)) continue;
             JSONObject result = summary(guide)
-                    .put("revision", 1)
+                    .put("revision", 2)
                     .put("kind", "adaptive_guidance")
                     .put("principle", "依目前畫面選擇下一步，不是逐項照跑。指南不是權限授予，也不代表列出的工具目前可用。已讀過同版指南可沿用；工具狀態仍以當下回傳為準。")
                     .put("capabilityIds", new JSONArray(guide[4].split(" ")))
                     .put("rules", new JSONArray(new String[]{
-                        "先搜尋是否有直接完成需求的能力；確認其效果符合需求後使用，避免不必要的畫面操作。不要猜未提供的 API、參數或座標操作。",
-                        "採用觀察 → 一個會改變畫面的操作 → 再觀察。畫面切換、捲動或彈窗出現後，重新取得元件；不要沿用舊 path 或舊截圖位置。",
+                        "優先使用已提供完整參數的直接工具；其餘從短索引選 ID，用 capability_status 取得規格。只有不確定能力時才用短英文關鍵字搜尋。",
+                        "觀察 → 一個畫面操作 → 再觀察。直接 UI 工具帶入最新 observationId 與唯一目標；畫面改變後重新取得，不沿用舊 path。",
                         "呼叫 completed 或成功只代表該次工具執行結束，不等於使用者任務完成。以目標畫面、欄位內容或可查證的結果驗證。",
                         "對相同畫面、相同目標，連續兩次操作沒有進展就停止同法重試，重新診斷或改用其他可用能力。",
                         "呼叫逾時或連線中斷時，先觀察是否已生效，再決定重試；尤其送出、付款、建立資料等操作不能盲目重送。",
@@ -73,10 +75,10 @@ final class OperationGuides {
     }
 
     private static JSONObject summary(String[] guide) throws JSONException {
-        return new JSONObject().put("id", guide[0]).put("title", guide[1]).put("summary", guide[2])
+        return new JSONObject().put("id", guide[0]).put("revision", 2).put("title", guide[1]).put("summary", guide[2])
                 .put("readWith", new JSONObject().put("tool", "command_run")
                         .put("requiredCallerArguments", new JSONArray().put("agent"))
-                        .put("instruction", "Add your actual model name/version as agent alongside commandId before calling this template.").put("arguments",
+                        .put("arguments",
                         new JSONObject().put("commandId", "guide.get").put("arguments", new JSONObject().put("guideId", guide[0]))));
     }
 

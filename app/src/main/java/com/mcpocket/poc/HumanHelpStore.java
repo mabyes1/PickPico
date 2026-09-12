@@ -103,6 +103,13 @@ final class HumanHelpStore {
         save(context, request);
         postRequestNotification(context, request);
 
+        if (!"approval".equals(requestType) && !arguments.optBoolean("wait", true)) {
+            return publicResult(context, request, false, callCount)
+                    .put("next", new JSONObject().put("tool", "human_help_status")
+                            .put("arguments", new JSONObject().put("requestId", requestId).put("waitMs", 25000))
+                            .put("requiredCallerArguments", new JSONArray().put("agent")));
+        }
+
         JSONObject current = request;
         while ("waiting_human".equals(current.optString("status"))) {
             SystemClock.sleep(250L);
@@ -124,7 +131,19 @@ final class HumanHelpStore {
 
     static JSONObject status(Context context, String requestId, boolean includeAttachmentData, long callCount)
             throws JSONException {
+        return status(context, requestId, includeAttachmentData, 0, callCount);
+    }
+
+    static JSONObject status(Context context, String requestId, boolean includeAttachmentData, int waitMs, long callCount)
+            throws JSONException {
         JSONObject request = load(context, requestId);
+        long deadline = SystemClock.elapsedRealtime() + Math.min(25000, Math.max(0, waitMs));
+        while (request != null && "waiting_human".equals(request.optString("status")) && SystemClock.elapsedRealtime() < deadline) {
+            if (Thread.currentThread().isInterrupted()) break;
+            RelayRequestScope.checkCurrent();
+            SystemClock.sleep(Math.min(200, Math.max(1, deadline - SystemClock.elapsedRealtime())));
+            request = load(context, requestId);
+        }
         if (request == null) {
             return new JSONObject()
                     .put("requestId", requestId)

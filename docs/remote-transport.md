@@ -39,14 +39,17 @@ Local MCP 另外監聽 `0.0.0.0:8765`，同時供區域網路與 loopback 使用
 
 對 `/v3` 請求，Relay 加入 `X-PickPico-Tool-Profile: thin-v1`，由手機選擇工具清單。版本路徑不會建立另一支手機或另一份能力執行器。
 
-目前精簡清單為：
+0.16.75 起沿用 `thin-v1` 路由名稱，提供 30 個混合入口：12 個既有管理／探索工具，加上 18 個直接能力。完整分類見 [能力入口方案](mcp-tool-exposure-plan-2026-09-12.md)。
 
 ```text
-server_info          capability_search    capability_status
-policy_status        command_run          command_status
-task_runtime_info    task_create          task_update
-task_status
+server_info capability_search capability_list capability_status policy_status
+command_run command_status caller_register task_runtime_info task_create task_update task_status
+phone_status phone_wake phone_home camera_capture phone_speak human_help human_help_status
+notification_list notification_reply ui_inspect ui_action ui_type ui_scroll screen_capture
+app_list app_launch url_open location_get
 ```
+
+`command_run.commandId` 列出全部 60 個合法 ID，說明包含其餘 38 個能力的短索引。直接 UI 動作必須帶最新 `observationId`；舊動態 ID 保留可選版本參數。`human_help` 預設先回傳 requestId，透過 `human_help_status` 接續；舊動態呼叫仍預設等待。新舊操作入口均要求 `agent` 模型名稱。
 
 ## 三種憑證，各自做什麼
 

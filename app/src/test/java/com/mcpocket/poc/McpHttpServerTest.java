@@ -338,7 +338,7 @@ public final class McpHttpServerTest {
                 .getJSONObject("properties")
                 .getJSONObject("commandId");
         assertEquals("string", commandIdSchema.getString("type"));
-        assertTrue(!commandIdSchema.has("enum"));
+        assertEquals(60, commandIdSchema.getJSONArray("enum").length());
     }
 
     @Test
@@ -349,7 +349,7 @@ public final class McpHttpServerTest {
         assertEquals(200, list.status);
         JSONObject listed = new JSONObject(list.body).getJSONObject("result");
         JSONArray tools = listed.getJSONArray("tools");
-        assertEquals(12, tools.length());
+        assertEquals(30, tools.length());
         assertTrue(tools.toString().contains("caller_register"));
         assertEquals("thin-v1", listed.getString("toolProfile"));
         String toolText = tools.toString();
@@ -358,7 +358,7 @@ public final class McpHttpServerTest {
         assertTrue(toolText.contains("command_run"));
         assertTrue(toolText.contains("task_create"));
         assertTrue(toolText.contains("server_info"));
-        assertTrue(!toolText.contains("camera_capture"));
+        assertTrue(toolText.contains("camera_capture"));
         assertTrue(!toolText.contains("exec_command"));
 
         capabilityStateProbeCount.set(0);
@@ -442,7 +442,7 @@ public final class McpHttpServerTest {
                         "\"params\":{\"name\":\"camera_capture\",\"arguments\":{}}}",
                 thinHeaders());
         assertEquals(200, directLegacyTool.status);
-        assertTrue(new JSONObject(directLegacyTool.body)
+        org.junit.Assert.assertFalse(new JSONObject(directLegacyTool.body)
                 .getJSONObject("result")
                 .getBoolean("isError"));
     }
@@ -971,7 +971,8 @@ public final class McpHttpServerTest {
                 if (params != null) {
                     JSONObject arguments = params.optJSONObject("arguments");
                     if (arguments == null) arguments = new JSONObject();
-                    if (!arguments.has("agent")) arguments.put("agent", "Test Model 1.0");
+                    if (!java.util.Arrays.asList("server_info", "capability_search", "capability_list", "capability_status", "policy_status", "command_list", "command_status", "caller_register", "task_runtime_info", "task_status", "task_update").contains(params.optString("name"))
+                            && !arguments.has("agent")) arguments.put("agent", "Test Model 1.0");
                     params.put("arguments", arguments);
                     body = request.toString();
                 }

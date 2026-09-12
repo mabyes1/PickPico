@@ -91,10 +91,10 @@ final class CommandRuntime {
                     JSONArray states = new JSONArray();
                     for (int i = 0; i < ids.length(); i++) {
                         String id = ids.getString(i);
-                        states.put(new JSONObject().put("id", id).put("state", actions.capabilityState(id)));
+                        states.put(new JSONObject().put("id", id).put("state", compactState(actions.capabilityState(id))));
                     }
                     return guide.put("capabilityStates", states)
-                            .put("stateHint", "States are a snapshot, not permission or a guarantee. Search the exact capability ID for its current input schema before an unfamiliar call.");
+                            .put("stateHint", "Use direct tools, or capability_status(id) for exact parameters. Availability is a snapshot, not authorization.");
                 });
         register(
                 "node.info",
@@ -799,7 +799,7 @@ final class CommandRuntime {
                 workspaceReadSchema(),
                 (arguments, callCount) -> {
                     validateWorkspacePath(arguments.optString("path", ""));
-                    int maxBytes = arguments.optInt("maxBytes", 262144);
+                    int maxBytes = arguments.optInt("maxBytes", 8192);
                     if (maxBytes < 1 || maxBytes > 1048576) {
                         throw new CommandInputException("workspace.read maxBytes must be between 1 and 1048576");
                     }
@@ -969,15 +969,21 @@ final class CommandRuntime {
         String group = arguments == null ? "" : arguments.optString("group", "").trim();
         boolean availableOnly = arguments != null && arguments.optBoolean("availableOnly", false);
         boolean includeSchema = arguments == null || arguments.optBoolean("includeSchema", true);
-        int limit = arguments == null ? 8 : arguments.optInt("limit", 8);
+        int limit = arguments == null ? 3 : arguments.optInt("limit", 3);
         limit = Math.max(1, Math.min(20, limit));
 
         List<SearchMatch> matches = new ArrayList<>();
+        String exactId = commands.containsKey(query) ? query : "";
+        java.util.Set<String> preferred = CapabilityIndex.preferred(query);
         for (Command command : commands.values()) {
+            if (!actions.isCommandExposed(command.id)) continue;
+            if (!exactId.isEmpty() && !exactId.equals(command.id)) continue;
+            if (exactId.isEmpty() && !preferred.isEmpty() && !preferred.contains(command.id)) continue;
             if (!category.isEmpty() && !category.equalsIgnoreCase(command.category)) {
                 continue;
             }
             int score = searchScore(query, command);
+            if (preferred.contains(command.id)) score = 2000 - new ArrayList<>(preferred).indexOf(command.id);
             if (!query.isEmpty() && score <= 0) {
                 continue;
             }
@@ -1010,28 +1016,10 @@ final class CommandRuntime {
             }
             Command command = match.command;
             JSONObject state = match.state;
-            JSONObject item = new JSONObject()
-                    .put("id", command.id)
-                    .put("description", command.description)
-                    .put("category", command.category)
-                    .put("risk", command.risk)
-                    .put("sideEffect", command.sideEffect)
-                    .put("group", state.optString("group", "core"))
-                    .put("supported", state.optBoolean("supported", true))
-                    .put("enabled", state.optBoolean("enabled", true))
-                    .put("available", state.optBoolean("available", false))
-                    .put("state", state.optString("state", "unknown"))
-                    .put("requiresSetup", state.optBoolean("requiresSetup", false))
-                    .put("userInteractionRequired", state.optBoolean("userInteractionRequired", false))
-                    .put("score", match.score);
-            if (state.has("setupType")) {
-                item.put("setupType", state.opt("setupType"));
-            }
-            if (state.has("reason")) {
-                item.put("reason", state.optString("reason", ""));
-            }
+            JSONObject item = capabilityDescriptor(command);
+            merge(item, compactState(state));
             if (includeSchema) {
-                item.put("inputSchema", command.inputSchema);
+                item.put("inputSchema", schema(command.id));
             }
             result.put(item);
         }
@@ -1042,9 +1030,46 @@ final class CommandRuntime {
                 .put("count", result.length())
                 .put("totalCandidates", matches.size())
                 .put("fallbackRecommended", !query.isEmpty() && result.length() == 0)
-                .put("guides", OperationGuides.search(query, result))
+                .put("schemaVersion", BuildConfig.VERSION_NAME)
+                .put("guides", exactId.isEmpty() ? OperationGuides.search(query, new JSONArray()) : new JSONArray())
                 .put("discoveryHint",
-                        "Capabilities are dynamic. For multi-step app/UI tasks, read a relevant guide with command_run guide.get before acting. Guides are advice, independent of capability filters; their tools may require setup. Search is an optimization, not proof of absence: if no reasonable match is returned, call capability_list before concluding that an action is unsupported.");
+                        result.length() == 0 ? "Use capability_list for the complete index; then capability_status(id)."
+                                : "Prefer direct tools. capability_status(id) returns the exact schema; reuse until schemaVersion changes.");
+    }
+
+    JSONArray commandIds() { return new JSONArray(commands.keySet()); }
+
+    JSONObject schema(String id) throws JSONException {
+        Command command = commands.get(id);
+        if (command == null) throw new CommandInputException("Unknown capability: " + id);
+        JSONObject schema = new JSONObject(command.inputSchema.toString());
+        if ("human.help".equals(id)) schema.getJSONObject("properties").getJSONObject("wait").put("default", false);
+        if ("ui.inspect".equals(id)) schema.getJSONObject("properties").getJSONObject("compact").put("default", true);
+        if (id.equals("ui.action") || id.equals("ui.type") || id.equals("ui.scroll")) {
+            JSONArray required = schema.optJSONArray("required");
+            if (required == null) required = new JSONArray();
+            schema.put("required", required.put("observationId"));
+        }
+        return schema;
+    }
+
+    String dynamicIndex() {
+        StringBuilder index = new StringBuilder();
+        for (String id : commands.keySet()) {
+            if ("command_run".equals(CapabilityIndex.tool(id)))
+                index.append("\n").append(id).append(": ").append(CapabilityIndex.label(id));
+        }
+        return index.toString();
+    }
+
+    static JSONObject compactState(JSONObject state) throws JSONException {
+        JSONObject result = new JSONObject().put("state", state.optString("state", "unknown"))
+                .put("available", state.optBoolean("available", false));
+        for (String key : new String[]{"reason", "setupType", "captureMode"})
+            if (state.has(key) && !state.isNull(key)) result.put(key, state.opt(key));
+        if (state.optBoolean("requiresSetup")) result.put("requiresSetup", true);
+        if (state.optBoolean("userInteractionRequired")) result.put("userInteractionRequired", true);
+        return result;
     }
 
     JSONObject execute(String commandId, JSONObject arguments, long callCount) throws JSONException {
@@ -1071,7 +1096,7 @@ final class CommandRuntime {
             JSONObject execution = new JSONObject()
                     .put("executionId", executionId)
                     .put("commandId", commandId)
-                    .put("status", result.optBoolean("isError", false) ? "failed" : "completed")
+                    .put("status", CommandOutcome.executionStatus(result))
                     .put("isError", result.optBoolean("isError", false))
                     .put("startedAt", startedAt)
                     .put("completedAt", Instant.now().toString())
@@ -1106,7 +1131,10 @@ final class CommandRuntime {
 
         JSONArray recent = new JSONArray();
         for (JSONObject execution : history.values()) {
-            recent.put(new JSONObject(execution.toString()));
+            JSONObject summary = new JSONObject();
+            for (String key : new String[]{"executionId", "commandId", "agent", "status", "isError", "startedAt", "completedAt"})
+                if (execution.has(key)) summary.put(key, execution.opt(key));
+            recent.put(summary);
         }
         return new JSONObject()
                 .put("recent", recent)
@@ -1277,6 +1305,18 @@ final class CommandRuntime {
 
     private JSONObject invoke(Command command, JSONObject arguments, long callCount) throws JSONException {
         RelayRequestScope.checkCurrent();
+        ToolSchemaValidator.validate(command.inputSchema, arguments, "arguments");
+        validateBeforeApproval(command.id, arguments);
+        JSONObject state = actions.capabilityState(command.id);
+        if (!state.optBoolean("available", false)) {
+            return new JSONObject().put("isError", true).put("status", "blocked")
+                    .put("error", new JSONObject().put("code", "CAPABILITY_UNAVAILABLE")
+                            .put("message", state.optString("reason", "Capability is not available"))
+                            .put("retryable", false).put("executionState", "not_started"))
+                    .put("state", compactState(state))
+                    .put("next", new JSONObject().put("tool", "capability_status")
+                            .put("arguments", new JSONObject().put("id", command.id)));
+        }
         // Every capability funnels through here. Android uses these lifecycle
         // hooks to keep the display awake for the whole Agent operation and to
         // renew a short idle lease after the command finishes. The finish hook
@@ -1285,6 +1325,7 @@ final class CommandRuntime {
         actions.onAgentCommandStarted(command.id);
         long pulseId = HomePulse.begin(command.id, AgentIdentity.current());
         boolean pulseFailed = true;
+        boolean dispatched = false;
         try {
             if (requiresApproval(command)) {
                 JSONObject approval = actions.requestApproval(
@@ -1302,15 +1343,46 @@ final class CommandRuntime {
             // Approval may have waited across a network change. Do not execute
             // the old operation just because a human eventually approved it.
             RelayRequestScope.checkCurrent();
+            dispatched = true;
             JSONObject result = command.handler.call(arguments, callCount);
             if (result == null) throw new IllegalStateException("Command returned no result: " + command.id);
             pulseFailed = CommandOutcome.isFailure(command.id, result);
             if (!AgentIdentity.current().isEmpty()) result.put("agent", AgentIdentity.current());
             return result.put("isError", pulseFailed);
+        } catch (CommandInputException error) {
+            throw error;
+        } catch (RelayRequestScope.CancelledException error) {
+            if (!dispatched) throw error;
+            return new JSONObject().put("isError", true).put("status", "unknown")
+                    .put("error", new JSONObject().put("code", "RESULT_UNKNOWN").put("message", error.getMessage())
+                            .put("executionState", "unknown").put("retryable", false))
+                    .put("next", "Verify current device state before retrying; the action may have happened.");
+        } catch (Exception error) {
+            boolean unknown = dispatched && command.sideEffect;
+            return new JSONObject().put("isError", true).put("status", unknown ? "unknown" : "failed")
+                    .put("error", new JSONObject().put("code", unknown ? "RESULT_UNKNOWN" : "EXECUTION_FAILED")
+                            .put("message", error.getClass().getSimpleName() + ": " + error.getMessage())
+                            .put("executionState", unknown ? "unknown" : dispatched ? "failed" : "not_started")
+                            .put("retryable", false))
+                    .put("next", unknown ? "Verify current device state before retrying; the action may have happened." : "Inspect the error before retrying.");
         } finally {
             HomePulse.finish(pulseId, pulseFailed);
             actions.onAgentCommandFinished(command.id);
         }
+    }
+
+    private static void validateBeforeApproval(String id, JSONObject args) {
+        if (id.startsWith("workspace.") && !id.equals("workspace.info")) validateWorkspacePath(args.optString("path", "."));
+        if (id.equals("node.start")) validateWorkspacePath(args.optString("entry"));
+        if (id.equals("process.exec")) validateExecArguments(args);
+        if (id.equals("contacts.get")) validateNumericId(args.optString("id"), "contacts.get id");
+        if (id.equals("calendar.get") || id.equals("calendar.update") || id.equals("calendar.delete")) validateNumericId(args.optString("eventId"), "eventId");
+        if (id.equals("calendar.create") || id.equals("calendar.update")) validateCalendarTimes(args, id.equals("calendar.create"));
+        if (id.equals("calendar.create") && args.has("calendarId")) validateNumericId(args.optString("calendarId"), "calendarId");
+        if (id.equals("file.pick") || id.equals("media.pick")) validatePickerArguments(args);
+        if (id.equals("share.send") && args.has("workspacePath")) validateWorkspacePath(args.optString("workspacePath"));
+        if (id.equals("ui.action") && !java.util.Arrays.asList("back", "home", "recents").contains(args.optString("action")) && !args.has("selector"))
+            throw new ToolSchemaValidator.Invalid("arguments.selector", "required for node actions");
     }
 
     private boolean requiresApproval(Command command) {
@@ -1338,8 +1410,9 @@ final class CommandRuntime {
     private JSONObject capabilityList(long callCount) throws JSONException {
         JSONArray capabilities = new JSONArray();
         for (Command command : commands.values()) {
+            if (!actions.isCommandExposed(command.id)) continue;
             JSONObject item = capabilityDescriptor(command);
-            merge(item, actions.capabilityState(command.id));
+            merge(item, compactState(actions.capabilityState(command.id)));
             capabilities.put(item);
         }
         return new JSONObject()
@@ -1357,17 +1430,26 @@ final class CommandRuntime {
             throw new CommandInputException("Unknown capability: " + capabilityId);
         }
         JSONObject result = capabilityDescriptor(command);
-        merge(result, actions.capabilityState(command.id));
-        return result.put("toolCallCount", callCount);
+        merge(result, compactState(actions.capabilityState(command.id)));
+        result.put("inputSchema", schema(capabilityId)).put("schemaVersion", BuildConfig.VERSION_NAME);
+        JSONObject call = new JSONObject().put("tool", CapabilityIndex.tool(capabilityId));
+        JSONObject args = new JSONObject();
+        if ("command_run".equals(call.getString("tool"))) args.put("commandId", capabilityId).put("arguments", new JSONObject());
+        else if ("capability_status".equals(call.getString("tool"))) args.put("id", capabilityId);
+        if (CapabilityIndex.DIRECT.contains(capabilityId) || "command_run".equals(call.getString("tool")))
+            call.put("requiredCallerArguments", new JSONArray().put("agent"));
+        call.put("arguments", args).put("template", true);
+        return result.put("call", call);
     }
 
     private static JSONObject capabilityDescriptor(Command command) throws JSONException {
         return new JSONObject()
                 .put("id", command.id)
-                .put("description", command.description)
+                .put("description", CapabilityIndex.label(command.id))
                 .put("category", command.category)
                 .put("risk", command.risk)
                 .put("sideEffect", command.sideEffect)
+                .put("tool", CapabilityIndex.tool(command.id))
                 .put("group", AndroidCapabilityRegistry.isHyperCommand(command.id) ? "hyper" : "core");
     }
 
@@ -1585,6 +1667,8 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
+                        .put("wait", new JSONObject().put("type", "boolean").put("default", true)
+                                .put("description", "False returns requestId immediately. Legacy dynamic calls default to waiting."))
                         .put("title", new JSONObject()
                                 .put("type", "string")
                                 .put("maxLength", 160)
@@ -1624,6 +1708,7 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
+                        .put("waitMs", new JSONObject().put("type", "integer").put("minimum", 0).put("maximum", 25000).put("default", 0))
                         .put("requestId", new JSONObject()
                                 .put("type", "string")
                                 .put("minLength", 1)
@@ -1699,6 +1784,10 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
+                        .put("compact", new JSONObject().put("type", "boolean").put("default", false))
+                        .put("query", new JSONObject().put("type", "string").put("maxLength", 200)
+                                .put("description", "Filter visible text, description or view ID; not instructions to the device."))
+                        .put("offset", new JSONObject().put("type", "integer").put("minimum", 0).put("maximum", 4000).put("default", 0))
                         .put("maxNodes", new JSONObject()
                                 .put("type", "integer")
                                 .put("minimum", 1)
@@ -1719,6 +1808,7 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
+                        .put("observationId", observationSchema())
                         .put("action", new JSONObject()
                                 .put("type", "string")
                                 .put("enum", new JSONArray()
@@ -1738,6 +1828,7 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
+                        .put("observationId", observationSchema())
                         .put("selector", uiSelectorSchema())
                         .put("text", new JSONObject()
                                 .put("type", "string")
@@ -1753,6 +1844,7 @@ final class CommandRuntime {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
+                        .put("observationId", observationSchema())
                         .put("selector", uiSelectorSchema())
                         .put("direction", new JSONObject()
                                 .put("type", "string")
@@ -1783,9 +1875,15 @@ final class CommandRuntime {
                 .put("additionalProperties", false);
     }
 
+    private static JSONObject observationSchema() throws JSONException {
+        return new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 100)
+                .put("description", "One-action observationId from the latest ui_inspect. Re-inspect after any UI change.");
+    }
+
     private static JSONObject uiSelectorSchema() throws JSONException {
         return new JSONObject()
                 .put("type", "object")
+                .put("minProperties", 1)
                 .put("properties", new JSONObject()
                         .put("path", new JSONObject()
                                 .put("type", "string")
@@ -2086,7 +2184,9 @@ final class CommandRuntime {
                                 .put("type", "integer")
                                 .put("minimum", 1)
                                 .put("maximum", 1048576)
-                                .put("default", 262144)))
+                                .put("default", 8192))
+                        .put("offset", new JSONObject().put("type", "integer").put("minimum", 0).put("default", 0))
+                        .put("version", new JSONObject().put("type", "string").put("description", "Reuse the version returned by the previous chunk; changed files are rejected.")))
                 .put("required", new JSONArray().put("path"))
                 .put("additionalProperties", false);
     }
@@ -2118,6 +2218,11 @@ final class CommandRuntime {
                         .put("type", "string")
                         .put("minLength", 1)
                         .put("maxLength", 128));
+        if (!includeForce) {
+            properties.put("stdoutOffset", new JSONObject().put("type", "integer").put("minimum", 0).put("default", 0))
+                    .put("stderrOffset", new JSONObject().put("type", "integer").put("minimum", 0).put("default", 0))
+                    .put("maxChars", new JSONObject().put("type", "integer").put("minimum", 2).put("maximum", 65536).put("default", 8192));
+        }
         if (includeForce) {
             properties.put("force", new JSONObject()
                     .put("type", "boolean")
@@ -2289,7 +2394,7 @@ final class CommandRuntime {
         }
     }
 
-    static final class CommandInputException extends RuntimeException {
+    static class CommandInputException extends RuntimeException {
         CommandInputException(String message) {
             super(message);
         }

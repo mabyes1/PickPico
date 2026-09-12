@@ -852,7 +852,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public JSONObject readProcessOutput(JSONObject arguments, long callCount) throws JSONException {
         String sessionId = arguments.optString("sessionId", "");
-        return processSessionResult(requireProcessSession(sessionId), callCount);
+        return PagedOutput.process(processSessionResult(requireProcessSession(sessionId), callCount), arguments);
     }
 
     @Override
@@ -925,34 +925,10 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public JSONObject workspaceReadFile(JSONObject arguments, long callCount) throws JSONException {
         String path = arguments.optString("path", "");
-        int maxBytes = arguments.optInt("maxBytes", 262144);
         try {
             File target = resolveWorkspacePath(path);
-            if (!target.isFile()) {
-                throw new CommandRuntime.CommandInputException("Workspace file does not exist: " + path);
-            }
-            byte[] bytes;
-            boolean truncated;
-            try (FileInputStream input = new FileInputStream(target);
-                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-                byte[] buffer = new byte[8192];
-                int remaining = maxBytes;
-                int read;
-                while (remaining > 0
-                        && (read = input.read(buffer, 0, Math.min(buffer.length, remaining))) >= 0) {
-                    output.write(buffer, 0, read);
-                    remaining -= read;
-                }
-                truncated = input.read() >= 0;
-                bytes = output.toByteArray();
-            }
-            return new JSONObject()
-                    .put("path", workspaceRelativePath(target))
-                    .put("content", new String(bytes, StandardCharsets.UTF_8))
-                    .put("bytesRead", bytes.length)
-                    .put("sizeBytes", target.length())
-                    .put("truncated", truncated)
-                    .put("toolCallCount", callCount);
+            if (!target.isFile()) throw new CommandRuntime.CommandInputException("Workspace file does not exist: " + path);
+            return PagedOutput.file(target, arguments).put("path", workspaceRelativePath(target)).put("toolCallCount", callCount);
         } catch (IOException error) {
             throw new CommandRuntime.CommandInputException("Unable to read workspace file: " + error.getMessage());
         }
@@ -1404,6 +1380,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 this,
                 arguments.optString("requestId", ""),
                 arguments.optBoolean("includeAttachmentData", true),
+                arguments.optInt("waitMs", 0),
                 callCount);
     }
 
@@ -2333,7 +2310,10 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
 
         String text() {
-            return new String(captured.toByteArray(), StandardCharsets.UTF_8);
+            try {
+                return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.IGNORE)
+                        .decode(java.nio.ByteBuffer.wrap(captured.toByteArray())).toString();
+            } catch (java.nio.charset.CharacterCodingException impossible) { return ""; }
         }
 
         boolean truncated() {
