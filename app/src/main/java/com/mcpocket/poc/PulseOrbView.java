@@ -23,6 +23,8 @@ final class PulseOrbView extends View {
     private final Path wave = new Path();
     private PickPicoTheme.State theme;
     private RuntimeShader fluid;
+    private RuntimeShader flame;
+    private boolean flameLoadAttempted;
     private long lastFrame;
     private long modeStartedAt = SystemClock.uptimeMillis();
     private float flowTime;
@@ -55,6 +57,22 @@ final class PulseOrbView extends View {
     void setResumed(boolean value) { resumed = value; lastFrame = 0; if (value) invalidate(); }
     void setTheme(PickPicoTheme.State value) { theme = value; invalidate(); }
 
+    boolean isFlameAvailable() {
+        if (Build.VERSION.SDK_INT < 33) return false;
+        if (!flameLoadAttempted) {
+            flameLoadAttempted = true;
+            try (InputStream input = getContext().getAssets().open("flame-orb.agsl")) {
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                byte[] buffer = new byte[4096]; int count;
+                while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                flame = new RuntimeShader(bytes.toString(StandardCharsets.UTF_8.name()));
+            } catch (Exception error) {
+                android.util.Log.e("PickPicoOrb", "Flame shader unavailable; keeping original orb", error);
+            }
+        }
+        return flame != null;
+    }
+
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         boolean animate = resumed && isShown() && getWindowVisibility() == VISIBLE && ValueAnimator.areAnimatorsEnabled();
@@ -75,27 +93,35 @@ final class PulseOrbView extends View {
         if (pulseScale != 1f) {
             canvas.scale(pulseScale, pulseScale, getWidth() * .5f, getHeight() * .5f);
         }
-        if (Build.VERSION.SDK_INT >= 33 && fluid != null && canvas.isHardwareAccelerated()) {
-            fluid.setFloatUniform("resolution", (float)getWidth(), (float)getHeight());
-            fluid.setFloatUniform("time", t);
-            fluid.setFloatUniform("energy",
+        boolean useFlame = PickPicoTheme.ORB_FLAME.equals(theme.orbStyle) && isFlameAvailable();
+        RuntimeShader activeShader = useFlame ? flame : fluid;
+        if (Build.VERSION.SDK_INT >= 33 && activeShader != null && canvas.isHardwareAccelerated()) {
+            activeShader.setFloatUniform("resolution", (float)getWidth(), (float)getHeight());
+            activeShader.setFloatUniform("time", t);
+            activeShader.setFloatUniform("energy",
                     mode.equals(PicoOrbState.COMPLETED) || mode.equals(PicoOrbState.HUMAN_HELP) ? 1.08f : 1f);
-            fluid.setFloatUniform("tension", mode.equals(PicoOrbState.RUNNING) ? .58f
+            activeShader.setFloatUniform("tension", mode.equals(PicoOrbState.RUNNING) ? .58f
                     : mode.equals(PicoOrbState.HUMAN_HELP) ? .35f : 0f);
-            fluid.setColorUniform("primary", accent);
-            fluid.setColorUniform("secondary", secondary);
+            // Flame keeps the chosen theme pigments; semantic alerts still use
+            // their existing rings, heartbeat, timing, and completion ripple.
+            activeShader.setColorUniform("primary", useFlame ? theme.colorA : accent);
+            activeShader.setColorUniform("secondary", useFlame
+                    ? (theme.gradient ? theme.colorB : theme.colorA) : secondary);
             // Drawing helpers such as blocked/completed ripples use STROKE. Paint is stateful,
             // so always restore the fluid body contract before drawing the next frame.
             paint.setStyle(Paint.Style.FILL);
             paint.setAlpha(255);
-            paint.setShader(fluid);
+            paint.setShader(activeShader);
             canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
             paint.setShader(null);
-            drawSparks(canvas, t, accent);
+            if (!useFlame) drawSparks(canvas, t, accent);
             drawBlockedAlert(canvas, now, accent);
             drawCompletedRipple(canvas, now);
             canvas.restoreToCount(pulseSave);
-            if (animate) postInvalidateOnAnimation();
+            if (animate) {
+                if (useFlame) postInvalidateDelayed(33L);
+                else postInvalidateOnAnimation();
+            }
             return;
         }
         float cx = getWidth() / 2f, cy = getHeight() / 2f;

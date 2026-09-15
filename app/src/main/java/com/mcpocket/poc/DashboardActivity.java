@@ -162,6 +162,10 @@ public final class DashboardActivity extends Activity {
     private SeekBar appearanceBackgroundIntensity;
     private TextView appearanceBackgroundValue;
     private View appearancePreview;
+    private PulseOrbView appearanceOrbPreview;
+    private TextView originalOrbChoice;
+    private TextView flameOrbChoice;
+    private String appearanceOrbStyle;
 
     // Remote access
     private EditText relayUrlInput;
@@ -198,12 +202,14 @@ public final class DashboardActivity extends Activity {
     protected void onResume() {
         super.onResume();
         PickPicoTheme.State savedTheme = PickPicoTheme.load(this);
-        if (savedTheme.colorA != theme.colorA || savedTheme.colorB != theme.colorB || savedTheme.gradient != theme.gradient) {
+        if (savedTheme.colorA != theme.colorA || savedTheme.colorB != theme.colorB
+                || savedTheme.gradient != theme.gradient || !savedTheme.orbStyle.equals(theme.orbStyle)) {
             theme = savedTheme;
             themeBackgroundView.setState(theme);
             showPage(currentPage);
         }
         if (pulseOrb != null) pulseOrb.setResumed(true);
+        if (appearanceOrbPreview != null) appearanceOrbPreview.setResumed(true);
         if (topBrandLogo != null) topBrandLogo.setResumed(currentPage == PAGE_HOME);
         refreshMediaForegroundTypesIfRunning();
         refreshPicoOrbServiceIfRunning();
@@ -213,6 +219,7 @@ public final class DashboardActivity extends Activity {
     @Override
     protected void onPause() {
         if (pulseOrb != null) pulseOrb.setResumed(false);
+        if (appearanceOrbPreview != null) appearanceOrbPreview.setResumed(false);
         if (topBrandLogo != null) topBrandLogo.setResumed(false);
         handler.removeCallbacks(refreshTask);
         super.onPause();
@@ -433,6 +440,15 @@ public final class DashboardActivity extends Activity {
     }
 
     private void clearPageReferences() {
+        if (appearanceOrbPreview != null) appearanceOrbPreview.setResumed(false);
+        appearanceOrbPreview = null;
+        originalOrbChoice = flameOrbChoice = null;
+        appearanceOrbStyle = null;
+        appearanceGradientSwitch = null;
+        appearanceColorA = appearanceColorB = null;
+        appearanceGlassOpacity = appearanceHighlight = appearanceBackgroundIntensity = null;
+        appearanceGlassValue = appearanceHighlightValue = appearanceBackgroundValue = null;
+        appearancePreview = null;
         if (pulseOrb != null) pulseOrb.setResumed(false);
         pulseOrb = null;
         pulseTitle = pulseAgent = pulseFlow = pulseState = pulseConnection = pulseCapabilities = null;
@@ -1041,9 +1057,73 @@ public final class DashboardActivity extends Activity {
         TextView intro = text("Appearance changes apply immediately across PickPico. These controls do not affect Agent permissions or behavior.", 13, Typeface.NORMAL, MUTED);
         intro.setPadding(dp(2), 0, dp(2), dp(14));
         root.addView(intro);
-        root.addView(buildAppearanceCard(), cardParams(0));
+        root.addView(buildOrbAppearanceCard(), cardParams(0));
+        root.addView(buildAppearanceCard(), cardParams(10));
         addBottomSpace(root);
         return pageScroll(root);
+    }
+
+    private View buildOrbAppearanceCard() {
+        appearanceOrbStyle = theme.orbStyle;
+        LinearLayout card = glassCard(true);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(text("PICO ORB", 14, Typeface.BOLD, TEXT));
+        TextView note = text("Choose a look. You can switch back anytime.", 12, Typeface.NORMAL, MUTED);
+        note.setPadding(0, dp(5), dp(8), 0);
+        copy.addView(note);
+        header.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        appearanceOrbPreview = new PulseOrbView(this, theme);
+        appearanceOrbPreview.setResumed(true);
+        header.addView(appearanceOrbPreview, new LinearLayout.LayoutParams(dp(84), dp(84)));
+        card.addView(header);
+
+        LinearLayout choices = new LinearLayout(this);
+        originalOrbChoice = orbAppearanceChoice("Original", PickPicoTheme.ORB_ORIGINAL);
+        flameOrbChoice = orbAppearanceChoice("Flame", PickPicoTheme.ORB_FLAME);
+        choices.addView(originalOrbChoice, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        LinearLayout.LayoutParams flameParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        flameParams.leftMargin = dp(8);
+        choices.addView(flameOrbChoice, flameParams);
+        card.addView(choices);
+        if (Build.VERSION.SDK_INT < 33) {
+            flameOrbChoice.setEnabled(false);
+            flameOrbChoice.setAlpha(.45f);
+            TextView compatibility = text("Flame requires Android 13 or later. Original is always available.", 11, Typeface.NORMAL, MUTED);
+            compatibility.setPadding(0, dp(8), 0, 0);
+            card.addView(compatibility);
+        }
+        refreshOrbAppearanceChoices();
+        return card;
+    }
+
+    private TextView orbAppearanceChoice(String label, String style) {
+        TextView choice = text(label, 13, Typeface.BOLD, TEXT);
+        choice.setGravity(Gravity.CENTER);
+        choice.setFocusable(true);
+        choice.setOnClickListener(view -> {
+            if (PickPicoTheme.ORB_FLAME.equals(style)
+                    && (appearanceOrbPreview == null || !appearanceOrbPreview.isFlameAvailable())) {
+                Toast.makeText(this, "Flame is unavailable on this device. Original is still available.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            appearanceOrbStyle = style;
+            saveAppearanceFromControls();
+        });
+        return choice;
+    }
+
+    private void refreshOrbAppearanceChoices() {
+        if (originalOrbChoice == null || flameOrbChoice == null) return;
+        boolean flame = PickPicoTheme.ORB_FLAME.equals(theme.orbStyle);
+        originalOrbChoice.setSelected(!flame);
+        flameOrbChoice.setSelected(flame);
+        originalOrbChoice.setContentDescription("Original orb" + (!flame ? ", selected" : ""));
+        flameOrbChoice.setContentDescription("Flame orb" + (flame ? ", selected" : ""));
+        originalOrbChoice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), !flame));
+        flameOrbChoice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), flame));
     }
 
     private View buildAppearanceCard() {
@@ -1299,7 +1379,8 @@ public final class DashboardActivity extends Activity {
                         theme.colorB),
                 opacity,
                 highlight,
-                intensity);
+                intensity,
+                appearanceOrbStyle == null ? theme.orbStyle : appearanceOrbStyle);
     }
 
     private void refreshAppearancePreview() {
@@ -1310,6 +1391,8 @@ public final class DashboardActivity extends Activity {
         theme = next;
         if (pulseOrb != null) pulseOrb.setTheme(theme);
         if (topBrandLogo != null) topBrandLogo.setTheme(theme);
+        if (appearanceOrbPreview != null) appearanceOrbPreview.setTheme(theme);
+        refreshOrbAppearanceChoices();
         updateBottomNav();
         applyWindowTheme();
         if (themeBackgroundView != null) {
@@ -1349,7 +1432,8 @@ public final class DashboardActivity extends Activity {
                 PickPicoTheme.toHex(next.colorB),
                 next.glassOpacity,
                 next.highlight,
-                next.backgroundIntensity);
+                next.backgroundIntensity,
+                next.orbStyle);
         applyThemeLive(theme);
     }
 

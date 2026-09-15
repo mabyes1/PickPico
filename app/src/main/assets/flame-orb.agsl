@@ -1,0 +1,80 @@
+// Approved browser flame, ported to Android. Original pulse-orb.agsl is retained.
+// Material travels radially outward from the core; no vertical advection.
+uniform float2 resolution;
+uniform float time;
+uniform float energy;
+uniform float tension;
+layout(color) uniform half4 primary;
+layout(color) uniform half4 secondary;
+float hash3(float3 p){p=fract(p*.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
+float noise3(float3 p){
+ float3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ return mix(mix(mix(hash3(i),hash3(i+float3(1,0,0)),f.x),mix(hash3(i+float3(0,1,0)),hash3(i+float3(1,1,0)),f.x),f.y),
+            mix(mix(hash3(i+float3(0,0,1)),hash3(i+float3(1,0,1)),f.x),mix(hash3(i+float3(0,1,1)),hash3(i+float3(1,1,1)),f.x),f.y),f.z);
+}
+float cloud3(float3 p){float v=0.,a=.52;for(int i=0;i<4;i++){v+=a*noise3(p);p=float3(p.x*1.62-p.y*1.18,p.x*1.18+p.y*1.62,p.z*2.)+13.7;a*=.48;}return v;}
+
+half4 main(float2 coord) {
+ float radius=min(resolution.x*.335,resolution.y*.397);
+ float2 p=(coord-resolution*.5)/radius;
+ float t=time;
+ p/=1.+sin(t*.72)*.009;
+ float d=length(p);
+ if(d>1.63) return half4(0.0);
+ float3 a=float3(primary.rgb),b=float3(secondary.rgb);
+ float heat=1.0,core=.92;
+ // A turbulent outward volume: density defines both the body and its edge.
+ // No fixed tongue geometry, evenly spaced rays, or circular outer boundary.
+ // Embed angle on a cylinder, then advect radius. A feature at radius r appears
+ // at r + .24 * dt next frame: all four sides flow away from the dark centre.
+ // cos/sin embedding avoids a seam where the angle wraps around.
+ float2 direction=p/max(d,.001);
+ float3 outward=float3(direction*1.30,(d-.25)*2.3-t*.55);
+ float2 curl=float2(cloud3(outward),cloud3(outward+float3(11.3,7.1,3.7)));
+ float3 stream=outward+float3((curl.x-.5)*1.5,(curl.y-.5)*1.5,(curl.x+curl.y-1.)*.65);
+ float billow=cloud3(stream*1.7);
+ float detail=cloud3(stream*3.4+float3(2.7,4.3,0.));
+ float laceNoise=cloud3(stream*6.2+float3(3.1,8.,1.7));
+ float mist=cloud3(outward*1.2+float3(7.3,2.1,0.));
+ float2 shape=p+float2((curl.x-.5)*.22,(curl.y-.5)*.2);
+ float envelope=length(float2(shape.x,(shape.y+.11)*.88));
+ float boundary=.87-envelope+(billow-.46)*1.48*heat+(detail-.49)*.15;
+ float mass=smoothstep(-.09,.30,boundary);
+ mass=max(mass,exp(-pow((d-.46)*5.1,2.))*.78);
+ float wisp=exp(-abs(boundary-.025)*32.);
+ float folds=exp(-abs(billow-.49)*11.);
+ float fine=exp(-abs(detail-.49)*35.);
+ float filigree=exp(-abs(laceNoise-.48)*42.);
+ float outside=1.-smoothstep(.93,1.47,envelope);
+ // Thin luminous sheets pass in front of softer, dimmer fire behind them.
+ float density=mass*(.13+billow*.30+folds*.86+fine*.16+filigree*.05);
+ density+=wisp*(.33+fine*.36);
+ density*=outside;
+ // The opening is torn into the luminous body; heat partially veils its edge.
+ float eyeD=length(p-float2(.025,-.015));
+ float eyeEdge=.205*core+(mist-.48)*.10+(detail-.48)*.052;
+ float eye=smoothstep(eyeEdge-.024,eyeEdge+.048,eyeD);
+ float hotCore=exp(-pow((eyeD-eyeEdge-.115)*6.6,2.));
+ density+=hotCore*(.77+folds*.46+fine*.17)*mass;
+ density*=eye;
+ float warm=smoothstep(.06,.48,density);
+ float hot=smoothstep(.52,1.13,density);
+ // Temperature falls outward: white-hot core, primary-colour body, secondary
+ // thin outer flames. Both pigments still come directly from the chosen theme.
+ float cooling=smoothstep(.40,1.05,d);
+ float3 flame=mix(b*.92,a,warm);
+ flame=mix(flame,b,cooling*.69);
+ flame=mix(flame,mix(a,float3(1),.94),hot*(1.-cooling*.75));
+ flame+=mix(a,float3(1),.70)*pow(max(density-.92,0.),1.3)*.22;
+ float alpha=clamp(mass*.24+density*.86+wisp*.17,0.,.99)*outside;
+ float glow=exp(-max(envelope-.47,0.)*4.6)*.12;
+ float3 result=flame*alpha+mix(a,b,.35)*glow*(1.-alpha);
+ alpha+=glow*(1.-alpha);
+ // A dark centre with a dim warm haze, not a black disk with a drawn outline.
+ float3 cavity=mix(float3(.023,.017,.006),a*.085,.35+.3*billow);
+ result=mix(cavity,result,eye);
+ alpha=mix(.98,alpha,eye);
+ result *= energy * (1.0 - tension * 0.035 * sin(t * 1.2));
+ return half4(half3(clamp(result,0.0,alpha)),half(alpha));
+
+}

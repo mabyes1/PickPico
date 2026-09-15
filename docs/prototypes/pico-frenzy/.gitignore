@@ -1,0 +1,3 @@
+# Local visual review captures and intermediate drafts are retained on disk.
+*.png
+version-*.html

@@ -21,6 +21,8 @@ import java.util.Locale;
 /** Shared PickPico appearance model for background and glass controls. */
 final class PickPicoTheme {
     static final String PREFS = "pickpico_appearance";
+    static final String ORB_ORIGINAL = "original";
+    static final String ORB_FLAME = "flame";
 
     // Shared product UI tokens. Keep product-facing screens on this palette
     // instead of letting individual Activities grow their own parallel theme.
@@ -48,18 +50,25 @@ final class PickPicoTheme {
         final int glassOpacity;
         final int highlight;
         final int backgroundIntensity;
+        final String orbStyle;
 
         State(boolean gradient, int colorA, int colorB, int glassOpacity) {
             this(gradient, colorA, colorB, glassOpacity, DEFAULT_HIGHLIGHT, DEFAULT_BACKGROUND_INTENSITY);
         }
 
         State(boolean gradient, int colorA, int colorB, int glassOpacity, int highlight, int backgroundIntensity) {
+            this(gradient, colorA, colorB, glassOpacity, highlight, backgroundIntensity, ORB_ORIGINAL);
+        }
+
+        State(boolean gradient, int colorA, int colorB, int glassOpacity, int highlight,
+                int backgroundIntensity, String orbStyle) {
             this.gradient = gradient;
             this.colorA = colorA;
             this.colorB = colorB;
             this.glassOpacity = clamp(glassOpacity, 1, 30);
             this.highlight = clamp(highlight, 4, 48);
             this.backgroundIntensity = clamp(backgroundIntensity, 30, 100);
+            this.orbStyle = normalizeOrbStyle(orbStyle);
         }
     }
 
@@ -84,7 +93,8 @@ final class PickPicoTheme {
                 parseHex(colorB, Color.rgb(67, 80, 89)),
                 prefs.getInt("glass_opacity", DEFAULT_GLASS_OPACITY),
                 prefs.getInt("highlight", DEFAULT_HIGHLIGHT),
-                prefs.getInt("background_intensity", DEFAULT_BACKGROUND_INTENSITY));
+                prefs.getInt("background_intensity", DEFAULT_BACKGROUND_INTENSITY),
+                prefs.getString("orb_style", ORB_ORIGINAL));
     }
 
     static State save(Context context, boolean gradient, String colorA, String colorB, int glassOpacity) {
@@ -100,9 +110,15 @@ final class PickPicoTheme {
             int glassOpacity,
             int highlight,
             int backgroundIntensity) {
+        return save(context, gradient, colorA, colorB, glassOpacity, highlight,
+                backgroundIntensity, load(context).orbStyle);
+    }
+
+    static State save(Context context, boolean gradient, String colorA, String colorB,
+            int glassOpacity, int highlight, int backgroundIntensity, String orbStyle) {
         int a = parseHex(colorA, Color.rgb(94, 109, 119));
         int b = parseHex(colorB, Color.rgb(67, 80, 89));
-        State state = new State(gradient, a, b, glassOpacity, highlight, backgroundIntensity);
+        State state = new State(gradient, a, b, glassOpacity, highlight, backgroundIntensity, orbStyle);
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean("gradient", state.gradient)
@@ -111,12 +127,17 @@ final class PickPicoTheme {
                 .putInt("glass_opacity", state.glassOpacity)
                 .putInt("highlight", state.highlight)
                 .putInt("background_intensity", state.backgroundIntensity)
+                .putString("orb_style", state.orbStyle)
                 .apply();
         return state;
     }
 
     static String toHex(int color) {
         return String.format(Locale.US, "#%02x%02x%02x", Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    static String normalizeOrbStyle(String value) {
+        return ORB_FLAME.equals(value) ? ORB_FLAME : ORB_ORIGINAL;
     }
 
     static int parseHex(String value, int fallback) {
