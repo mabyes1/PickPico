@@ -95,6 +95,9 @@ final class HumanHelpStore {
                 .put("idleTimeoutSeconds", idleTimeoutSeconds)
                 .put("expiresAtEpochMs", createdAtEpochMs + idleTimeoutSeconds * 1000L)
                 .put("openGraceUsed", false);
+        request.put("deliveryStatus", HumanHelpDelivery.isLocked(context) ? "waiting_unlock" : "received")
+                .put("deliveryReason", HumanHelpDelivery.isLocked(context) ? "device_locked" : "queued")
+                .put("deliveryAttempts", 0);
         AgentInboxStore.add(
                 context,
                 "approval".equals(requestType) ? "human.approval" : "human.help",
@@ -334,6 +337,42 @@ final class HumanHelpStore {
         return true;
     }
 
+    static synchronized List<JSONObject> pendingDelivery(Context context) throws JSONException {
+        List<JSONObject> pending = new ArrayList<>();
+        for (String key : context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getAll().keySet()) {
+            if (!key.startsWith(KEY_PREFIX)) continue;
+            JSONObject request = load(context, key.substring(KEY_PREFIX.length()));
+            if (request != null && "waiting_human".equals(request.optString("status"))
+                    && request.has("deliveryStatus") && !request.has("displayedAt")) pending.add(request);
+        }
+        pending.sort(Comparator.comparingLong(r -> r.optLong("createdAtEpochMs")));
+        return pending;
+    }
+
+    static synchronized void deliveryState(Context context, String id, String state, String reason, boolean attempt)
+            throws JSONException {
+        JSONObject request = load(context, id);
+        if (request == null || !"waiting_human".equals(request.optString("status")) || request.has("displayedAt")) return;
+        if ("waiting_unlock".equals(request.optString("deliveryStatus")) && !"waiting_unlock".equals(state)) {
+            request.put("expiresAtEpochMs", System.currentTimeMillis() + request.optInt("idleTimeoutSeconds", DEFAULT_IDLE_TIMEOUT_SECONDS) * 1000L);
+        }
+        request.put("deliveryStatus", state).put("deliveryReason", reason);
+        if (attempt) request.put("deliveryAttempts", request.optInt("deliveryAttempts") + 1)
+                .put("lastLaunchElapsedMs", SystemClock.elapsedRealtime())
+                .put("lastLaunchAtEpochMs", System.currentTimeMillis());
+        save(context, request);
+    }
+
+    static synchronized void markDisplayed(Context context, String id) throws JSONException {
+        if (HumanHelpDelivery.isLocked(context)) return;
+        JSONObject request = load(context, id);
+        if (request == null || !"waiting_human".equals(request.optString("status")) || request.has("displayedAt")) return;
+        request.put("deliveryStatus", "displayed").put("deliveryReason", "unlocked_window_focused")
+                .put("displayedAt", Instant.now().toString())
+                .put("expiresAtEpochMs", System.currentTimeMillis() + request.optInt("idleTimeoutSeconds", DEFAULT_IDLE_TIMEOUT_SECONDS) * 1000L);
+        save(context, request);
+    }
+
     static synchronized void complete(Context context, String requestId, String action, String text)
             throws JSONException {
         JSONObject request = requireWaiting(context, requestId);
@@ -500,13 +539,22 @@ final class HumanHelpStore {
         if (!"waiting_human".equals(request.optString("status"))) {
             return;
         }
+        if ("waiting_unlock".equals(request.optString("deliveryStatus"))) return;
+        if (request.has("deliveryStatus") && !request.has("displayedAt") && HumanHelpDelivery.isLocked(context)) {
+            try {
+                request.put("deliveryStatus", "waiting_unlock").put("deliveryReason", "device_locked");
+                save(context, request);
+            } catch (JSONException ignored) { }
+            return;
+        }
         long expiresAtEpochMs = request.optLong("expiresAtEpochMs", 0L);
         if (expiresAtEpochMs <= 0L || System.currentTimeMillis() < expiresAtEpochMs) {
             return;
         }
         try {
             request.put("status", "timed_out")
-                    .put("timeoutReason", "human_idle_timeout")
+                    .put("timeoutReason", request.has("deliveryStatus") && !request.has("displayedAt")
+                            ? "delivery_timeout" : "human_idle_timeout")
                     .put("timedOutAt", Instant.now().toString())
                     .put("timedOutAtEpochMs", System.currentTimeMillis());
             save(context, request);
@@ -698,12 +746,8 @@ final class HumanHelpStore {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(false)
                 .setContentIntent(pending);
-        boolean launchedDirectly = AgentAttention.tryLaunchLockedHumanHelp(context, open);
-        if (!launchedDirectly) {
-            AgentAttention.applyHumanHelpBehavior(context, builder, requestId.hashCode(), open);
-        } else {
-            AgentAttention.applyPublicLockscreen(builder);
-        }
+        // Service owns delivery; notifications never count as a display receipt.
+        AgentAttention.applyPublicLockscreen(builder);
         Notification notification = builder.build();
         manager.notify(requestId.hashCode(), notification);
         AgentAttention.alert(context);

@@ -145,6 +145,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
     private PicoOrbOverlayController picoOrbOverlay;
+    private HumanHelpDelivery humanHelpDelivery;
 
     @Override
     public void onCreate() {
@@ -155,6 +156,8 @@ public final class McpNodeService extends Service implements McpToolActions {
         buttonBridge = new BleButtonBridge(this);
         picoOrbOverlay = new PicoOrbOverlayController(this, this::picoOrbSnapshot);
         picoOrbOverlay.start();
+        humanHelpDelivery = new HumanHelpDelivery(this);
+        humanHelpDelivery.start();
     }
 
     @Override
@@ -257,6 +260,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         activeAgentCommandCount = 0;
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
+        if (humanHelpDelivery != null) humanHelpDelivery.stop();
         if (picoOrbOverlay != null) {
             picoOrbOverlay.destroy();
             picoOrbOverlay = null;

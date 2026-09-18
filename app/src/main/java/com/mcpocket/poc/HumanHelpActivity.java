@@ -100,14 +100,6 @@ public final class HumanHelpActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (McpocketPolicySettings.isHyperModeEnabled(this)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                setShowWhenLocked(true);
-                setTurnScreenOn(true);
-            } else {
-                getWindow().addFlags(
-                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
-            }
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         theme = PickPicoTheme.load(this);
@@ -130,9 +122,6 @@ public final class HumanHelpActivity extends Activity {
         } catch (Exception ignored) {
         }
         setContentView(buildContent());
-        if (McpocketPolicySettings.isHyperModeEnabled(this)) {
-            getWindow().getDecorView().post(this::requestHyperKeyguardDismissal);
-        }
         if (getIntent().getBooleanExtra(EXTRA_CONFIRM_BLE_VOICE, false)) {
             showBleVoiceConfirmation(
                     getIntent().getStringExtra(EXTRA_BLE_VOICE_PATH),
@@ -141,16 +130,16 @@ public final class HumanHelpActivity extends Activity {
         }
     }
 
-    private void requestHyperKeyguardDismissal() {
-        KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
-        if (keyguard == null || !keyguard.isKeyguardLocked()) return;
-        try {
-            keyguard.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {
-                @Override public void onDismissSucceeded() { }
-                @Override public void onDismissCancelled() { }
-                @Override public void onDismissError() { }
-            });
-        } catch (RuntimeException ignored) {
+    private static HumanHelpActivity resumedActivity;
+    static boolean hasVisibleRequest() {
+        return resumedActivity != null && resumedActivity.request != null
+                && "waiting_human".equals(resumedActivity.request.optString("status"));
+    }
+
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused && requestId != null && !HumanHelpDelivery.isLocked(this)) {
+            try { HumanHelpStore.markDisplayed(this, requestId); } catch (Exception ignored) { }
         }
     }
 
@@ -172,6 +161,11 @@ public final class HumanHelpActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        String incomingId = intent == null ? null : intent.getStringExtra(HumanHelpStore.EXTRA_REQUEST_ID);
+        if (!TextUtils.isEmpty(incomingId) && !incomingId.equals(requestId)) {
+            recreate();
+            return;
+        }
         if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_DETAILS, false)) {
             setDetailsExpanded(true);
         }
@@ -180,6 +174,7 @@ public final class HumanHelpActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        resumedActivity = this;
         if (requestId != null && actionContainer != null) {
             reload();
             refreshState();
@@ -190,6 +185,7 @@ public final class HumanHelpActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (resumedActivity == this) resumedActivity = null;
         lifecycleHandler.removeCallbacks(lifecycleTicker);
         super.onPause();
     }
