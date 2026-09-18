@@ -155,6 +155,7 @@ public final class DashboardActivity extends Activity {
     private Switch appearanceGradientSwitch;
     private TextView appearanceColorA;
     private TextView appearanceColorB;
+    private View appearanceColorBControl;
     private SeekBar appearanceGlassOpacity;
     private TextView appearanceGlassValue;
     private SeekBar appearanceHighlight;
@@ -446,6 +447,7 @@ public final class DashboardActivity extends Activity {
         appearanceOrbStyle = null;
         appearanceGradientSwitch = null;
         appearanceColorA = appearanceColorB = null;
+        appearanceColorBControl = null;
         appearanceGlassOpacity = appearanceHighlight = appearanceBackgroundIntensity = null;
         appearanceGlassValue = appearanceHighlightValue = appearanceBackgroundValue = null;
         appearancePreview = null;
@@ -1171,15 +1173,10 @@ public final class DashboardActivity extends Activity {
         colors.addView(appearanceColorControl("COLOR A", appearanceColorA), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams bParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         bParams.leftMargin = dp(8);
-        colors.addView(appearanceColorControl("COLOR B", appearanceColorB), bParams);
+        appearanceColorBControl = appearanceColorControl("COLOR B", appearanceColorB);
+        appearanceColorBControl.setVisibility(theme.gradient ? View.VISIBLE : View.GONE);
+        colors.addView(appearanceColorBControl, bParams);
         card.addView(colors);
-
-        LinearLayout solidPresets = new LinearLayout(this);
-        solidPresets.setOrientation(LinearLayout.HORIZONTAL);
-        solidPresets.setPadding(0, dp(12), 0, 0);
-        addSolidBackgroundPreset(solidPresets, "BLACK", "#000000");
-        addSolidBackgroundPreset(solidPresets, "WHITE", "#ffffff");
-        card.addView(solidPresets);
 
         TextView styleLabel = sectionLabel("GLASS");
         styleLabel.setPadding(dp(2), dp(16), 0, dp(7));
@@ -1313,6 +1310,8 @@ public final class DashboardActivity extends Activity {
         int fallback = input == appearanceColorA ? theme.colorA : theme.colorB;
         setColorSwatch(swatch, PickPicoTheme.parseHex(input.getText().toString(), fallback));
         View.OnClickListener chooseColor = v -> showColorPicker(input, swatch);
+        row.setOnClickListener(chooseColor);
+        row.setContentDescription(label + ", open color palette");
         swatch.setOnClickListener(chooseColor);
         input.setOnClickListener(chooseColor);
         row.addView(swatch, new LinearLayout.LayoutParams(dp(44), dp(44)));
@@ -1321,32 +1320,6 @@ public final class DashboardActivity extends Activity {
         inputParams.leftMargin = dp(7);
         row.addView(input, inputParams);
         return wrapper;
-    }
-
-    private void addSolidBackgroundPreset(LinearLayout parent, String label, String color) {
-        TextView preset = text(label, 9, Typeface.BOLD, TEXT);
-        preset.setGravity(Gravity.CENTER);
-        int presetColor = PickPicoTheme.parseHex(color, theme.colorA);
-        preset.setTag(R.id.theme_text_role, null);
-        preset.setTextColor(Color.luminance(presetColor) >= 0.56f
-                ? Color.rgb(22, 26, 29)
-                : Color.rgb(242, 246, 248));
-        PickPicoTheme.State previewTheme = new PickPicoTheme.State(
-                false,
-                presetColor,
-                presetColor,
-                theme.glassOpacity);
-        preset.setBackground(PickPicoTheme.preview(previewTheme, dp(10)));
-        preset.setOnClickListener(v -> {
-            appearanceColorA.setText(color);
-            appearanceColorB.setText(color);
-            appearanceGradientSwitch.setChecked(false);
-            refreshAppearancePreview();
-            saveAppearanceFromControls();
-        });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(36), 1f);
-        if (parent.getChildCount() > 0) params.leftMargin = dp(6);
-        parent.addView(preset, params);
     }
 
     private void addGlassPreset(LinearLayout parent, String label, int opacity, int highlight, int intensity) {
@@ -1389,6 +1362,9 @@ public final class DashboardActivity extends Activity {
 
     private void applyThemeLive(PickPicoTheme.State next) {
         theme = next;
+        if (appearanceColorBControl != null) {
+            appearanceColorBControl.setVisibility(theme.gradient ? View.VISIBLE : View.GONE);
+        }
         if (pulseOrb != null) pulseOrb.setTheme(theme);
         if (topBrandLogo != null) topBrandLogo.setTheme(theme);
         if (appearanceOrbPreview != null) appearanceOrbPreview.setTheme(theme);
@@ -1446,106 +1422,41 @@ public final class DashboardActivity extends Activity {
     }
 
     private void showColorPicker(TextView target, View externalSwatch) {
-        int fallback = target == appearanceColorA ? theme.colorA : theme.colorB;
-        int initial = PickPicoTheme.parseHex(target.getText().toString(), fallback);
-        float[] hsv = new float[3];
-        Color.colorToHSV(initial, hsv);
-        int[] selected = new int[]{initial};
-
+        final boolean primary = target == appearanceColorA;
+        int initial = primary ? theme.colorA : theme.colorB;
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(18), dp(10), dp(18), dp(4));
-
-        LinearLayout previewRow = new LinearLayout(this);
-        previewRow.setOrientation(LinearLayout.HORIZONTAL);
-        previewRow.setGravity(Gravity.CENTER_VERTICAL);
-        body.addView(previewRow, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(58)));
-
-        View swatch = new View(this);
-        setColorSwatch(swatch, initial);
-        previewRow.addView(swatch, new LinearLayout.LayoutParams(dp(52), dp(52)));
-        TextView hex = text(PickPicoTheme.toHex(initial).toUpperCase(), 16, Typeface.BOLD, TEXT);
-        hex.setTypeface(Typeface.MONOSPACE);
-        hex.setPadding(dp(14), 0, 0, 0);
-        previewRow.addView(hex, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        SeekBar hue = colorPickerSlider(body, "HUE", 360, Math.round(hsv[0]));
-        SeekBar saturation = colorPickerSlider(body, "SATURATION", 100, Math.round(hsv[1] * 100f));
-        SeekBar value = colorPickerSlider(body, "BRIGHTNESS", 100, Math.round(hsv[2] * 100f));
-
-        SeekBar.OnSeekBarChangeListener listener = new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                hsv[0] = hue.getProgress();
-                hsv[1] = saturation.getProgress() / 100f;
-                hsv[2] = value.getProgress() / 100f;
-                selected[0] = Color.HSVToColor(hsv);
-                setColorSwatch(swatch, selected[0]);
-                hex.setText(PickPicoTheme.toHex(selected[0]).toUpperCase());
-            }
-
-            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
-            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
-        };
-        hue.setOnSeekBarChangeListener(listener);
-        saturation.setOnSeekBarChangeListener(listener);
-        value.setOnSeekBarChangeListener(listener);
-
-        TextView paletteLabel = text("QUICK COLORS", 9, Typeface.BOLD, MUTED);
-        paletteLabel.setLetterSpacing(0.06f);
-        paletteLabel.setPadding(0, dp(12), 0, dp(7));
-        body.addView(paletteLabel);
-
-        LinearLayout quick = new LinearLayout(this);
-        quick.setOrientation(LinearLayout.HORIZONTAL);
-        int[] quickColors = new int[]{
-                Color.BLACK, Color.WHITE, Color.rgb(75, 31, 102),
-                Color.rgb(23, 52, 77), Color.rgb(21, 93, 74), Color.rgb(170, 80, 146)
-        };
-        for (int color : quickColors) {
-            View chip = new View(this);
-            setColorSwatch(chip, color);
-            chip.setOnClickListener(v -> {
-                Color.colorToHSV(color, hsv);
-                hue.setProgress(Math.round(hsv[0]));
-                saturation.setProgress(Math.round(hsv[1] * 100f));
-                value.setProgress(Math.round(hsv[2] * 100f));
-            });
-            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(38), 1f);
-            if (quick.getChildCount() > 0) chipParams.leftMargin = dp(6);
-            quick.addView(chip, chipParams);
-        }
-        body.addView(quick, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
-
-        new AlertDialog.Builder(this)
-                .setTitle("Choose color")
-                .setView(body)
+        body.setPadding(dp(20), dp(12), dp(20), dp(12));
+        ThemeColorPicker picker = new ThemeColorPicker(this, initial);
+        body.addView(picker, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(body);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(primary ? "Color A" : "Color B")
+                .setView(scroll)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Use color", (dialog, which) -> {
-                    target.setText(PickPicoTheme.toHex(selected[0]));
-                    setColorSwatch(externalSwatch, selected[0]);
-                    refreshAppearancePreview();
-                    saveAppearanceFromControls();
-                })
-                .show();
-    }
-
-    private SeekBar colorPickerSlider(LinearLayout parent, String label, int max, int progress) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.VERTICAL);
-        row.setPadding(0, dp(8), 0, 0);
-        TextView title = text(label, 9, Typeface.BOLD, MUTED);
-        title.setLetterSpacing(0.05f);
-        row.addView(title);
-        SeekBar slider = new SeekBar(this);
-        slider.setMax(max);
-        slider.setProgress(progress);
-        row.addView(slider, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(36)));
-        parent.addView(row);
-        return slider;
+                .setPositiveButton("Apply", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!picker.validateColor()) return;
+            int selected = picker.getColor();
+            // Save the selected value itself, not a possibly replaced page control.
+            PickPicoTheme.State current = appearanceStateFromControls();
+            PickPicoTheme.State saved = PickPicoTheme.save(this, current.gradient,
+                    PickPicoTheme.toHex(primary ? selected : current.colorA),
+                    PickPicoTheme.toHex(primary ? current.colorB : selected),
+                    current.glassOpacity, current.highlight, current.backgroundIntensity, current.orbStyle);
+            TextView activeTarget = primary ? appearanceColorA : appearanceColorB;
+            if (activeTarget != null) {
+                activeTarget.setText(PickPicoTheme.toHex(selected));
+                activeTarget.setContentDescription("Choose color " + PickPicoTheme.toHex(selected));
+            }
+            setColorSwatch(externalSwatch, selected);
+            applyThemeLive(saved);
+            dialog.dismiss();
+        }));
+        dialog.show();
     }
 
     private LinearLayout settingsRow(String title, String detail, Runnable action) {
