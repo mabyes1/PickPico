@@ -30,6 +30,9 @@ final class CallerReturnTarget {
     }
 
     static CallerReturnTarget unknown() { return new CallerReturnTarget("呼叫端", "", "", false); }
+    static CallerReturnTarget resolve(CallerReturnTarget task, CallerReturnTarget preferred) {
+        return task.available() ? task : preferred.available() ? preferred : task;
+    }
     boolean available() { return !packageName.isEmpty() || !url.isEmpty(); }
     String label() { return available() ? "回到 " + name + "  →" : remote ? "此呼叫來自遠端 · 請回原裝置繼續" : "未提供返回位置"; }
 }

@@ -381,16 +381,14 @@ final class CommandRuntime {
 
         register(
                 "notification.dismiss",
-                "Dismiss one active Android notification by notification key.",
+                "Dismiss one notification by key, or all=true with requestId to snapshot and batch-clear up to 200 notifications. Returns a compact digest and verified results. Reuse requestId after a lost response; own service notifications are excluded.",
                 "notification",
                 "notification_write",
                 true,
-                notificationKeySchema(),
+                notificationDismissSchema(),
                 (arguments, callCount) -> {
                     String key = arguments.optString("key", "");
-                    if (key.isEmpty() || key.length() > 1024) {
-                        throw new CommandInputException("notification.dismiss requires a valid key");
-                    }
+                    validateNotificationDismiss(arguments);
                     return actions.notificationDismiss(arguments, callCount);
                 });
 
@@ -1365,6 +1363,7 @@ final class CommandRuntime {
     }
 
     private static void validateBeforeApproval(String id, JSONObject args) {
+        if (id.equals("notification.dismiss")) validateNotificationDismiss(args);
         if (id.startsWith("workspace.") && !id.equals("workspace.info")) validateWorkspacePath(args.optString("path", "."));
         if (id.equals("node.start")) validateWorkspacePath(args.optString("entry"));
         if (id.equals("process.exec")) validateExecArguments(args);
@@ -1879,6 +1878,26 @@ final class CommandRuntime {
     private static JSONObject observationSchema() throws JSONException {
         return new JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 100)
                 .put("description", "Selector/global actions: latest ui_inspect observationId. Point/swipe/focused-input: latest screen_capture observationId, valid for one action within 60s. Observe again after each action.");
+    }
+
+    static JSONObject notificationDismissSchema() throws JSONException {
+        JSONObject schema = notificationKeySchema();
+        schema.remove("required");
+        schema.getJSONObject("properties")
+                .put("all", new JSONObject().put("type", "boolean"))
+                .put("requestId", new JSONObject().put("type", "string").put("minLength", 8).put("maxLength", 80)
+                        .put("pattern", "^[A-Za-z0-9_-]{8,80}$"));
+        return schema;
+    }
+
+    static void validateNotificationDismiss(JSONObject args) {
+        boolean all = args.optBoolean("all", false);
+        if (all) {
+            if (args.has("key") || !args.optString("requestId").matches("[A-Za-z0-9_-]{8,80}"))
+                throw new CommandInputException("all=true requires requestId (8-80 letters/digits/_/-), without key");
+        } else if (args.optString("key").isEmpty() || args.optString("key").length() > 1024 || args.has("requestId")) {
+            throw new CommandInputException("Provide key, or all=true with requestId");
+        }
     }
 
     private static JSONObject uiPointSchema() throws JSONException {

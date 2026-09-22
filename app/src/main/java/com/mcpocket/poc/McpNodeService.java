@@ -125,6 +125,10 @@ public final class McpNodeService extends Service implements McpToolActions {
     private boolean mediaForegroundRequested;
     private PowerManager.WakeLock agentScreenWakeLock;
     private int activeAgentCommandCount;
+    private volatile int awakeTaskCount;
+    // Loopback server recovery must not orphan task IDs or their screen holds.
+    private final AgentTaskRuntime agentTasks = new AgentTaskRuntime(this::onAgentTasksChanged);
+    @Override public AgentTaskRuntime agentTaskRuntime() { return agentTasks; }
     private boolean agentScreenDestroyed;
     private final Runnable agentScreenRetryRunnable = () -> {
         if (!agentScreenDestroyed) {
@@ -136,7 +140,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private View agentScreenKeepAwakeView;
     private final Runnable agentScreenIdleReleaseRunnable = () -> {
         synchronized (McpNodeService.this) {
-            if (activeAgentCommandCount == 0) {
+            if (activeAgentCommandCount == 0 && awakeTaskCount == 0) {
                 releaseAgentScreenKeepAwakeWindow();
                 releaseAgentScreenLease();
             }
@@ -162,13 +166,20 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null) {
+            SharedPreferences saved = getSharedPreferences(PREFS, MODE_PRIVATE);
+            if (!saved.getBoolean(KEY_DESIRED_RUNNING, false)) { stopSelf(); return START_NOT_STICKY; }
+            intent = new Intent(this, McpNodeService.class).setAction(ACTION_START)
+                    .putExtra(EXTRA_TOKEN, saved.getString(KEY_TOKEN, ""))
+                    .putExtra(EXTRA_ENABLE_MEDIA_FGS, false);
+        }
         String action = intent == null ? null : intent.getAction();
         if (ACTION_RESET_RELAY_IDENTITY.equals(action)) {
             resetRelayIdentity(this);
             if (nodeActive) {
                 startRelayIfConfigured();
             }
-            return START_NOT_STICKY;
+            return nodeActive ? START_STICKY : START_NOT_STICKY;
         }
         if (ACTION_STOP.equals(action)) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
@@ -193,14 +204,14 @@ public final class McpNodeService extends Service implements McpToolActions {
                     android.util.Log.w("PickPico", "Media foreground refresh was declined", error);
                 }
             }
-            return START_NOT_STICKY;
+            return nodeActive ? START_STICKY : START_NOT_STICKY;
         }
         if (ACTION_REFRESH_PICO_ORB.equals(action)) {
             if (picoOrbOverlay != null) picoOrbOverlay.refreshNow();
-            return START_NOT_STICKY;
+            return nodeActive ? START_STICKY : START_NOT_STICKY;
         }
         if (!ACTION_START.equals(action) || server != null || nodeActive) {
-            return START_NOT_STICKY;
+            return nodeActive ? START_STICKY : START_NOT_STICKY;
         }
 
         String token = intent.getStringExtra(EXTRA_TOKEN);
@@ -246,7 +257,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
         }
-        return START_NOT_STICKY;
+        return nodeActive ? START_STICKY : START_NOT_STICKY;
     }
 
     @Override
@@ -303,6 +314,26 @@ public final class McpNodeService extends Service implements McpToolActions {
         postAgentScreenAction(this::startAgentScreenCommand);
     }
 
+    @Override
+    public void onAgentTasksChanged(int activeTasks) {
+        postAgentScreenAction(() -> {
+            boolean starting = awakeTaskCount == 0 && activeTasks > 0;
+            awakeTaskCount = activeTasks;
+            mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+            if (activeTasks > 0) {
+                // Wake once at task start; do not repeatedly override a manual power-button lock.
+                if (starting) try { phoneWake(0L); } catch (Exception ignored) { }
+                refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
+                mainHandler.removeCallbacks(agentScreenRetryRunnable);
+                mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
+            } else if (activeAgentCommandCount == 0) {
+                mainHandler.removeCallbacks(agentScreenRetryRunnable);
+                releaseAgentScreenKeepAwakeWindow();
+                releaseAgentScreenLease();
+            }
+        });
+    }
+
     // WindowManager views and their lifecycle belong to the main Looper, even
     // when the command itself runs on an HTTP worker. Never block that worker
     // waiting for the main thread, and ignore callbacks after service teardown.
@@ -336,7 +367,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         if (activeAgentCommandCount > 0) {
             activeAgentCommandCount--;
         }
-        if (activeAgentCommandCount > 0) {
+        if (activeAgentCommandCount > 0 || awakeTaskCount > 0) {
             refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
         } else {
             // Keep the display awake briefly after the last Agent command so a
@@ -428,7 +459,8 @@ public final class McpNodeService extends Service implements McpToolActions {
             if (agentScreenWakeLock.isHeld()) {
                 agentScreenWakeLock.release();
             }
-            agentScreenWakeLock.acquire(leaseMs);
+            if (awakeTaskCount > 0) agentScreenWakeLock.acquire();
+            else agentScreenWakeLock.acquire(leaseMs);
         } catch (RuntimeException ignored) {
         }
     }
@@ -585,7 +617,12 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("uptimeSeconds", uptimeMs / 1000L)
                 .put("nodeStartedAt", nodeStartedAt)
                 .put("processStartedAt", PickPicoApplication.processStartedAt())
+                .put("connectionDiagnostics", ConnectionDiagnostics.snapshot(this))
                 .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
+                .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
+                        .put("requested", awakeTaskCount > 0).put("overlayHeld", agentScreenKeepAwakeView != null)
+                        .put("wakeLockHeld", agentScreenWakeLock != null && agentScreenWakeLock.isHeld())
+                        .put("restoration", "Original display timeout is never modified; holds are released on task completion or service teardown"))
                 .put("toolCallCount", callCount);
         if (relayClient != null) {
             result.put("relay", relayClient.diagnostics());
@@ -1404,6 +1441,8 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public JSONObject notificationDismiss(JSONObject arguments, long callCount) throws JSONException {
+        if (arguments.optBoolean("all"))
+            return McpNotificationListenerService.dismissAll(this, arguments.getString("requestId"), callCount);
         return McpNotificationListenerService.dismiss(this, arguments.optString("key", ""), callCount);
     }
 

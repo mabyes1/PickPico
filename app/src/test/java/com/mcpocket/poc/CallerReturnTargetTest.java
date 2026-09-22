@@ -5,6 +5,17 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class CallerReturnTargetTest {
+    @Test public void taskDestinationPrecedesUserFallback() throws Exception {
+        CallerReturnTarget preferred = CallerReturnTarget.fromTask(task("p", new JSONObject()
+                .put("name", "ChatGPT").put("packageName", "com.example.chat")));
+        CallerReturnTarget explicit = CallerReturnTarget.fromTask(task("e", new JSONObject()
+                .put("returnUrl", "https://example.com/chat/123")));
+        assertSame(explicit, CallerReturnTarget.resolve(explicit, preferred));
+        assertSame(preferred, CallerReturnTarget.resolve(CallerReturnTarget.unknown(), preferred));
+        CallerReturnTarget remote = CallerReturnTarget.fromTask(task("r", new JSONObject().put("type", "remote")));
+        assertSame(preferred, CallerReturnTarget.resolve(remote, preferred));
+        assertSame(remote, CallerReturnTarget.resolve(remote, CallerReturnTarget.unknown()));
+    }
     private JSONObject task(String id, JSONObject caller) throws Exception {
         return new JSONObject().put("taskId", id).put("status", "running")
                 .put("updatedAt", java.time.Instant.now().toString())

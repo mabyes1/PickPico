@@ -23,7 +23,7 @@ final class PicoOrbOverlayController {
     }
 
     private static final long REFRESH_MS = 250L;
-    private static final int PANEL_WIDTH_DP = 260;
+    private static final int PANEL_WIDTH_DP = 224;
     private static final int PANEL_ESTIMATED_HEIGHT_DP = 232;
 
     private final Context context;
@@ -218,6 +218,15 @@ final class PicoOrbOverlayController {
         try {
             panelWindow = new PicoOrbPanelView(context);
             panelWindow.setDismissAction(this::removePanel);
+            panelWindow.setOutsideAction(event -> {
+                // The orb receives the same gesture next. Leave the panel open
+                // until its click toggles it closed, instead of closing then reopening.
+                if (orbParams != null && event.getRawX() >= orbParams.x
+                        && event.getRawX() < orbParams.x + orbSize
+                        && event.getRawY() >= orbParams.y
+                        && event.getRawY() < orbParams.y + orbSize) return;
+                removePanel();
+            });
 
             panelParams = new WindowManager.LayoutParams(
                     panelWidthForScreen(),
@@ -240,8 +249,9 @@ final class PicoOrbOverlayController {
 
     private void updatePanel(HomePulse.Snapshot snapshot) {
         if (panelWindow == null) return;
-        panelWindow.bind(snapshot, PickPicoTheme.load(context).colorA, this::openPrimary,
-                () -> openCaller(snapshot.caller));
+        CallerReturnTarget caller = CallerReturnTarget.resolve(snapshot.caller, CallerReturnSettings.load(context));
+        panelWindow.bind(snapshot, PickPicoTheme.load(context).colorA, this::openPrimary, caller,
+                () -> openCaller(caller));
         positionPanel();
         try {
             windowManager.updateViewLayout(panelWindow, panelParams);

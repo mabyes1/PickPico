@@ -23,6 +23,16 @@ final class AgentTaskRuntime {
     };
 
     private final LinkedHashMap<String, JSONObject> tasks = new LinkedHashMap<>();
+    private final java.util.function.IntConsumer awakeTasksChanged;
+
+    AgentTaskRuntime() { this(count -> {}); }
+    AgentTaskRuntime(java.util.function.IntConsumer listener) { awakeTasksChanged = listener; }
+
+    synchronized int awakeTaskCount() {
+        int count = 0;
+        for (JSONObject task : tasks.values()) if (!isTerminal(task.optString("status"))) count++;
+        return count;
+    }
 
     synchronized JSONObject info() throws JSONException {
         int active = 0;
@@ -44,6 +54,8 @@ final class AgentTaskRuntime {
                 .put("activeProjectionLeaseMs", ACTIVE_PROJECTION_LEASE_MS)
                 .put("retainedTasks", tasks.size())
                 .put("activeTasks", active)
+                .put("screenAwakeTasks", awakeTaskCount())
+                .put("screenAwakePolicy", "Until every task is completed, failed or cancelled; no idle expiry")
                 .put("staleTasks", stale);
     }
 
@@ -70,9 +82,13 @@ final class AgentTaskRuntime {
             task.put("context", new JSONObject(context.toString()));
         }
 
+        if (awakeTaskCount() >= MAX_TASKS)
+            throw new CommandRuntime.CommandInputException("Finish or cancel an existing task before creating another");
+        task.put("screenAwakeUntilTerminal", true);
         tasks.put(taskId, task);
         HomePulse.task(task);
         trim();
+        awakeTasksChanged.accept(awakeTaskCount());
         return copy(task);
     }
 
@@ -111,6 +127,8 @@ final class AgentTaskRuntime {
             task.put("leaseExpiresAt", now.plusMillis(ACTIVE_PROJECTION_LEASE_MS).toString());
         }
         HomePulse.task(task);
+        task.put("screenAwakeUntilTerminal", !isTerminal(task.optString("status")));
+        awakeTasksChanged.accept(awakeTaskCount());
         return copy(task);
     }
 
@@ -137,7 +155,10 @@ final class AgentTaskRuntime {
 
     private void trim() {
         while (tasks.size() > MAX_TASKS) {
-            String oldest = tasks.keySet().iterator().next();
+            String oldest = null;
+            for (Map.Entry<String, JSONObject> entry : tasks.entrySet())
+                if (isTerminal(entry.getValue().optString("status"))) { oldest = entry.getKey(); break; }
+            if (oldest == null) break;
             tasks.remove(oldest);
         }
     }

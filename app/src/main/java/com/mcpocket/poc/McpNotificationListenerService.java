@@ -57,6 +57,9 @@ public final class McpNotificationListenerService extends NotificationListenerSe
             return availability;
         }
         List<StatusBarNotification> items = activeNotifications();
+        int total = 0;
+        for (StatusBarNotification sbn : items)
+            if (includeOwn || !context.getPackageName().equals(sbn.getPackageName())) total++;
         items.sort(Comparator.comparingLong(StatusBarNotification::getPostTime).reversed());
         JSONArray notifications = new JSONArray();
         for (StatusBarNotification sbn : items) {
@@ -74,7 +77,75 @@ public final class McpNotificationListenerService extends NotificationListenerSe
                 .put("listenerConnected", activeInstance != null)
                 .put("notifications", notifications)
                 .put("count", notifications.length())
+                .put("totalCount", total)
+                .put("truncated", total > notifications.length())
                 .put("toolCallCount", callCount);
+    }
+
+    // One snapshot and one Android batch call. Save before changing notifications so a lost
+    // response can be recovered without deleting the next set of arriving notifications.
+    static synchronized JSONObject dismissAll(Context context, String requestId, long callCount) throws JSONException {
+        JSONObject ready = availability(context, callCount);
+        if (!ready.optBoolean("available")) return ready;
+        java.io.File dir = new java.io.File(context.getFilesDir(), "workspaces/notification-reports");
+        java.io.File report = new java.io.File(dir, requestId + ".json");
+        try {
+            if (report.isFile()) {
+                JSONObject saved = new JSONObject(new String(java.nio.file.Files.readAllBytes(report.toPath()), java.nio.charset.StandardCharsets.UTF_8));
+                saved.put("replayed", true);
+                saved.put("verification", NotificationBatch.verify(NotificationBatch.candidates(saved.getJSONArray("notifications")), activeKeys()));
+                return saved;
+            }
+            JSONObject snapshot = list(context, 200, false, callCount);
+            if (!snapshot.optBoolean("available")) return snapshot;
+            if (snapshot.optBoolean("truncated")) return new JSONObject().put("isError", true)
+                    .put("error", "notification_batch_limit").put("totalCount", snapshot.optInt("totalCount"))
+                    .put("message", "More than 200 active notifications; nothing cleared. Use bounded per-key cleanup first.");
+            JSONArray full = snapshot.getJSONArray("notifications"), compact = new JSONArray();
+            for (int i = 0; i < full.length(); i++) compact.put(NotificationBatch.compact(full.getJSONObject(i)));
+            Set<String> keys = NotificationBatch.candidates(full);
+            JSONObject result = new JSONObject().put("requestId", requestId).put("snapshotAt", java.time.Instant.now().toString())
+                    .put("notifications", compact).put("snapshotCount", full.length())
+                    .put("retainedCount", full.length() - keys.size()).put("requestedCount", keys.size())
+                    .put("reportPath", "notification-reports/" + requestId + ".json")
+                    .put("status", "prepared").put("replayed", false);
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new java.io.IOException("Cannot create report directory");
+            writeReport(report, result);
+            McpNotificationListenerService listener = activeInstance;
+            if (listener == null) return result.put("isError", true).put("error", "listener_disconnected_before_dispatch");
+            listener.cancelNotifications(keys.toArray(new String[0]));
+            result.put("status", "dispatched");
+            JSONObject verification = NotificationBatch.verify(keys, activeKeys());
+            for (int retry = 0; retry < 5 && !verification.optBoolean("verified"); retry++) {
+                try { Thread.sleep(100); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
+                verification = NotificationBatch.verify(keys, activeKeys());
+            }
+            result.put("verification", verification);
+            result.put("status", verification.getString("status"));
+            writeReport(report, result);
+            return result;
+        } catch (Exception error) {
+            return new JSONObject().put("isError", true).put("error", "notification_batch_failed")
+                    .put("reportPath", "notification-reports/" + requestId + ".json")
+                    .put("message", "Read the saved report and current notifications before retrying with a new requestId.")
+                    .put("errorType", error.getClass().getSimpleName());
+        }
+    }
+
+    private static Set<String> activeKeys() {
+        if (activeInstance == null) throw new IllegalStateException("Notification listener disconnected; cannot verify");
+        Set<String> keys = new java.util.HashSet<>();
+        for (StatusBarNotification sbn : activeNotifications()) keys.add(sbn.getKey());
+        return keys;
+    }
+
+    private static void writeReport(java.io.File target, JSONObject value) throws java.io.IOException {
+        android.util.AtomicFile file = new android.util.AtomicFile(target);
+        java.io.FileOutputStream stream = file.startWrite();
+        try {
+            stream.write(value.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            file.finishWrite(stream);
+        } catch (java.io.IOException error) { file.failWrite(stream); throw error; }
     }
 
     static JSONObject get(Context context, String key, long callCount) throws JSONException {

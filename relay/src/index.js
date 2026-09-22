@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
+import { offlineResult } from "./offline-result.js";
 
 // HUMAN_HELP uses a renewable human-idle lease, so its total wall-clock wait
 // can legitimately exceed one 360-second lease. This is only a transport
@@ -240,7 +241,9 @@ export class NodeRelay extends DurableObject {
       HEARTBEAT_STALE_MS,
     );
     if (!socket) {
-      return json({ error: "node_offline" }, 503, corsHeaders());
+      let rpc;
+      try { rpc = await request.json(); } catch { return json({ error: "node_offline" }, 503, corsHeaders()); }
+      return json(offlineResult(rpc, sockets.length, sockets.map(s => this.socketHeartbeatAgeMs(s))), 200, corsHeaders());
     }
 
     const body = await request.text();

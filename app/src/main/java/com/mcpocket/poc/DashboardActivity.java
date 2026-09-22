@@ -1019,6 +1019,8 @@ public final class DashboardActivity extends Activity {
                     refreshStatus();
                 });
         root.addView(orbCard, cardParams(7));
+        root.addView(settingsRow("Pico return app", "Choose your default return app and Pico text size.",
+                () -> startActivity(new Intent(this, CallerReturnSettingsActivity.class))), cardParams(7));
 
         TextView appHeading = sectionLabel("APP");
         appHeading.setPadding(0, dp(20), 0, dp(7));

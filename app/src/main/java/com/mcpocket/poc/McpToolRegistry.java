@@ -61,7 +61,7 @@ final class McpToolRegistry {
 
     McpToolRegistry(McpToolActions actions) throws JSONException {
         CommandRuntime runtime = new CommandRuntime(actions);
-        AgentTaskRuntime tasks = new AgentTaskRuntime();
+        AgentTaskRuntime tasks = actions.agentTaskRuntime();
         CallerRegistry callers = new CallerRegistry();
 
         register("caller_register",
@@ -84,7 +84,7 @@ final class McpToolRegistry {
 
         register(
                 "task_create",
-                "Create a long-lived Agent task before multi-step phone work. agent is mandatory: provide your actual model name/version for Home/Pico, not merely a client name. Include a short user-facing title. Non-terminal presence has a short lease; task_update renews it. Keep task status accurate through running, waiting_human, blocked and completion.",
+                "MANDATORY before phone work: create a task to keep the screen awake throughout work, including gaps between calls. Always task_update to completed/failed/cancelled in cleanup to restore normal screen timeout. agent must be your actual model. Home/Pico presence has a separate short lease; task_update renews it.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()
@@ -111,7 +111,7 @@ final class McpToolRegistry {
 
         register(
                 "task_update",
-                "Update an Agent task state or append a progress/blocker note. Any non-terminal update renews the task's Home/Pico presence lease.",
+                "Update task progress. ALWAYS finish with completed/failed/cancelled to release its continuous screen-awake hold. Other unfinished tasks keep their holds. Non-terminal updates renew Home/Pico presence only; screen hold does not expire between calls.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()

@@ -43,7 +43,7 @@ final class CapabilityIndex {
             case "human.help.status": return "Read a human-help response by requestId";
             case "notification.list": return "List active notifications";
             case "notification.get": return "Read one notification by key";
-            case "notification.dismiss": return "Clear one notification by key";
+            case "notification.dismiss": return "Clear one notification, or batch-clear all with a saved digest";
             case "notification.actions": return "Read notification buttons and reply options";
             case "notification.invoke_action": return "Invoke a discovered notification button";
             case "notification.reply": return "Send a reply via a notification";

@@ -170,6 +170,9 @@ interface McpToolActions {
                 .put("toolCallCount", callCount);
     }
 
+    default void onAgentTasksChanged(int activeTasks) { }
+    default AgentTaskRuntime agentTaskRuntime() { return new AgentTaskRuntime(this::onAgentTasksChanged); }
+
     default JSONObject notificationList(JSONObject arguments, long callCount) throws JSONException {
         return new JSONObject()
                 .put("supported", false)

@@ -243,6 +243,7 @@ final class RelayClient {
         socket.cancel();
         lastRelayDisconnectAt = Instant.now().toString();
         lastRelayDisconnectReason = detail == null ? "" : detail;
+        ConnectionDiagnostics.record(context, lastRelayDisconnectReason);
         listener.onRelayState("disconnected", remoteEndpoint, detail);
         scheduleReconnect();
     }
