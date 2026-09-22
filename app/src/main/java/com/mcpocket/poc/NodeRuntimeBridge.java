@@ -10,4 +10,5 @@ final class NodeRuntimeBridge {
     }
 
     static native int startNode(String cwd, String[] arguments);
+    static native int startNodeCaptured(String cwd, String[] arguments, String stdout, String stderr);
 }

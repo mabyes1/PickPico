@@ -80,6 +80,9 @@ interface McpToolActions {
     JSONObject nodeStart(JSONObject arguments, long callCount) throws JSONException;
 
     JSONObject nodeStatus(long callCount) throws JSONException;
+    default JSONObject development(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject().put("isError", true).put("error", "Development workbench unavailable");
+    }
 
     JSONObject nodeStop(JSONObject arguments, long callCount) throws JSONException;
 

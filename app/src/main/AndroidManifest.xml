@@ -129,6 +129,18 @@
             </intent-filter>
         </receiver>
 
+        <service android:name=".DevJobService$Slot0" android:process=":dev0" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started development job" />
+        </service>
+        <service android:name=".DevJobService$Slot1" android:process=":dev1" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started development job" />
+        </service>
+        <service android:name=".DevJobService$Slot2" android:process=":dev2" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started development job" />
+        </service>
+        <service android:name=".DevJobService$Slot3" android:process=":dev3" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started development job" />
+        </service>
         <service
             android:name=".McpNodeService"
             android:exported="false"

@@ -1044,6 +1044,18 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
     }
 
+    private DevWorkbench developmentWorkbench;
+    @Override public JSONObject development(JSONObject arguments, long callCount) throws JSONException {
+        try {
+            synchronized (this) {
+                if (developmentWorkbench == null) developmentWorkbench = new DevWorkbench(this);
+            }
+            return developmentWorkbench.call(arguments).put("toolCallCount", callCount);
+        } catch (Exception error) {
+            return new JSONObject().put("isError",true).put("error",error.getMessage() == null ? error.toString() : error.getMessage());
+        }
+    }
+
     @Override
     public JSONObject nodeStatus(long callCount) throws JSONException {
         JSONObject state = NodeRuntimeState.read(this);

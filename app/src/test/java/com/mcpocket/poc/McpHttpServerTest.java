@@ -338,7 +338,7 @@ public final class McpHttpServerTest {
                 .getJSONObject("properties")
                 .getJSONObject("commandId");
         assertEquals("string", commandIdSchema.getString("type"));
-        assertEquals(60, commandIdSchema.getJSONArray("enum").length());
+        assertEquals(61, commandIdSchema.getJSONArray("enum").length());
     }
 
     @Test
@@ -349,7 +349,7 @@ public final class McpHttpServerTest {
         assertEquals(200, list.status);
         JSONObject listed = new JSONObject(list.body).getJSONObject("result");
         JSONArray tools = listed.getJSONArray("tools");
-        assertEquals(30, tools.length());
+        assertEquals(31, tools.length());
         assertTrue(tools.toString().contains("caller_register"));
         assertEquals("thin-v1", listed.getString("toolProfile"));
         String toolText = tools.toString();
@@ -543,7 +543,7 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(60, listed.getInt("count"));
+        assertEquals(61, listed.getInt("count"));
         assertTrue(listed.getJSONArray("commands").toString().contains("guide.get"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
@@ -644,7 +644,7 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(60, capabilityList.getInt("count"));
+        assertEquals(61, capabilityList.getInt("count"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("phone.home"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));

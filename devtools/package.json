@@ -1,0 +1,1 @@
+{"name":"pickpico-devtools","version":"0.1.0","private":true,"scripts":{"test":"node --test test/*.test.cjs"},"dependencies":{"npm":"10.8.2","localtunnel":"2.0.2"}}

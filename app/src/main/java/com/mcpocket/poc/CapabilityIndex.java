@@ -14,6 +14,7 @@ final class CapabilityIndex {
     static String tool(String id) {
         if (DIRECT.contains(id)) return id.replace('.', '_');
         switch (id) {
+            case "dev": return "dev";
             case "node.info": return "server_info";
             case "capability.list": return "capability_list";
             case "capability.status": return "capability_status";
@@ -73,6 +74,7 @@ final class CapabilityIndex {
             case "workspace.read": return "Read a chunk of a workspace text file";
             case "workspace.write": return "Write or append workspace text";
             case "node.start": return "Start a workspace Node.js program";
+            case "dev": return "Develop projects: install packages, run jobs, logs, snapshots and public tunnels";
             case "node.status": return "Read Node.js program state";
             case "node.stop": return "Stop the Node.js program";
             case "app.update": return "Install PickPico from verified APK URL and hash";

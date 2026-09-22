@@ -820,6 +820,9 @@ final class CommandRuntime {
                     return actions.workspaceWriteFile(arguments, callCount);
                 });
 
+        register("dev", "Development workbench: projects, files, npm registry installation, isolated JavaScript jobs with logs, source snapshots and time-limited public tunnels. Call action=info first. Lifecycle scripts/native builds are unsupported. Stop project jobs before file edits/install/restore. Jobs return jobId; poll job.status and read job.logs. Tunnel allocation is not external verification.",
+                "runtime", "arbitrary_process", true, DevWorkbench.schema(),
+                (arguments, callCount) -> actions.development(arguments, callCount));
         register(
                 "node.start",
                 "Start one Node.js workspace entry point in PickPico's isolated :node runtime process.",

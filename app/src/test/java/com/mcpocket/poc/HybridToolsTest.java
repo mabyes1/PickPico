@@ -20,8 +20,8 @@ public final class HybridToolsTest {
     }
     @Test public void completeCatalogAndDirectSchemasStayAligned() throws Exception {
         JSONArray listed = tools.list(false, "thin-v1").getJSONArray("tools");
-        assertEquals(30, listed.length());
-        assertEquals(60, runtime.commandIds().length());
+        assertEquals(31, listed.length());
+        assertEquals(61, runtime.commandIds().length());
         assertEquals(38, runtime.dynamicIndex().trim().split("\n").length);
         for (String id : CapabilityIndex.DIRECT) {
             JSONObject found = null;
@@ -93,10 +93,10 @@ public final class HybridToolsTest {
                 .put("requiresSetup", true).put("setupType", "foreground_service_type").put("reason", "Open the app to refresh media access");
         when(actions.capabilityState("camera.capture")).thenReturn(unavailable);
         when(actions.capabilityState("microphone.record")).thenReturn(unavailable);
-        assertEquals(60, runtime.list().getInt("count"));
-        assertEquals(60, runtime.execute("capability.list", new JSONObject(), 1).getInt("count"));
-        assertEquals(60, runtime.search(new JSONObject()).getInt("totalCandidates"));
-        assertEquals(58, runtime.search(new JSONObject().put("availableOnly", true)).getInt("totalCandidates"));
+        assertEquals(61, runtime.list().getInt("count"));
+        assertEquals(61, runtime.execute("capability.list", new JSONObject(), 1).getInt("count"));
+        assertEquals(61, runtime.search(new JSONObject()).getInt("totalCandidates"));
+        assertEquals(59, runtime.search(new JSONObject().put("availableOnly", true)).getInt("totalCandidates"));
         JSONObject exact = runtime.search(new JSONObject().put("query", "camera.capture"));
         assertEquals(1, exact.getInt("count"));
         JSONObject match = exact.getJSONArray("matches").getJSONObject(0);

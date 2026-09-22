@@ -28,6 +28,7 @@ final class McpToolRegistry {
         THIN_TOOLS.add("caller_register");
         THIN_TOOLS.add("task_update");
         THIN_TOOLS.add("task_status");
+        THIN_TOOLS.add("dev");
     }
     private interface Handler {
         JSONObject call(JSONObject arguments, long callCount) throws JSONException;
@@ -63,6 +64,8 @@ final class McpToolRegistry {
         CommandRuntime runtime = new CommandRuntime(actions);
         AgentTaskRuntime tasks = actions.agentTaskRuntime();
         CallerRegistry callers = new CallerRegistry();
+        register("dev", "Phone development workbench. Start with action=info. Create a project, write files, install pure-JS npm dependencies, run an entry with args, poll jobs/read stdout and stderr, stop, snapshot/diff/restore, or open an explicitly public temporary tunnel. Separate from legacy node runtime. Does not emulate arbitrary npm shell scripts or native builds.",
+                DevWorkbench.schema(), (arguments, callCount) -> runtime.execute("dev", arguments, callCount));
 
         register("caller_register",
                 "Register an explicit return destination for the Pico orb before task_create. Use only your known Android package or HTTPS conversation URL; never guess from the foreground app or client name. For desktop/remote callers without a phone destination use type remote and omit destinations. Pass the returned callerId to task_create. Optional; ordinary phone commands need no registration.",
@@ -507,7 +510,7 @@ final class McpToolRegistry {
     private static boolean requiresAgent(String name) {
         // Discovery/status for the task system remain usable before identification.
         // Both the Thin command gateway and legacy direct device tools require it.
-        return "task_create".equals(name) || "command_run".equals(name)
+        return "dev".equals(name) || "task_create".equals(name) || "command_run".equals(name)
                 || (!THIN_TOOLS.contains(name) && !"command_list".equals(name));
     }
 
