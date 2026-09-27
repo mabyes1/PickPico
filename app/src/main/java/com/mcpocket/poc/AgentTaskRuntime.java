@@ -55,7 +55,7 @@ final class AgentTaskRuntime {
                 .put("retainedTasks", tasks.size())
                 .put("activeTasks", active)
                 .put("screenAwakeTasks", awakeTaskCount())
-                .put("screenAwakePolicy", "Until every task is completed, failed or cancelled; no idle expiry")
+                .put("screenAwakePolicy", "Unfinished task AND Agent activity within 3 minutes; task updates renew activity")
                 .put("staleTasks", stale);
     }
 
@@ -84,7 +84,7 @@ final class AgentTaskRuntime {
 
         if (awakeTaskCount() >= MAX_TASKS)
             throw new CommandRuntime.CommandInputException("Finish or cancel an existing task before creating another");
-        task.put("screenAwakeUntilTerminal", true);
+        task.put("screenAwakeUntilTerminal", false).put("screenAwakeIdleTimeoutMs", AgentScreenLease.IDLE_MS);
         tasks.put(taskId, task);
         HomePulse.task(task);
         trim();
@@ -127,7 +127,7 @@ final class AgentTaskRuntime {
             task.put("leaseExpiresAt", now.plusMillis(ACTIVE_PROJECTION_LEASE_MS).toString());
         }
         HomePulse.task(task);
-        task.put("screenAwakeUntilTerminal", !isTerminal(task.optString("status")));
+        task.put("screenAwakeUntilTerminal", false);
         awakeTasksChanged.accept(awakeTaskCount());
         return copy(task);
     }

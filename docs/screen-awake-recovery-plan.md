@@ -1,6 +1,28 @@
 # Screen-awake recovery proposal
 
-Status: proposed, not implemented in 0.17.1. Source reviewed 2026-09-28.
+Status: original proposal below; simplified activity lease shipped in 0.17.2.
+Source reviewed 2026-09-28.
+
+## Shipped behavior (0.17.2)
+
+Display retention requires both an unfinished task and caller activity within
+180 seconds, measured with Android monotonic elapsed time. Task creation/update
+and new operational capability calls renew activity. Discovery, node health and
+automatic update checks do not. Completion of a command never renews the lease.
+All tasks finishing releases immediately. Expiry removes the keep-awake overlay
+and releases the timed fallback wake lock without waiting for another request.
+Task history and background development jobs are retained.
+
+This is a shared display activity lease, not per-task attribution: another active
+Agent can retain the display while any unfinished task exists, but inactivity
+always expires it. Expiration runs on the service Looper independently of HTTP
+command workers. This fixes abandoned tasks and hung command workers; dedicated
+process protection against an Android main-Looper deadlock and a manual revoke
+button remain outside this patch. No screen-timeout settings are changed.
+
+Targeted tests cover inactivity, renewal, completion, ignored health checks, and
+Android service release after simulated three-minute inactivity with an unfinished
+task/command, including a late command completion.
 
 ## Confirmed code paths
 

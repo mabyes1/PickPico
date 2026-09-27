@@ -67,11 +67,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class McpNodeService extends Service implements McpToolActions {
-    private static final long AGENT_SCREEN_IDLE_LEASE_MS = 90_000L;
-    // human.help can legitimately wait for up to 360 seconds. Keep an active
-    // command covered longer than that, while retaining a bounded safety timeout
-    // in case Android tears down execution before the finish hook runs.
-    private static final long AGENT_SCREEN_ACTIVE_LEASE_MS = TimeUnit.MINUTES.toMillis(10L);
     public static final String ACTION_START = "com.mcpocket.poc.action.START";
     public static final String ACTION_STOP = "com.mcpocket.poc.action.STOP";
     public static final String ACTION_RESET_RELAY_IDENTITY = "com.mcpocket.poc.action.RESET_RELAY_IDENTITY";
@@ -124,28 +119,16 @@ public final class McpNodeService extends Service implements McpToolActions {
     private AndroidDeviceCapabilities deviceCapabilities;
     private boolean mediaForegroundRequested;
     private PowerManager.WakeLock agentScreenWakeLock;
-    private int activeAgentCommandCount;
+    private final AgentScreenLease agentScreenLease = new AgentScreenLease();
     private volatile int awakeTaskCount;
     // Loopback server recovery must not orphan task IDs or their screen holds.
     private final AgentTaskRuntime agentTasks = new AgentTaskRuntime(this::onAgentTasksChanged);
     @Override public AgentTaskRuntime agentTaskRuntime() { return agentTasks; }
     private boolean agentScreenDestroyed;
-    private final Runnable agentScreenRetryRunnable = () -> {
-        if (!agentScreenDestroyed) {
-            refreshAgentScreenAwakeState(activeAgentCommandCount > 0
-                    ? AGENT_SCREEN_ACTIVE_LEASE_MS : AGENT_SCREEN_IDLE_LEASE_MS);
-        }
-    };
+    private final Runnable agentScreenRetryRunnable = this::refreshAgentScreenAwakeState;
     private WindowManager agentScreenWindowManager;
     private View agentScreenKeepAwakeView;
-    private final Runnable agentScreenIdleReleaseRunnable = () -> {
-        synchronized (McpNodeService.this) {
-            if (activeAgentCommandCount == 0 && awakeTaskCount == 0) {
-                releaseAgentScreenKeepAwakeWindow();
-                releaseAgentScreenLease();
-            }
-        }
-    };
+    private final Runnable agentScreenIdleReleaseRunnable = this::refreshAgentScreenAwakeState;
     private RelayClient relayClient;
     private BleButtonBridge buttonBridge;
     private PicoOrbOverlayController picoOrbOverlay;
@@ -268,7 +251,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         mainHandler.removeCallbacks(agentScreenRetryRunnable);
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
-        activeAgentCommandCount = 0;
+        agentScreenLease.tasksChanged(0, SystemClock.elapsedRealtime());
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
         if (humanHelpDelivery != null) humanHelpDelivery.stop();
@@ -308,10 +291,13 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public void onAgentCommandStarted(String commandId) {
-        if ("phone.wake".equals(commandId)) {
-            return;
-        }
-        postAgentScreenAction(this::startAgentScreenCommand);
+        if (!AgentScreenLease.isActivity(commandId)) return;
+        postAgentScreenAction(() -> {
+            agentScreenLease.activity(SystemClock.elapsedRealtime());
+            refreshAgentScreenAwakeState();
+            mainHandler.removeCallbacks(agentScreenRetryRunnable);
+            mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
+        });
     }
 
     @Override
@@ -319,72 +305,35 @@ public final class McpNodeService extends Service implements McpToolActions {
         postAgentScreenAction(() -> {
             boolean starting = awakeTaskCount == 0 && activeTasks > 0;
             awakeTaskCount = activeTasks;
-            mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
-            if (activeTasks > 0) {
-                // Wake once at task start; do not repeatedly override a manual power-button lock.
-                if (starting) try { phoneWake(0L); } catch (Exception ignored) { }
-                refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
-                mainHandler.removeCallbacks(agentScreenRetryRunnable);
-                mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
-            } else if (activeAgentCommandCount == 0) {
-                mainHandler.removeCallbacks(agentScreenRetryRunnable);
-                releaseAgentScreenKeepAwakeWindow();
-                releaseAgentScreenLease();
-            }
+            agentScreenLease.tasksChanged(activeTasks, SystemClock.elapsedRealtime());
+            if (starting) try { phoneWake(0L); } catch (Exception ignored) { }
+            refreshAgentScreenAwakeState();
         });
     }
 
-    // WindowManager views and their lifecycle belong to the main Looper, even
-    // when the command itself runs on an HTTP worker. Never block that worker
-    // waiting for the main thread, and ignore callbacks after service teardown.
     private void postAgentScreenAction(Runnable action) {
-        mainHandler.post(() -> {
-            if (!agentScreenDestroyed) action.run();
-        });
-    }
-
-    private void startAgentScreenCommand() {
-        activeAgentCommandCount++;
-        mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
-        refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
-        // Some commands (notably human.help / urgent notifications) wake the
-        // screen from inside their handler. If the start hook ran while the
-        // display was still asleep, retry once after that wake has had time to
-        // land so a long-running command remains visibly awake.
-        mainHandler.removeCallbacks(agentScreenRetryRunnable);
-        mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
+        mainHandler.post(() -> { if (!agentScreenDestroyed) action.run(); });
     }
 
     @Override
     public void onAgentCommandFinished(String commandId) {
-        if ("phone.wake".equals(commandId)) {
-            return;
-        }
-        postAgentScreenAction(this::finishAgentScreenCommand);
+        // A late completion must never renew an expired activity lease.
+        if (AgentScreenLease.isActivity(commandId)) postAgentScreenAction(this::refreshAgentScreenAwakeState);
     }
 
-    private void finishAgentScreenCommand() {
-        if (activeAgentCommandCount > 0) {
-            activeAgentCommandCount--;
-        }
-        if (activeAgentCommandCount > 0 || awakeTaskCount > 0) {
-            refreshAgentScreenAwakeState(AGENT_SCREEN_ACTIVE_LEASE_MS);
-        } else {
-            // Keep the display awake briefly after the last Agent command so a
-            // multi-command flow can continue without racing the user's normal
-            // screen timeout. Manual power-button locking is still respected.
-            refreshAgentScreenAwakeState(AGENT_SCREEN_IDLE_LEASE_MS);
-            mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
-            mainHandler.postDelayed(agentScreenIdleReleaseRunnable, AGENT_SCREEN_IDLE_LEASE_MS);
-        }
-    }
-
-    private synchronized void refreshAgentScreenAwakeState(long fallbackLeaseMs) {
-        if (ensureAgentScreenKeepAwakeWindow()) {
+    private synchronized void refreshAgentScreenAwakeState() {
+        if (agentScreenDestroyed) return;
+        mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
+        long remaining = agentScreenLease.remaining(SystemClock.elapsedRealtime());
+        if (remaining == 0) {
+            releaseAgentScreenKeepAwakeWindow();
             releaseAgentScreenLease();
             return;
         }
-        refreshAgentScreenLease(fallbackLeaseMs);
+        // Expiry is scheduled even if a command is stuck or tasks remain unfinished.
+        mainHandler.postDelayed(agentScreenIdleReleaseRunnable, remaining);
+        if (ensureAgentScreenKeepAwakeWindow()) releaseAgentScreenLease();
+        else refreshAgentScreenLease(remaining);
     }
 
     private synchronized boolean ensureAgentScreenKeepAwakeWindow() {
@@ -459,8 +408,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             if (agentScreenWakeLock.isHeld()) {
                 agentScreenWakeLock.release();
             }
-            if (awakeTaskCount > 0) agentScreenWakeLock.acquire();
-            else agentScreenWakeLock.acquire(leaseMs);
+            agentScreenWakeLock.acquire(leaseMs);
         } catch (RuntimeException ignored) {
         }
     }
@@ -620,9 +568,11 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("connectionDiagnostics", ConnectionDiagnostics.snapshot(this))
                 .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
                 .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
-                        .put("requested", awakeTaskCount > 0).put("overlayHeld", agentScreenKeepAwakeView != null)
+                        .put("requested", agentScreenLease.remaining(SystemClock.elapsedRealtime()) > 0)
+                        .put("idleTimeoutMs", AgentScreenLease.IDLE_MS)
+                        .put("remainingMs", agentScreenLease.remaining(SystemClock.elapsedRealtime())).put("overlayHeld", agentScreenKeepAwakeView != null)
                         .put("wakeLockHeld", agentScreenWakeLock != null && agentScreenWakeLock.isHeld())
-                        .put("restoration", "Original display timeout is never modified; holds are released on task completion or service teardown"))
+                        .put("restoration", "Original display timeout is never modified; holds expire after 3 minutes without Agent activity or when all tasks finish"))
                 .put("toolCallCount", callCount);
         if (relayClient != null) {
             result.put("relay", relayClient.diagnostics());

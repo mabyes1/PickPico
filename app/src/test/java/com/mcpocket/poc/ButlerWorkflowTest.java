@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.*;
 
 public class ButlerWorkflowTest {
-    @Test public void taskHoldsSurvivePresentationExpiryAndReleaseOnlyAfterLastTask() throws Exception {
+    @Test public void unfinishedTaskCountsSurvivePresentationExpiryUntilLastTaskEnds() throws Exception {
         AtomicInteger count = new AtomicInteger();
         AgentTaskRuntime runtime = new AgentTaskRuntime(count::set);
         JSONObject a = runtime.create(new JSONObject().put("agent", "test model").put("objective", "a"));
