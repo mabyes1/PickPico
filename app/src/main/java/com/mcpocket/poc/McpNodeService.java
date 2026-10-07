@@ -133,6 +133,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     private BleButtonBridge buttonBridge;
     private PicoOrbOverlayController picoOrbOverlay;
     private HumanHelpDelivery humanHelpDelivery;
+    private PicoAdbDiscovery picoAdbDiscovery;
 
     @Override
     public void onCreate() {
@@ -145,6 +146,8 @@ public final class McpNodeService extends Service implements McpToolActions {
         picoOrbOverlay.start();
         humanHelpDelivery = new HumanHelpDelivery(this);
         humanHelpDelivery.start();
+        picoAdbDiscovery = new PicoAdbDiscovery(this);
+        picoAdbDiscovery.start();
     }
 
     @Override
@@ -255,6 +258,10 @@ public final class McpNodeService extends Service implements McpToolActions {
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
         if (humanHelpDelivery != null) humanHelpDelivery.stop();
+        if (picoAdbDiscovery != null) {
+            picoAdbDiscovery.stop();
+            picoAdbDiscovery = null;
+        }
         if (picoOrbOverlay != null) {
             picoOrbOverlay.destroy();
             picoOrbOverlay = null;
@@ -574,6 +581,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("processStartedAt", PickPicoApplication.processStartedAt())
                 .put("connectionDiagnostics", ConnectionDiagnostics.snapshot(this))
                 .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
+                .put("picoAdb", picoAdbDiscovery == null ? JSONObject.NULL : picoAdbDiscovery.status())
                 .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
                         .put("activeOperations", agentScreenLease.activeOperations())
                         .put("requested", agentScreenLease.activeOperations() > 0)
