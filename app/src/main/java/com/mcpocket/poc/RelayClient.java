@@ -87,6 +87,9 @@ final class RelayClient {
     private volatile boolean closed;
     private int reconnectAttempt;
     private long reconnectAttemptCount;
+    private long disconnectCount;
+    private long heartbeatSentCount;
+    private long heartbeatPongCount;
     private volatile String pendingHeartbeatNonce;
     private volatile ScheduledFuture<?> heartbeatFuture;
     private volatile ScheduledFuture<?> heartbeatTimeoutFuture;
@@ -181,6 +184,9 @@ final class RelayClient {
                 .put("lastLoopbackProxyRequestId", lastLoopbackProxyRequestId)
                 .put("loopbackHealthy", loopbackHealthy)
                 .put("reconnectAttemptCount", reconnectAttemptCount)
+                .put("disconnectCount", disconnectCount)
+                .put("heartbeatSentCount", heartbeatSentCount)
+                .put("heartbeatPongCount", heartbeatPongCount)
                 .put("reconnectBackoffAttempt", reconnectAttempt)
                 .put("currentNetworkType", observedNetworkType)
                 .put("socketPresent", webSocket != null);
@@ -243,6 +249,7 @@ final class RelayClient {
         socket.cancel();
         lastRelayDisconnectAt = Instant.now().toString();
         lastRelayDisconnectReason = detail == null ? "" : detail;
+        disconnectCount++;
         ConnectionDiagnostics.record(context, lastRelayDisconnectReason);
         listener.onRelayState("disconnected", remoteEndpoint, detail);
         scheduleReconnect();
@@ -270,6 +277,7 @@ final class RelayClient {
                     .put("nonce", nonce)
                     .put("sentAtElapsedMs", SystemClock.elapsedRealtime())
                     .toString());
+            if (queued) heartbeatSentCount++;
             if (!queued) {
                 pendingHeartbeatNonce = null;
                 listener.onRelayState("stale", remoteEndpoint, "relay heartbeat could not be queued");
@@ -343,6 +351,7 @@ final class RelayClient {
             relayConnectedAt = Instant.now().toString();
         }
         lastRelayPongAt = Instant.now().toString();
+        heartbeatPongCount++;
         listener.onRelayState("connected", remoteEndpoint, "relay heartbeat healthy");
     }
 
