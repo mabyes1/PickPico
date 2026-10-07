@@ -251,7 +251,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         mainHandler.removeCallbacks(agentScreenRetryRunnable);
         mainHandler.removeCallbacks(autoUpdateCheckRunnable);
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
-        agentScreenLease.tasksChanged(0, SystemClock.elapsedRealtime());
+        agentScreenLease.reset();
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
         if (humanHelpDelivery != null) humanHelpDelivery.stop();
@@ -293,8 +293,13 @@ public final class McpNodeService extends Service implements McpToolActions {
     public void onAgentCommandStarted(String commandId) {
         if (!AgentScreenLease.isActivity(commandId)) return;
         postAgentScreenAction(() -> {
-            agentScreenLease.activity(SystemClock.elapsedRealtime());
+            boolean firstOperation = agentScreenLease.started(commandId, SystemClock.elapsedRealtime());
+            if (firstOperation) {
+                try { phoneWake(0L); } catch (Exception ignored) { }
+            }
             refreshAgentScreenAwakeState();
+            // phoneWake can become interactive asynchronously. Re-check once so
+            // the overlay hold is installed as soon as the display is available.
             mainHandler.removeCallbacks(agentScreenRetryRunnable);
             mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
         });
@@ -302,13 +307,9 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public void onAgentTasksChanged(int activeTasks) {
-        postAgentScreenAction(() -> {
-            boolean starting = awakeTaskCount == 0 && activeTasks > 0;
-            awakeTaskCount = activeTasks;
-            agentScreenLease.tasksChanged(activeTasks, SystemClock.elapsedRealtime());
-            if (starting) try { phoneWake(0L); } catch (Exception ignored) { }
-            refreshAgentScreenAwakeState();
-        });
+        // Tasks remain useful for Agent progress/history, but never own the screen.
+        // Screen lifetime is tied strictly to operational command start/finish.
+        postAgentScreenAction(() -> awakeTaskCount = activeTasks);
     }
 
     private void postAgentScreenAction(Runnable action) {
@@ -317,23 +318,29 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public void onAgentCommandFinished(String commandId) {
-        // A late completion must never renew an expired activity lease.
-        if (AgentScreenLease.isActivity(commandId)) postAgentScreenAction(this::refreshAgentScreenAwakeState);
+        if (!AgentScreenLease.isActivity(commandId)) return;
+        postAgentScreenAction(() -> {
+            agentScreenLease.finished(commandId);
+            refreshAgentScreenAwakeState();
+        });
     }
 
     private synchronized void refreshAgentScreenAwakeState() {
         if (agentScreenDestroyed) return;
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
-        long remaining = agentScreenLease.remaining(SystemClock.elapsedRealtime());
-        if (remaining == 0) {
+        long now = SystemClock.elapsedRealtime();
+        agentScreenLease.expireIfNeeded(now);
+        long remaining = agentScreenLease.remaining(now);
+        if (agentScreenLease.activeOperations() == 0) {
             releaseAgentScreenKeepAwakeWindow();
             releaseAgentScreenLease();
             return;
         }
-        // Expiry is scheduled even if a command is stuck or tasks remain unfinished.
-        mainHandler.postDelayed(agentScreenIdleReleaseRunnable, remaining);
+        // A bounded watchdog is only crash/hang protection. Normal completion
+        // releases the display immediately from onAgentCommandFinished().
+        mainHandler.postDelayed(agentScreenIdleReleaseRunnable, Math.max(1L, remaining));
         if (ensureAgentScreenKeepAwakeWindow()) releaseAgentScreenLease();
-        else refreshAgentScreenLease(remaining);
+        else refreshAgentScreenLease(Math.max(1L, remaining));
     }
 
     private synchronized boolean ensureAgentScreenKeepAwakeWindow() {
@@ -568,11 +575,13 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("connectionDiagnostics", ConnectionDiagnostics.snapshot(this))
                 .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
                 .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
-                        .put("requested", agentScreenLease.remaining(SystemClock.elapsedRealtime()) > 0)
-                        .put("idleTimeoutMs", AgentScreenLease.IDLE_MS)
-                        .put("remainingMs", agentScreenLease.remaining(SystemClock.elapsedRealtime())).put("overlayHeld", agentScreenKeepAwakeView != null)
+                        .put("activeOperations", agentScreenLease.activeOperations())
+                        .put("requested", agentScreenLease.activeOperations() > 0)
+                        .put("watchdogMs", AgentScreenLease.WATCHDOG_MS)
+                        .put("remainingWatchdogMs", agentScreenLease.remaining(SystemClock.elapsedRealtime()))
+                        .put("overlayHeld", agentScreenKeepAwakeView != null)
                         .put("wakeLockHeld", agentScreenWakeLock != null && agentScreenWakeLock.isHeld())
-                        .put("restoration", "Original display timeout is never modified; holds expire after 3 minutes without Agent activity or when all tasks finish"))
+                        .put("restoration", "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"))
                 .put("toolCallCount", callCount);
         if (relayClient != null) {
             result.put("relay", relayClient.diagnostics());
