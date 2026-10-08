@@ -61,6 +61,18 @@ interface McpToolActions {
 
     JSONObject phoneStatus(long callCount) throws JSONException;
 
+    default JSONObject picoAdbStatus(long callCount) throws JSONException {
+        return unsupported("picoadb.status", callCount);
+    }
+
+    default JSONObject picoAdbDiscover(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("picoadb.discover", callCount);
+    }
+
+    default JSONObject picoAdbBatteryDiagnostics(long callCount) throws JSONException {
+        return unsupported("picoadb.battery_diagnostics", callCount);
+    }
+
     JSONObject phoneExec(String command, long callCount) throws JSONException;
 
     JSONObject execCommand(JSONObject arguments, long callCount) throws JSONException;

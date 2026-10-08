@@ -7,7 +7,8 @@ import java.util.Set;
 /** Small vocabulary shared by top-level discovery and deterministic fallback search. */
 final class CapabilityIndex {
     static final Set<String> DIRECT = new LinkedHashSet<>(Arrays.asList(
-            "phone.status", "phone.wake", "phone.home", "camera.capture", "phone.speak",
+            "phone.status", "picoadb.status", "picoadb.discover", "picoadb.battery_diagnostics",
+            "phone.wake", "phone.home", "camera.capture", "phone.speak",
             "human.help", "human.help.status", "notification.list", "notification.reply",
             "ui.inspect", "ui.action", "ui.type", "ui.scroll", "screen.capture",
             "app.list", "app.launch", "url.open", "location.get"));
@@ -27,6 +28,9 @@ final class CapabilityIndex {
             case "guide.get": return "Read an operation guide";
             case "node.info": return "Device and connection information";
             case "phone.status": return "Battery, network and storage";
+            case "picoadb.status": return "Wireless Debugging and privileged access state";
+            case "picoadb.discover": return "Scan for Wireless Debugging endpoints";
+            case "picoadb.battery_diagnostics": return "Collect full privileged battery diagnostics";
             case "capability.list": return "All capability names and availability";
             case "capability.status": return "Exact input schema and availability";
             case "policy.status": return "Local approval policy";
@@ -97,7 +101,18 @@ final class CapabilityIndex {
         boolean create = has(q, "create add new 新增 建立 添加");
         boolean edit = has(q, "update edit write set change replace lower decrease raise increase 調整 调整 調低 调低 調高 修改 設定 设置 寫入 写入 貼上");
         boolean open = has(q, "open launch 開啟 打開 打开 開");
-        if (has(q, "battery 電量 电量 剩多少電 剩多少电")) return ids("phone.status");
+        if (has(q, "battery 電量 电量 剩多少電 剩多少电")) {
+            if (has(q, "diagnostic diagnostics batterystats wakelock doze 耗電 診斷 诊断 待機 待机 喚醒 唤醒")) {
+                return ids("picoadb.battery_diagnostics", "phone.status");
+            }
+            return ids("phone.status");
+        }
+        if (has(q, "wireless debugging adb picoadb 無線偵錯 无线调试") ) {
+            if (has(q, "scan discover pairing connect 掃描 搜尋 搜索 配對 配对 連線 连接")) {
+                return ids("picoadb.discover", "picoadb.status");
+            }
+            return ids("picoadb.status");
+        }
         if (has(q, "volume audio 音量 音效")) return ids(edit ? "audio.set" : "audio.status");
         if (has(q, "calendar agenda schedule event events 行事曆 日曆 日历 行程")) {
             if (remove) return ids("calendar.delete");

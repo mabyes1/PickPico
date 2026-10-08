@@ -108,9 +108,9 @@ export default {
       });
     }
 
-    // v1/v2 remain available for existing clients. v3 is the Thin MCP public schema
-    // boundary: a small stable top-level tool set backed by dynamic capability discovery.
-    const match = url.pathname.match(/^\/(v1|v2|v3)\/nodes\/([^/]+)\/(connect|mcp|status)$/);
+    // v1/v2 remain available for existing clients. v3/v4 are Thin MCP public-schema
+    // boundaries; v4 forces clients to refresh schema after PicoADB was added.
+    const match = url.pathname.match(/^\/(v1|v2|v3|v4)\/nodes\/([^/]+)\/(connect|mcp|status)$/);
     if (!match) {
       return json({ error: "not_found" }, 404);
     }
@@ -118,7 +118,7 @@ export default {
     const apiVersion = match[1];
     const nodeId = match[2];
     const action = match[3];
-    if ((apiVersion === "v2" || apiVersion === "v3") && action !== "mcp") {
+    if ((apiVersion === "v2" || apiVersion === "v3" || apiVersion === "v4") && action !== "mcp") {
       return json({ error: "not_found" }, 404);
     }
     if (!NODE_ID_PATTERN.test(nodeId)) {
@@ -260,7 +260,8 @@ export class NodeRelay extends DurableObject {
       const value = request.headers.get(name);
       if (value) headers[name] = value;
     }
-    if (new URL(request.url).pathname.startsWith("/v3/")) {
+    const publicPath = new URL(request.url).pathname;
+    if (publicPath.startsWith("/v3/") || publicPath.startsWith("/v4/")) {
       headers["x-pickpico-tool-profile"] = "thin-v1";
     }
 

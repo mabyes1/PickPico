@@ -1,27 +1,61 @@
 package com.mcpocket.poc;
 
-/** Monotonic activity lease, independent of command completion and task retention. */
+/**
+ * Operation-scoped display hold.
+ *
+ * Every operational Agent command acquires a hold at dispatch start and must
+ * release it from the command runtime's finally block. A bounded watchdog only
+ * exists as crash/hang protection; ordinary task lifetime never owns the screen.
+ */
 final class AgentScreenLease {
-    static final long IDLE_MS = 180_000L;
-    private int unfinishedTasks;
-    private long deadline;
+    static final long WATCHDOG_MS = 360_000L;
+    // Compatibility name used by older diagnostics/tests while callers migrate.
+    static final long IDLE_MS = WATCHDOG_MS;
 
-    synchronized void tasksChanged(int count, long now) {
-        unfinishedTasks = count;
-        if (count > 0) activity(now); else deadline = 0;
+    private int activeOperations;
+    private long watchdogDeadline;
+
+    synchronized boolean started(String command, long now) {
+        if (!isActivity(command)) return false;
+        activeOperations++;
+        watchdogDeadline = now + WATCHDOG_MS;
+        return activeOperations == 1;
     }
 
-    synchronized void activity(long now) {
-        if (unfinishedTasks > 0) deadline = now + IDLE_MS;
+    synchronized boolean finished(String command) {
+        if (!isActivity(command)) return false;
+        if (activeOperations > 0) activeOperations--;
+        if (activeOperations == 0) watchdogDeadline = 0L;
+        return activeOperations == 0;
+    }
+
+    synchronized int activeOperations() {
+        return activeOperations;
+    }
+
+    synchronized boolean expireIfNeeded(long now) {
+        if (activeOperations <= 0 || watchdogDeadline <= 0L || now < watchdogDeadline) {
+            return false;
+        }
+        activeOperations = 0;
+        watchdogDeadline = 0L;
+        return true;
     }
 
     synchronized long remaining(long now) {
-        return unfinishedTasks > 0 ? Math.max(0, deadline - now) : 0;
+        if (activeOperations <= 0 || watchdogDeadline <= 0L) return 0L;
+        return Math.max(0L, watchdogDeadline - now);
+    }
+
+    synchronized void reset() {
+        activeOperations = 0;
+        watchdogDeadline = 0L;
     }
 
     static boolean isActivity(String command) {
         return !command.equals("node.info") && !command.equals("guide.get")
                 && !command.startsWith("capability.") && !command.equals("policy.status")
+                && !command.equals("picoadb.status")
                 && !command.equals("app.update_check") && !command.equals("app.update_status");
     }
 }

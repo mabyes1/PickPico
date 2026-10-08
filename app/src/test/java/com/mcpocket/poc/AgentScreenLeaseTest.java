@@ -1,41 +1,51 @@
 package com.mcpocket.poc;
 
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 public class AgentScreenLeaseTest {
-    @Test public void abandonedTaskAndNeverFinishedCommandExpire() {
+    @Test public void firstOperationAcquiresAndLastFinishReleases() {
         AgentScreenLease lease = new AgentScreenLease();
-        lease.tasksChanged(1, 100);
-        lease.activity(200);
-        assertEquals(1, lease.remaining(180199));
-        assertEquals(0, lease.remaining(180200));
-        assertEquals(0, lease.remaining(999999));
+
+        assertTrue(lease.started("ui.inspect", 100L));
+        assertEquals(1, lease.activeOperations());
+        assertFalse(lease.started("ui.action", 200L));
+        assertEquals(2, lease.activeOperations());
+
+        assertFalse(lease.finished("ui.inspect"));
+        assertEquals(1, lease.activeOperations());
+        assertTrue(lease.finished("ui.action"));
+        assertEquals(0, lease.activeOperations());
+        assertEquals(0L, lease.remaining(300L));
     }
-    @Test public void activityRequiresTaskAndCompletionReleasesImmediately() {
+
+    @Test public void watchdogOnlyRecoversHungOperation() {
         AgentScreenLease lease = new AgentScreenLease();
-        lease.activity(100);
-        assertEquals(0, lease.remaining(100));
-        lease.tasksChanged(2, 200);
-        lease.tasksChanged(1, 300);
-        assertTrue(lease.remaining(300) > 0);
-        lease.tasksChanged(0, 400);
-        lease.activity(500);
-        assertEquals(0, lease.remaining(500));
+
+        lease.started("process.exec", 100L);
+        assertTrue(lease.remaining(100L) > 0L);
+        assertFalse(lease.expireIfNeeded(100L + AgentScreenLease.WATCHDOG_MS - 1L));
+        assertTrue(lease.expireIfNeeded(100L + AgentScreenLease.WATCHDOG_MS));
+        assertEquals(0, lease.activeOperations());
     }
-    @Test public void continuingActivityRenewsAndExpiredWorkCanResume() {
+
+    @Test public void lateFinishAfterWatchdogCannotUnderflow() {
         AgentScreenLease lease = new AgentScreenLease();
-        lease.tasksChanged(1, 100);
-        lease.activity(150000);
-        assertEquals(150000, lease.remaining(180000));
-        assertEquals(0, lease.remaining(330000));
-        lease.activity(400000);
-        assertEquals(180000, lease.remaining(400000));
+
+        lease.started("process.exec", 100L);
+        lease.expireIfNeeded(100L + AgentScreenLease.WATCHDOG_MS);
+        assertTrue(lease.finished("process.exec"));
+        assertEquals(0, lease.activeOperations());
     }
-    @Test public void healthAndAutomaticChecksDoNotRenew() {
+
+    @Test public void healthAndAutomaticChecksDoNotOwnScreen() {
         assertFalse(AgentScreenLease.isActivity("node.info"));
         assertFalse(AgentScreenLease.isActivity("app.update_check"));
+        assertFalse(AgentScreenLease.isActivity("picoadb.status"));
         assertTrue(AgentScreenLease.isActivity("ui.inspect"));
         assertTrue(AgentScreenLease.isActivity("process.exec"));
+        assertTrue(AgentScreenLease.isActivity("picoadb.discover"));
+        assertTrue(AgentScreenLease.isActivity("picoadb.battery_diagnostics"));
     }
 }

@@ -79,6 +79,7 @@ public final class DashboardActivity extends Activity {
     static final int PAGE_REMOTE = 3;
     private static final int PAGE_DEVELOPER = 4;
     private static final int PAGE_APPEARANCE = 5;
+    private static final int PAGE_PICO_ADB = 6;
 
     private static final int BG = PickPicoTheme.BASE_BG;
     private static final int TEXT = PickPicoTheme.TEXT;
@@ -146,6 +147,7 @@ public final class DashboardActivity extends Activity {
     // Settings / update
     private TextView settingsApprovalState;
     private TextView settingsRemoteState;
+    private TextView settingsPicoAdbState;
     private TextView settingsVersionState;
     private TextView settingsUpdateState;
     private TextView updateAction;
@@ -172,6 +174,15 @@ public final class DashboardActivity extends Activity {
     private EditText relayUrlInput;
     private TextView remoteState;
     private TextView remoteEndpointSummary;
+
+    // PicoADB / Wireless Debugging
+    private TextView picoAdbState;
+    private TextView picoAdbDetail;
+    private TextView picoAdbScanAction;
+    private TextView picoAdbPairAction;
+    private TextView picoAdbConnectAction;
+    private EditText picoAdbPairCodeInput;
+    private boolean picoAdbBusy;
 
     // Developer / diagnostics
     private TextView devLocalEndpoint;
@@ -228,7 +239,8 @@ public final class DashboardActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (currentPage == PAGE_REMOTE || currentPage == PAGE_DEVELOPER || currentPage == PAGE_APPEARANCE) {
+        if (currentPage == PAGE_REMOTE || currentPage == PAGE_DEVELOPER
+                || currentPage == PAGE_APPEARANCE || currentPage == PAGE_PICO_ADB) {
             showPage(PAGE_SETTINGS);
             return;
         }
@@ -395,6 +407,9 @@ public final class DashboardActivity extends Activity {
         } else if (page == PAGE_APPEARANCE) {
             content = buildAppearancePage();
             configureTopBar("Appearance", "PERSONALIZATION", true);
+        } else if (page == PAGE_PICO_ADB) {
+            content = buildPicoAdbPage();
+            configureTopBar("System Control", "WIRELESS DEBUGGING", true);
         } else {
             content = buildHomePage();
             configureTopBar("PickPico", "YOUR AGENT. IN ACTION.", false);
@@ -421,7 +436,8 @@ public final class DashboardActivity extends Activity {
 
     private void updateBottomNav() {
         int active = currentPage;
-        if (active == PAGE_REMOTE || active == PAGE_DEVELOPER || active == PAGE_APPEARANCE) {
+        if (active == PAGE_REMOTE || active == PAGE_DEVELOPER
+                || active == PAGE_APPEARANCE || active == PAGE_PICO_ADB) {
             active = PAGE_SETTINGS;
         }
         setNavActive(navHome, active == PAGE_HOME);
@@ -475,6 +491,7 @@ public final class DashboardActivity extends Activity {
 
         settingsApprovalState = null;
         settingsRemoteState = null;
+        settingsPicoAdbState = null;
         settingsVersionState = null;
         settingsUpdateState = null;
         updateAction = null;
@@ -483,6 +500,13 @@ public final class DashboardActivity extends Activity {
         relayUrlInput = null;
         remoteState = null;
         remoteEndpointSummary = null;
+
+        picoAdbState = null;
+        picoAdbDetail = null;
+        picoAdbScanAction = null;
+        picoAdbPairAction = null;
+        picoAdbConnectAction = null;
+        picoAdbPairCodeInput = null;
 
         devLocalEndpoint = null;
         devRemoteEndpoint = null;
@@ -988,6 +1012,13 @@ public final class DashboardActivity extends Activity {
         settingsRemoteState = rowState(remote, "NOT CONFIGURED", AMBER);
         root.addView(remote, cardParams(7));
 
+        LinearLayout picoAdb = settingsRow(
+                "System Control",
+                "Pair Android Wireless Debugging for full battery and system diagnostics.",
+                () -> showPage(PAGE_PICO_ADB));
+        settingsPicoAdbState = rowState(picoAdb, "SETUP REQUIRED", AMBER);
+        root.addView(picoAdb, cardParams(7));
+
         TextView appearanceHeading = sectionLabel("APPEARANCE");
         appearanceHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(appearanceHeading);
@@ -1054,6 +1085,177 @@ public final class DashboardActivity extends Activity {
 
         addBottomSpace(root);
         return pageScroll(root);
+    }
+
+    private View buildPicoAdbPage() {
+        LinearLayout root = pageRoot();
+
+        TextView intro = text(
+                "PickPico can use Android's own Wireless Debugging trust flow to gain ADB shell diagnostics. The pairing code stays on this phone and the authorization can be revoked from Android settings.",
+                13,
+                Typeface.NORMAL,
+                MUTED);
+        intro.setPadding(dp(2), 0, dp(2), dp(14));
+        root.addView(intro);
+
+        LinearLayout statusCard = glassCard(true);
+        statusCard.addView(text("SYSTEM CONTROL", 14, Typeface.BOLD, TEXT));
+        picoAdbState = text("CHECKING", 12, Typeface.BOLD, AMBER);
+        picoAdbState.setPadding(0, dp(8), 0, 0);
+        statusCard.addView(picoAdbState);
+        picoAdbDetail = text("Reading PicoADB state…", 12, Typeface.NORMAL, MUTED);
+        picoAdbDetail.setPadding(0, dp(6), 0, 0);
+        statusCard.addView(picoAdbDetail);
+        root.addView(statusCard, cardParams(0));
+
+        LinearLayout setupCard = glassCard(true);
+        setupCard.addView(text("1 · ANDROID AUTHORIZATION", 14, Typeface.BOLD, TEXT));
+        TextView setupNote = text(
+                "Open Wireless Debugging, enable it, then choose “Pair device with pairing code”. Keep that six-digit dialog open. Split screen is the most reliable setup on Samsung.",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        setupNote.setPadding(0, dp(6), 0, dp(12));
+        setupCard.addView(setupNote);
+
+        TextView openSettings = actionButton("OPEN WIRELESS DEBUGGING", false, false);
+        openSettings.setOnClickListener(v -> openWirelessDebuggingSettings());
+        setupCard.addView(openSettings, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+
+        picoAdbScanAction = actionButton("SCAN FOR ENDPOINTS", false, false);
+        picoAdbScanAction.setOnClickListener(v -> {
+            PicoAdbManager.get(this).discover();
+            Toast.makeText(this, "Scanning for Wireless Debugging for 15 seconds", Toast.LENGTH_SHORT).show();
+            refreshStatus();
+        });
+        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        scanParams.topMargin = dp(8);
+        setupCard.addView(picoAdbScanAction, scanParams);
+        root.addView(setupCard, cardParams(10));
+
+        LinearLayout pairCard = glassCard(true);
+        pairCard.addView(text("2 · PAIR THIS PHONE", 14, Typeface.BOLD, TEXT));
+        TextView pairNote = text(
+                "Enter the six-digit code shown by Android. PickPico stores its ADB identity in private app storage; the code itself is never saved.",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        pairNote.setPadding(0, dp(6), 0, dp(10));
+        pairCard.addView(pairNote);
+
+        picoAdbPairCodeInput = new EditText(this);
+        picoAdbPairCodeInput.setSingleLine(true);
+        picoAdbPairCodeInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        picoAdbPairCodeInput.setHint("6-digit pairing code");
+        picoAdbPairCodeInput.setTextColor(TEXT);
+        picoAdbPairCodeInput.setHintTextColor(DIM);
+        picoAdbPairCodeInput.setTextSize(18);
+        picoAdbPairCodeInput.setGravity(Gravity.CENTER);
+        picoAdbPairCodeInput.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(6)});
+        picoAdbPairCodeInput.setBackground(PickPicoTheme.control(
+                theme, dp(12), PickPicoTheme.accentA(theme), false));
+        pairCard.addView(picoAdbPairCodeInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
+        picoAdbPairAction = actionButton("PAIR", false, false);
+        picoAdbPairAction.setOnClickListener(v -> pairPicoAdb());
+        LinearLayout.LayoutParams pairParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        pairParams.topMargin = dp(8);
+        pairCard.addView(picoAdbPairAction, pairParams);
+        root.addView(pairCard, cardParams(10));
+
+        LinearLayout connectCard = glassCard(true);
+        connectCard.addView(text("3 · ACTIVATE SHELL ACCESS", 14, Typeface.BOLD, TEXT));
+        TextView connectNote = text(
+                "After pairing, scan once more and connect. PickPico then receives the same UID 2000 shell access as an ADB client, while Android's root and app-sandbox boundaries remain intact.",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        connectNote.setPadding(0, dp(6), 0, dp(12));
+        connectCard.addView(connectNote);
+        picoAdbConnectAction = actionButton("CONNECT", false, false);
+        picoAdbConnectAction.setOnClickListener(v -> connectPicoAdb());
+        connectCard.addView(picoAdbConnectAction, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+        root.addView(connectCard, cardParams(10));
+
+        TextView safety = text(
+                "Privileged MCP tools are allowlisted. Pairing does not expose a free-form remote ADB shell.",
+                11,
+                Typeface.NORMAL,
+                DIM);
+        safety.setPadding(dp(2), dp(4), dp(2), 0);
+        root.addView(safety);
+
+        addBottomSpace(root);
+        return pageScroll(root);
+    }
+
+    private void openWirelessDebuggingSettings() {
+        Intent direct = new Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS");
+        try {
+            if (direct.resolveActivity(getPackageManager()) != null) {
+                startActivity(direct);
+                return;
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Open Developer options → Wireless debugging", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void pairPicoAdb() {
+        if (picoAdbBusy) return;
+        String code = picoAdbPairCodeInput == null
+                ? "" : picoAdbPairCodeInput.getText().toString().trim();
+        if (!PicoAdbClient.isValidPairingCode(code)) {
+            Toast.makeText(this, "Enter the six-digit Android pairing code", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        picoAdbBusy = true;
+        refreshStatus();
+        PicoAdbManager.get(this).pair(code, result -> {
+            picoAdbBusy = false;
+            boolean paired = result.optBoolean("paired", false);
+            if (paired && picoAdbPairCodeInput != null) picoAdbPairCodeInput.setText("");
+            Toast.makeText(
+                    this,
+                    paired ? "PicoADB paired. Scan again, then connect."
+                            : picoAdbResultMessage(result, "Pairing failed"),
+                    Toast.LENGTH_LONG).show();
+            refreshStatus();
+        });
+    }
+
+    private void connectPicoAdb() {
+        if (picoAdbBusy) return;
+        picoAdbBusy = true;
+        refreshStatus();
+        PicoAdbManager.get(this).connect(result -> {
+            picoAdbBusy = false;
+            boolean connected = result.optBoolean("connected", false);
+            Toast.makeText(
+                    this,
+                    connected ? "PicoADB shell access is ready."
+                            : picoAdbResultMessage(result, "Connection failed"),
+                    Toast.LENGTH_LONG).show();
+            refreshStatus();
+        });
+    }
+
+    private static String picoAdbResultMessage(JSONObject result, String fallback) {
+        if (result == null) return fallback;
+        String output = result.optString("output", "").trim();
+        if (!output.isEmpty()) return output;
+        JSONObject error = result.optJSONObject("error");
+        return error == null ? fallback : error.optString("message", fallback);
     }
 
     private View buildAppearancePage() {
@@ -1958,6 +2160,8 @@ public final class DashboardActivity extends Activity {
             else setState(settingsRemoteState, relayStatus.toUpperCase(), AMBER);
         }
 
+        refreshPicoAdbStatus();
+
         JSONObject updateState = SelfUpdateManager.status(this, 0L);
         String version = updateState.optString("currentVersionName", BuildConfig.VERSION_NAME);
         long versionCode = updateState.optLong("currentVersionCode", BuildConfig.VERSION_CODE);
@@ -2024,7 +2228,107 @@ public final class DashboardActivity extends Activity {
         if (devRecent != null) setTextIfChanged(devRecent, prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet"));
     }
 
+    private void refreshPicoAdbStatus() {
+        JSONObject status;
+        try {
+            status = PicoAdbManager.get(this).status();
+        } catch (Exception error) {
+            setState(settingsPicoAdbState, "ERROR", RED);
+            setState(picoAdbState, "ERROR", RED);
+            setTextIfChanged(picoAdbDetail, error.getClass().getSimpleName());
+            return;
+        }
+
+        String state = status.optString("state", "setup_required");
+        boolean paired = status.optBoolean("paired", false);
+        JSONObject discovery = status.optJSONObject("discovery");
+        int pairingEndpoints = discovery == null
+                ? 0 : discovery.optJSONArray("pairingEndpoints") == null
+                ? 0 : discovery.optJSONArray("pairingEndpoints").length();
+        int connectEndpoints = discovery == null
+                ? 0 : discovery.optJSONArray("connectEndpoints") == null
+                ? 0 : discovery.optJSONArray("connectEndpoints").length();
+
+        String label;
+        String detail;
+        int color;
+        switch (state) {
+            case "engine_unavailable":
+                label = "ENGINE MISSING";
+                detail = "This build does not contain the verified PicoADB engine.";
+                color = RED;
+                break;
+            case "pairing":
+                label = "PAIRING";
+                detail = "Authenticating the six-digit code through Android's TLS + SPAKE2 pairing flow.";
+                color = BLUE;
+                break;
+            case "connecting":
+                label = "CONNECTING";
+                detail = "Connecting to the trusted local Wireless Debugging endpoint.";
+                color = BLUE;
+                break;
+            case "diagnosing":
+                label = "DIAGNOSING";
+                detail = "Collecting privileged Android system diagnostics.";
+                color = BLUE;
+                break;
+            case "ready_to_pair":
+                label = "PAIRING ENDPOINT FOUND";
+                detail = pairingEndpoints + " pairing endpoint found. Enter the code while Android's pairing dialog remains open.";
+                color = BLUE;
+                break;
+            case "ready_to_connect":
+                label = "READY TO CONNECT";
+                detail = connectEndpoints + " trusted endpoint found. Connect to activate shell diagnostics.";
+                color = GREEN;
+                break;
+            case "discovering":
+                label = "SCANNING";
+                detail = "Searching briefly for Android Wireless Debugging services on this Wi-Fi network.";
+                color = BLUE;
+                break;
+            case "paired":
+                label = "PAIRED";
+                detail = "The ADB identity is trusted. Enable Wireless Debugging, scan, then connect when shell access is needed.";
+                color = GREEN;
+                break;
+            default:
+                label = "SETUP REQUIRED";
+                detail = "Enable Wireless Debugging and pair this PickPico installation once.";
+                color = AMBER;
+                break;
+        }
+
+        setState(settingsPicoAdbState, paired ? "PAIRED" : label, paired ? GREEN : color);
+        setState(picoAdbState, picoAdbBusy ? "WORKING" : label, picoAdbBusy ? BLUE : color);
+        setTextIfChanged(picoAdbDetail, detail);
+
+        boolean busy = picoAdbBusy || "pairing".equals(state)
+                || "connecting".equals(state) || "diagnosing".equals(state);
+        if (picoAdbScanAction != null) {
+            picoAdbScanAction.setEnabled(!busy);
+            picoAdbScanAction.setAlpha(busy ? .45f : 1f);
+            setTextIfChanged(picoAdbScanAction,
+                    "discovering".equals(state) ? "SCANNING…" : "SCAN FOR ENDPOINTS");
+        }
+        if (picoAdbPairAction != null) {
+            boolean enabled = !busy && pairingEndpoints > 0;
+            picoAdbPairAction.setEnabled(enabled);
+            picoAdbPairAction.setAlpha(enabled ? 1f : .45f);
+            setTextIfChanged(picoAdbPairAction, "pairing".equals(state) ? "PAIRING…" : "PAIR");
+        }
+        if (picoAdbConnectAction != null) {
+            boolean enabled = !busy && paired;
+            picoAdbConnectAction.setEnabled(enabled);
+            picoAdbConnectAction.setAlpha(enabled ? 1f : .45f);
+            setTextIfChanged(picoAdbConnectAction,
+                    "connecting".equals(state) ? "CONNECTING…" : "CONNECT");
+        }
+    }
+
     private void setState(TextView view, String value, int color) {
+        if (view == null) return;
         setTextIfChanged(view, value);
         applyTextColor(view, color);
     }

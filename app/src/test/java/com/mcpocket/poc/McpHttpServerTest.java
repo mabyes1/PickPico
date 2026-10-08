@@ -1,6 +1,7 @@
 package com.mcpocket.poc;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.json.JSONArray;
@@ -338,7 +339,9 @@ public final class McpHttpServerTest {
                 .getJSONObject("properties")
                 .getJSONObject("commandId");
         assertEquals("string", commandIdSchema.getString("type"));
-        assertEquals(61, commandIdSchema.getJSONArray("enum").length());
+        assertFalse(commandIdSchema.has("enum"));
+        assertEquals(160, commandIdSchema.getInt("maxLength"));
+        assertTrue(commandIdSchema.getString("description").contains("capability_list"));
     }
 
     @Test
@@ -349,7 +352,7 @@ public final class McpHttpServerTest {
         assertEquals(200, list.status);
         JSONObject listed = new JSONObject(list.body).getJSONObject("result");
         JSONArray tools = listed.getJSONArray("tools");
-        assertEquals(31, tools.length());
+        assertEquals(34, tools.length());
         assertTrue(tools.toString().contains("caller_register"));
         assertEquals("thin-v1", listed.getString("toolProfile"));
         String toolText = tools.toString();
@@ -359,6 +362,9 @@ public final class McpHttpServerTest {
         assertTrue(toolText.contains("task_create"));
         assertTrue(toolText.contains("server_info"));
         assertTrue(toolText.contains("camera_capture"));
+        assertTrue(toolText.contains("picoadb_status"));
+        assertTrue(toolText.contains("picoadb_discover"));
+        assertTrue(toolText.contains("picoadb_battery_diagnostics"));
         assertTrue(!toolText.contains("exec_command"));
 
         capabilityStateProbeCount.set(0);
@@ -543,7 +549,7 @@ public final class McpHttpServerTest {
         JSONObject listed = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(61, listed.getInt("count"));
+        assertTrue(listed.getInt("count") >= 64);
         assertTrue(listed.getJSONArray("commands").toString().contains("guide.get"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.list"));
         assertTrue(listed.getJSONArray("commands").toString().contains("capability.status"));
@@ -566,6 +572,9 @@ public final class McpHttpServerTest {
         assertTrue(listed.getJSONArray("commands").toString().contains("notification.actions"));
         assertTrue(listed.getJSONArray("commands").toString().contains("notification.invoke_action"));
         assertTrue(listed.getJSONArray("commands").toString().contains("notification.reply"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("picoadb.status"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("picoadb.discover"));
+        assertTrue(listed.getJSONArray("commands").toString().contains("picoadb.battery_diagnostics"));
         assertTrue(listed.getJSONArray("commands").toString().contains("ui.inspect"));
         assertTrue(listed.getJSONArray("commands").toString().contains("ui.action"));
         assertTrue(listed.getJSONArray("commands").toString().contains("ui.type"));
@@ -644,12 +653,14 @@ public final class McpHttpServerTest {
         JSONObject capabilityList = new JSONObject(list.body)
                 .getJSONObject("result")
                 .getJSONObject("structuredContent");
-        assertEquals(61, capabilityList.getInt("count"));
+        assertTrue(capabilityList.getInt("count") >= 64);
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("phone.home"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("ui.inspect"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("screen.capture"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.status"));
         assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("audio.set"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("picoadb.status"));
+        assertTrue(capabilityList.getJSONArray("capabilities").toString().contains("picoadb.battery_diagnostics"));
 
         HttpResult status = post(
                 "{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\"," +

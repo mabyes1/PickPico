@@ -6,6 +6,10 @@ def nodeMobileVersion = '18.20.4'
 def nodeMobileSha256 = 'BD7321EAA1A7602FBE0BB87302DF2D79D87835CF4363FBDD17C350DBB485C2AF'
 def nodeMobileRoot = layout.buildDirectory.dir("generated/node-mobile-${nodeMobileVersion}").get().asFile
 def nodeMobileZip = layout.buildDirectory.file("downloads/nodejs-mobile-v${nodeMobileVersion}-android.zip").get().asFile
+def adbEngineCommit = '60f48029cf9d8e0bc848ca41a7bd76694d4ab796'
+def adbEngineSha256 = '47EA035FA5ED57F6149A2B025BBBD4B21584C355C05D0400416804715E4C12DE'
+def adbEngineRoot = layout.buildDirectory.dir('generated/picoadb-jni').get().asFile
+def adbEngineFile = new File(adbEngineRoot, 'arm64-v8a/libadb.so')
 def pickpicoDebugKeystore = providers.gradleProperty('pickpicoDebugKeystore').orNull
 
 tasks.register('prepareNodeMobileRuntime') {
@@ -45,6 +49,37 @@ tasks.register('prepareNodeMobileRuntime') {
     }
 }
 
+// Android's adb client already implements TLS pairing, SPAKE2 and the ADB
+// transport. PickPico owns discovery, policy and its capability surface; this
+// pinned Apache-2.0 engine remains a replaceable implementation detail.
+tasks.register('preparePicoAdbEngine') {
+    outputs.file(adbEngineFile)
+
+    doLast {
+        if (!adbEngineFile.isFile()) {
+            adbEngineFile.parentFile.mkdirs()
+            def url = new URL("https://raw.githubusercontent.com/tytydraco/LADB/${adbEngineCommit}/app/src/main/jniLibs/arm64-v8a/libadb.so")
+            url.withInputStream { input ->
+                adbEngineFile.withOutputStream { output -> output << input }
+            }
+        }
+
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        adbEngineFile.withInputStream { input ->
+            byte[] buffer = new byte[8192]
+            int read
+            while ((read = input.read(buffer)) >= 0) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        def actualSha256 = digest.digest().encodeHex().toString().toUpperCase()
+        if (actualSha256 != adbEngineSha256) {
+            adbEngineFile.delete()
+            throw new GradleException("PicoADB engine SHA-256 mismatch: ${actualSha256}")
+        }
+    }
+}
+
 android {
     namespace 'com.mcpocket.poc'
     compileSdk 35
@@ -58,12 +93,20 @@ android {
         unitTests.includeAndroidResources = true
     }
 
+    packagingOptions {
+        jniLibs {
+            // PicoADB executes adb from nativeLibraryDir. The library must be
+            // extracted as a real executable file rather than mmap'd from APK.
+            useLegacyPackaging = true
+        }
+    }
+
     defaultConfig {
         applicationId 'com.mcpocket.poc'
         minSdk 26
         targetSdk 35
-        versionCode 128
-        versionName '0.17.2'
+        versionCode 130
+        versionName '0.17.4'
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -112,7 +155,7 @@ android {
 
     sourceSets {
         main {
-            jniLibs.srcDirs "${nodeMobileRoot.absolutePath}/bin"
+            jniLibs.srcDirs "${nodeMobileRoot.absolutePath}/bin", adbEngineRoot
             assets.srcDir layout.buildDirectory.dir('generated/dev-assets')
         }
     }
@@ -144,6 +187,7 @@ tasks.register('prepareDevTools', Zip) {
 
 tasks.named('preBuild').configure {
     dependsOn tasks.named('prepareNodeMobileRuntime')
+    dependsOn tasks.named('preparePicoAdbEngine')
     dependsOn tasks.named('prepareDevTools')
 }
 
