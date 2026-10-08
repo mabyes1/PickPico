@@ -32,7 +32,8 @@ Local MCP 另外監聽 `0.0.0.0:8765`，同時供區域網路與 loopback 使用
 | `GET /health` | Relay 本身的健康回應，不代表手機在線。 |
 | `GET /v1/nodes/<node-id>/connect` | 手機的 WebSocket 升級入口，需要 Relay secret。 |
 | `/v1/nodes/<node-id>/status` | 目前連線、心跳與等待請求數。持有 Node ID 即可查詢。 |
-| `POST /v3/nodes/<node-id>/mcp` | 目前 App 產生的遠端 MCP 入口，使用精簡工具清單。 |
+| `POST /v4/nodes/<node-id>/mcp` | 目前 App 產生的遠端 MCP 入口，使用精簡工具清單；v4 為 PicoADB 後的 schema cache boundary。 |
+| `POST /v3/nodes/<node-id>/mcp` | 舊版精簡工具清單相容入口。 |
 | `POST /v1/nodes/<node-id>/mcp`、`/v2/.../mcp` | 保留完整工具清單的相容入口。 |
 
 `/mcp` 支援 POST，另接受 OPTIONS；這不是一般可直接在瀏覽器閱讀的網頁，也不是 GET SSE 訂閱端點。

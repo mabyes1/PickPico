@@ -22,7 +22,7 @@
    https://your-relay.example.com
    ```
 
-   這裡不要填手機的 `/v3/nodes/.../mcp` 完整網址，也不要填區域網路 IP。
+   這裡不要填手機的 `/v4/nodes/.../mcp` 完整網址，也不要填區域網路 IP。
 
 3. 點 **SAVE RELAY**。若服務已在運行，選 **Restart** 套用；若尚未啟動，回首頁按 **START**。
 4. 等待 **REMOTE ACCESS** 顯示 **CONNECTED**。
@@ -32,7 +32,7 @@
 
 ```json
 {
-  "url": "https://your-relay.example.com/v3/nodes/<你的裝置識別碼>/mcp",
+  "url": "https://your-relay.example.com/v4/nodes/<你的裝置識別碼>/mcp",
   "authentication": "none"
 }
 ```

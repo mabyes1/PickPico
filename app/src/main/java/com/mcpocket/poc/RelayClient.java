@@ -128,9 +128,9 @@ final class RelayClient {
         // Keep the node transport on v1, but version the public MCP endpoint separately.
         // ChatGPT/OpenAI may retain a tool schema for a previously seen MCP URL, so a
         // deliberate public-schema version bump gives schema-breaking changes a clean
-        // cache boundary without rotating the node identity or relay secret. v3 is the
-        // Thin MCP profile; v1/v2 remain relay-compatible for existing clients.
-        this.remoteEndpoint = this.relayBaseUrl + "/v3/nodes/" + nodeId + "/mcp";
+        // cache boundary without rotating the node identity or relay secret. v4 is the
+        // current Thin MCP schema boundary; older versions remain relay-compatible.
+        this.remoteEndpoint = this.relayBaseUrl + "/v4/nodes/" + nodeId + "/mcp";
     }
 
     static String migrateLegacyRelayIfNeeded(SharedPreferences prefs, String relayBaseUrl) {
