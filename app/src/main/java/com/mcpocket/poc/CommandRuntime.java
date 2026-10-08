@@ -115,6 +115,33 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.phoneStatus(callCount));
 
         register(
+                "picoadb.status",
+                "Return PickPico Wireless Debugging engine, pairing, discovery, and connection state.",
+                "system",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.picoAdbStatus(callCount));
+
+        register(
+                "picoadb.discover",
+                "Temporarily scan this Wi-Fi network for Android Wireless Debugging pairing and connect endpoints. Discovery stops automatically.",
+                "system",
+                "system_access",
+                true,
+                picoAdbDiscoverSchema(),
+                (arguments, callCount) -> actions.picoAdbDiscover(arguments, callCount));
+
+        register(
+                "picoadb.battery_diagnostics",
+                "Use the user-paired local ADB identity to collect full batterystats, power, device-idle, alarm, and job-scheduler dumps into workspace files.",
+                "system",
+                "system_diagnostics",
+                true,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.picoAdbBatteryDiagnostics(callCount));
+
+        register(
                 "capability.list",
                 "List all implemented PickPico capabilities, including disabled/setup-required capabilities and their runtime state.",
                 "capability",
@@ -1498,6 +1525,19 @@ final class CommandRuntime {
                                 .put("maxLength", 160)
                                 .put("description", "Capability/command ID returned by capability.list.")))
                 .put("required", new JSONArray().put("id"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject picoAdbDiscoverSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("durationSeconds", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 5)
+                                .put("maximum", 60)
+                                .put("default", 15)
+                                .put("description", "Bounded Wireless Debugging discovery window.")))
                 .put("additionalProperties", false);
     }
 

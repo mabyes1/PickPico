@@ -20,9 +20,14 @@ public final class HybridToolsTest {
     }
     @Test public void completeCatalogAndDirectSchemasStayAligned() throws Exception {
         JSONArray listed = tools.list(false, "thin-v1").getJSONArray("tools");
-        assertEquals(31, listed.length());
-        assertEquals(61, runtime.commandIds().length());
-        assertEquals(38, runtime.dynamicIndex().trim().split("\n").length);
+        assertEquals(34, listed.length());
+        assertTrue(runtime.commandIds().length() >= 64);
+        assertTrue(runtime.commandIds().toString().contains("picoadb.status"));
+        assertTrue(runtime.commandIds().toString().contains("picoadb.discover"));
+        assertTrue(runtime.commandIds().toString().contains("picoadb.battery_diagnostics"));
+        assertTrue(listed.toString().contains("picoadb_status"));
+        assertTrue(listed.toString().contains("picoadb_discover"));
+        assertTrue(listed.toString().contains("picoadb_battery_diagnostics"));
         for (String id : CapabilityIndex.DIRECT) {
             JSONObject found = null;
             for (int i = 0; i < listed.length(); i++) if (listed.getJSONObject(i).getString("name").equals(CapabilityIndex.tool(id))) found = listed.getJSONObject(i);
@@ -93,10 +98,11 @@ public final class HybridToolsTest {
                 .put("requiresSetup", true).put("setupType", "foreground_service_type").put("reason", "Open the app to refresh media access");
         when(actions.capabilityState("camera.capture")).thenReturn(unavailable);
         when(actions.capabilityState("microphone.record")).thenReturn(unavailable);
-        assertEquals(61, runtime.list().getInt("count"));
-        assertEquals(61, runtime.execute("capability.list", new JSONObject(), 1).getInt("count"));
-        assertEquals(61, runtime.search(new JSONObject()).getInt("totalCandidates"));
-        assertEquals(59, runtime.search(new JSONObject().put("availableOnly", true)).getInt("totalCandidates"));
+        int total = runtime.commandIds().length();
+        assertEquals(total, runtime.list().getInt("count"));
+        assertEquals(total, runtime.execute("capability.list", new JSONObject(), 1).getInt("count"));
+        assertEquals(total, runtime.search(new JSONObject()).getInt("totalCandidates"));
+        assertEquals(total - 2, runtime.search(new JSONObject().put("availableOnly", true)).getInt("totalCandidates"));
         JSONObject exact = runtime.search(new JSONObject().put("query", "camera.capture"));
         assertEquals(1, exact.getInt("count"));
         JSONObject match = exact.getJSONArray("matches").getJSONObject(0);

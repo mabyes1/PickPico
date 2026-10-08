@@ -55,6 +55,7 @@ final class AgentScreenLease {
     static boolean isActivity(String command) {
         return !command.equals("node.info") && !command.equals("guide.get")
                 && !command.startsWith("capability.") && !command.equals("policy.status")
+                && !command.equals("picoadb.status")
                 && !command.equals("app.update_check") && !command.equals("app.update_status");
     }
 }

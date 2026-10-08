@@ -3,6 +3,7 @@ package com.mcpocket.poc;
 import android.content.Context;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.net.wifi.WifiManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,19 +24,26 @@ final class PicoAdbDiscovery {
     static final String CONNECT_TYPE = "_adb-tls-connect._tcp.";
 
     private final NsdManager nsd;
+    private final WifiManager wifi;
     private final Map<String, Endpoint> pairing = new LinkedHashMap<>();
     private final Map<String, Endpoint> connect = new LinkedHashMap<>();
     private NsdManager.DiscoveryListener pairingListener;
     private NsdManager.DiscoveryListener connectListener;
+    private WifiManager.MulticastLock multicastLock;
     private boolean started;
     private String lastError = "";
 
     PicoAdbDiscovery(Context context) {
-        nsd = (NsdManager) context.getApplicationContext().getSystemService(Context.NSD_SERVICE);
+        Context app = context.getApplicationContext();
+        nsd = (NsdManager) app.getSystemService(Context.NSD_SERVICE);
+        wifi = (WifiManager) app.getSystemService(Context.WIFI_SERVICE);
     }
 
     synchronized void start() {
         if (started || nsd == null) return;
+        pairing.clear();
+        connect.clear();
+        acquireMulticastLock();
         started = true;
         pairingListener = listener(PAIRING_TYPE, pairing);
         connectListener = listener(CONNECT_TYPE, connect);
@@ -54,6 +62,19 @@ final class PicoAdbDiscovery {
         pairingListener = null;
         connectListener = null;
         started = false;
+        releaseMulticastLock();
+    }
+
+    synchronized Endpoint pairingEndpoint() {
+        return pairing.isEmpty() ? null : pairing.values().iterator().next();
+    }
+
+    synchronized Endpoint connectEndpoint() {
+        return connect.isEmpty() ? null : connect.values().iterator().next();
+    }
+
+    synchronized boolean isStarted() {
+        return started;
     }
 
     synchronized JSONObject status() throws JSONException {
@@ -138,6 +159,28 @@ final class PicoAdbDiscovery {
         }
     }
 
+    private void acquireMulticastLock() {
+        if (wifi == null || multicastLock != null) return;
+        try {
+            WifiManager.MulticastLock lock = wifi.createMulticastLock("PickPico:PicoADB");
+            lock.setReferenceCounted(false);
+            lock.acquire();
+            multicastLock = lock;
+        } catch (RuntimeException error) {
+            lastError = error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage());
+        }
+    }
+
+    private void releaseMulticastLock() {
+        WifiManager.MulticastLock lock = multicastLock;
+        multicastLock = null;
+        if (lock == null) return;
+        try {
+            if (lock.isHeld()) lock.release();
+        } catch (RuntimeException ignored) {
+        }
+    }
+
     private static boolean sameType(String expected, String actual) {
         if (actual == null) return false;
         String normalizedExpected = expected.endsWith(".") ? expected : expected + ".";
@@ -156,7 +199,7 @@ final class PicoAdbDiscovery {
         return result;
     }
 
-    private static final class Endpoint {
+    static final class Endpoint {
         final String name;
         final String host;
         final int port;
@@ -165,6 +208,13 @@ final class PicoAdbDiscovery {
             this.name = name;
             this.host = host;
             this.port = port;
+        }
+
+        JSONObject toJson() throws JSONException {
+            return new JSONObject()
+                    .put("name", name)
+                    .put("host", host)
+                    .put("port", port);
         }
     }
 }

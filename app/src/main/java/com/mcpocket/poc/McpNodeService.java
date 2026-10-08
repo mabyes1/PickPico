@@ -133,7 +133,6 @@ public final class McpNodeService extends Service implements McpToolActions {
     private BleButtonBridge buttonBridge;
     private PicoOrbOverlayController picoOrbOverlay;
     private HumanHelpDelivery humanHelpDelivery;
-    private PicoAdbDiscovery picoAdbDiscovery;
 
     @Override
     public void onCreate() {
@@ -146,8 +145,6 @@ public final class McpNodeService extends Service implements McpToolActions {
         picoOrbOverlay.start();
         humanHelpDelivery = new HumanHelpDelivery(this);
         humanHelpDelivery.start();
-        picoAdbDiscovery = new PicoAdbDiscovery(this);
-        picoAdbDiscovery.start();
     }
 
     @Override
@@ -258,10 +255,6 @@ public final class McpNodeService extends Service implements McpToolActions {
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
         if (humanHelpDelivery != null) humanHelpDelivery.stop();
-        if (picoAdbDiscovery != null) {
-            picoAdbDiscovery.stop();
-            picoAdbDiscovery = null;
-        }
         if (picoOrbOverlay != null) {
             picoOrbOverlay.destroy();
             picoOrbOverlay = null;
@@ -581,7 +574,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("processStartedAt", PickPicoApplication.processStartedAt())
                 .put("connectionDiagnostics", ConnectionDiagnostics.snapshot(this))
                 .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
-                .put("picoAdb", picoAdbDiscovery == null ? JSONObject.NULL : picoAdbDiscovery.status())
+                .put("picoAdb", PicoAdbManager.get(this).status())
                 .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
                         .put("activeOperations", agentScreenLease.activeOperations())
                         .put("requested", agentScreenLease.activeOperations() > 0)
@@ -645,6 +638,32 @@ public final class McpNodeService extends Service implements McpToolActions {
                         .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
                         .put("relay", relayClient == null ? new JSONObject() : relayClient.diagnostics())
                         .put("toolCallCount", callCount));
+    }
+
+    @Override
+    public JSONObject picoAdbStatus(long callCount) throws JSONException {
+        return PicoAdbManager.get(this).status()
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
+    public JSONObject picoAdbDiscover(JSONObject arguments, long callCount) throws JSONException {
+        int durationSeconds = arguments == null ? 15 : arguments.optInt("durationSeconds", 15);
+        if (durationSeconds < 5 || durationSeconds > 60) {
+            throw new CommandRuntime.CommandInputException(
+                    "picoadb.discover durationSeconds must be between 5 and 60");
+        }
+        PicoAdbManager manager = PicoAdbManager.get(this);
+        manager.discover(durationSeconds * 1000L);
+        return manager.status()
+                .put("scanRequested", true)
+                .put("durationSeconds", durationSeconds)
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
+    public JSONObject picoAdbBatteryDiagnostics(long callCount) throws JSONException {
+        return PicoAdbManager.get(this).batteryDiagnostics(callCount);
     }
 
     @Override

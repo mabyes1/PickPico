@@ -42,7 +42,10 @@ public class AgentScreenLeaseTest {
     @Test public void healthAndAutomaticChecksDoNotOwnScreen() {
         assertFalse(AgentScreenLease.isActivity("node.info"));
         assertFalse(AgentScreenLease.isActivity("app.update_check"));
+        assertFalse(AgentScreenLease.isActivity("picoadb.status"));
         assertTrue(AgentScreenLease.isActivity("ui.inspect"));
         assertTrue(AgentScreenLease.isActivity("process.exec"));
+        assertTrue(AgentScreenLease.isActivity("picoadb.discover"));
+        assertTrue(AgentScreenLease.isActivity("picoadb.battery_diagnostics"));
     }
 }

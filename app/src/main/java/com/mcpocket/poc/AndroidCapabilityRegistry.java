@@ -35,6 +35,40 @@ final class AndroidCapabilityRegistry {
                     .put("reason", "Hyper Mode is off");
         }
 
+        if (commandId.startsWith("picoadb.")) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                return result
+                        .put("supported", false)
+                        .put("available", false)
+                        .put("state", "unsupported")
+                        .put("reason", "Wireless Debugging requires Android 11 or later");
+            }
+            JSONObject picoAdb = PicoAdbManager.get(context).status();
+            boolean engineReady = picoAdb.optJSONObject("engine") != null
+                    && picoAdb.optJSONObject("engine").optBoolean("enginePresent", false);
+            result.put("picoAdb", picoAdb);
+            if ("picoadb.status".equals(commandId)) {
+                return result
+                        .put("available", true)
+                        .put("state", "available");
+            }
+            if ("picoadb.discover".equals(commandId)) {
+                return setupState(
+                        result,
+                        engineReady,
+                        "picoadb_engine",
+                        "PicoADB engine is unavailable");
+            }
+            if ("picoadb.battery_diagnostics".equals(commandId)) {
+                return setupState(
+                        result,
+                        engineReady && picoAdb.optBoolean("paired", false),
+                        "wireless_debugging_pairing",
+                        "Pair PickPico with Android Wireless Debugging first")
+                        .put("userInteractionRequired", !picoAdb.optBoolean("paired", false));
+            }
+        }
+
         if ("camera.capture".equals(commandId)) {
             return mediaCapabilityState(
                     context,
@@ -157,6 +191,8 @@ final class AndroidCapabilityRegistry {
                 || "ui.action".equals(commandId)
                 || "ui.type".equals(commandId)
                 || "ui.scroll".equals(commandId)
+                || "picoadb.discover".equals(commandId)
+                || "picoadb.battery_diagnostics".equals(commandId)
                 || "screen.capture".equals(commandId);
     }
 
