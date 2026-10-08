@@ -62,6 +62,8 @@ final class PicoAdbDiscovery {
         pairingListener = null;
         connectListener = null;
         started = false;
+        pairing.clear();
+        connect.clear();
         releaseMulticastLock();
     }
 

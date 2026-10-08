@@ -197,12 +197,12 @@ final class PicoAdbManager {
                 return;
             }
 
-            PicoAdbClient.Result result = client.connect("127.0.0.1", endpoint.port);
+            PicoAdbClient.Result result = client.connect(endpoint.host, endpoint.port);
             synchronized (PicoAdbManager.this) {
                 connecting = false;
                 lastOutput = result.output;
                 if (result.connected()) {
-                    String serial = PicoAdbClient.endpoint("127.0.0.1", endpoint.port);
+                    String serial = PicoAdbClient.endpoint(endpoint.host, endpoint.port);
                     prefs.edit()
                             .putString(KEY_LAST_CONNECT_AT, Instant.now().toString())
                             .putString(KEY_LAST_SERIAL, serial)
@@ -304,9 +304,15 @@ final class PicoAdbManager {
         try (FileOutputStream output = new FileOutputStream(target, false)) {
             output.write(result.output.getBytes(StandardCharsets.UTF_8));
         }
-        return result.toJson()
-                .put("workspacePath", "diagnostics/" + target.getName())
+        JSONObject metadata = result.toJson();
+        metadata.remove("output");
+        metadata.put("workspacePath", "diagnostics/" + target.getName())
                 .put("bytes", target.length());
+        if (!result.success() && !result.output.isEmpty()) {
+            metadata.put("errorOutput", result.output.substring(
+                    0, Math.min(2_000, result.output.length())));
+        }
+        return metadata;
     }
 
     private String ensureConnected() {
@@ -319,9 +325,9 @@ final class PicoAdbManager {
 
         PicoAdbDiscovery.Endpoint endpoint = awaitEndpoint(false, ENDPOINT_WAIT_MS);
         if (endpoint == null) return "";
-        PicoAdbClient.Result connect = client.connect("127.0.0.1", endpoint.port);
+        PicoAdbClient.Result connect = client.connect(endpoint.host, endpoint.port);
         if (!connect.connected()) return "";
-        String serial = PicoAdbClient.endpoint("127.0.0.1", endpoint.port);
+        String serial = PicoAdbClient.endpoint(endpoint.host, endpoint.port);
         prefs.edit()
                 .putString(KEY_LAST_CONNECT_AT, Instant.now().toString())
                 .putString(KEY_LAST_SERIAL, serial)

@@ -28,7 +28,7 @@ final class PicoAdbClient {
     private static final long CONNECT_TIMEOUT_MS = 20_000L;
     // dumpsys batterystats can easily exceed a chat-sized payload. Keep enough
     // data to write a complete workspace artifact; MCP returns only metadata.
-    private static final int MAX_OUTPUT_BYTES = 1024 * 1024;
+    private static final int MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 
     private final Context context;
     private final File adbBinary;
