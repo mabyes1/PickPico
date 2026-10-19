@@ -114,7 +114,7 @@ final class McpToolRegistry {
 
         register(
                 "task_update",
-                "Update task progress. ALWAYS finish with completed/failed/cancelled to release its continuous screen-awake hold. Other unfinished tasks keep their holds. Non-terminal updates renew Home/Pico presence only; screen hold does not expire between calls.",
+                "Update task progress. ALWAYS finish with completed/failed/cancelled to release its screen-awake hold. Operational commands and task updates renew a three-minute task activity lease; inactivity releases the display automatically. Other active tasks retain their holds.",
                 new JSONObject()
                         .put("type", "object")
                         .put("properties", new JSONObject()

@@ -50,6 +50,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONObject;
+import org.json.JSONException;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -62,7 +63,7 @@ import java.util.Locale;
  * MainActivity is intentionally retained as the legacy engineering console and can be opened from
  * Developer / Diagnostics. This Activity owns the user-facing information architecture.
  */
-public final class DashboardActivity extends Activity {
+public final class DashboardActivity extends LocalizedActivity {
     private static final int REQUEST_NOTIFICATION = 200;
     private static final int REQUEST_NODE_MEDIA = 201;
     private static final int REQUEST_CAMERA = 202;
@@ -148,10 +149,12 @@ public final class DashboardActivity extends Activity {
     private TextView settingsApprovalState;
     private TextView settingsRemoteState;
     private TextView settingsPicoAdbState;
+    private TextView settingsPicoAdbConnectionState;
     private TextView settingsVersionState;
     private TextView settingsUpdateState;
     private TextView updateAction;
     private Switch picoOrbSwitch;
+    private Switch buttonPadSwitch;
     private boolean updateCheckInProgress;
     private String updateCheckError;
     private Switch appearanceGradientSwitch;
@@ -177,12 +180,23 @@ public final class DashboardActivity extends Activity {
 
     // PicoADB / Wireless Debugging
     private TextView picoAdbState;
+    private TextView picoAdbPairingState;
     private TextView picoAdbDetail;
     private TextView picoAdbScanAction;
     private TextView picoAdbPairAction;
     private TextView picoAdbConnectAction;
+    private TextView picoAdbPairingToggle;
+    private View picoAdbSetupCard;
+    private View picoAdbPairCard;
+    private View picoAdbConnectCard;
+    private boolean picoAdbPairingExpanded;
     private EditText picoAdbPairCodeInput;
     private boolean picoAdbBusy;
+    private TextView developerControlState;
+    private TextView developerControlNote;
+    private TextView developerEnableAction;
+    private TextView developerDisableAction;
+    private TextView developerAuthorizeAction;
 
     // Developer / diagnostics
     private TextView devLocalEndpoint;
@@ -200,7 +214,13 @@ public final class DashboardActivity extends Activity {
         configureWindow();
         setContentView(buildShell());
         requestNotificationPermissionIfNeeded();
-        showPage(requestedPage(getIntent()));
+        showPage(savedInstanceState == null ? requestedPage(getIntent())
+                : savedInstanceState.getInt("visiblePage", PAGE_HOME));
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt("visiblePage", currentPage);
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -332,13 +352,13 @@ public final class DashboardActivity extends Activity {
         topMeta.setPadding(0, dp(4), 0, 0);
         titles.addView(topMeta);
 
-        topStatusDot = text("● READY", 10, Typeface.BOLD, GREEN);
+        topStatusDot = text(getString(R.string.ui_ready), 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
         topStatusDot.setLetterSpacing(.035f);
         topStatusDot.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
         bar.addView(topStatusDot, new LinearLayout.LayoutParams(dp(84), dp(34)));
 
-        topNodeAction = actionButton("STOP", true, true);
+        topNodeAction = actionButton(getString(R.string.ui_stop), true, true);
         topNodeAction.setOnClickListener(v -> toggleNodeFromHome());
         LinearLayout.LayoutParams topNodeParams = new LinearLayout.LayoutParams(dp(58), dp(34));
         topNodeParams.leftMargin = dp(8);
@@ -359,11 +379,11 @@ public final class DashboardActivity extends Activity {
         nav.setBackground(PickPicoTheme.strongGlass(theme, dp(26)));
         nav.setElevation(dp(8));
 
-        navHome = navItem("⌂", "HOME", () -> showPage(PAGE_HOME));
-        TextView navInbox = navItem("◷", "ACTIVITY", () ->
+        navHome = navItem("⌂", getString(R.string.ui_home), () -> showPage(PAGE_HOME));
+        TextView navInbox = navItem("◷", getString(R.string.ui_activity), () ->
                 openActivityPage());
-        navCapabilities = navItem("▦", "CAPABILITIES", () -> showPage(PAGE_CAPABILITIES));
-        navSettings = navItem("⚙", "SETTINGS", () -> showPage(PAGE_SETTINGS));
+        navCapabilities = navItem("▦", getString(R.string.ui_capabilities), () -> showPage(PAGE_CAPABILITIES));
+        navSettings = navItem("⚙", getString(R.string.ui_settings), () -> showPage(PAGE_SETTINGS));
 
         nav.addView(navHome, navParams());
         nav.addView(navInbox, navParams());
@@ -394,25 +414,25 @@ public final class DashboardActivity extends Activity {
         View content;
         if (page == PAGE_CAPABILITIES) {
             content = buildCapabilitiesPage();
-            configureTopBar("Capabilities", "WHAT AGENTS CAN DO", false);
+            configureTopBar(getString(R.string.ui_capabilities_ca09c5), getString(R.string.ui_what_agents_can_do), false);
         } else if (page == PAGE_SETTINGS) {
             content = buildSettingsPage();
-            configureTopBar("Settings", "", false);
+            configureTopBar(getString(R.string.ui_settings_c7f73b), "", false);
         } else if (page == PAGE_REMOTE) {
             content = buildRemoteAccessPage();
-            configureTopBar("Remote Access", "CONNECT FROM ANYWHERE", true);
+            configureTopBar(getString(R.string.ui_remote_access), getString(R.string.ui_connect_from_anywhere), true);
         } else if (page == PAGE_DEVELOPER) {
             content = buildDeveloperPage();
-            configureTopBar("Developer / Diagnostics", "ADVANCED", true);
+            configureTopBar(getString(R.string.ui_developer_diagnostics), getString(R.string.ui_advanced), true);
         } else if (page == PAGE_APPEARANCE) {
             content = buildAppearancePage();
-            configureTopBar("Appearance", "PERSONALIZATION", true);
+            configureTopBar(getString(R.string.ui_appearance), getString(R.string.ui_personalization), true);
         } else if (page == PAGE_PICO_ADB) {
             content = buildPicoAdbPage();
-            configureTopBar("System Control", "WIRELESS DEBUGGING", true);
+            configureTopBar(getString(R.string.ui_system_control), getString(R.string.ui_wireless_debugging), true);
         } else {
             content = buildHomePage();
-            configureTopBar("PickPico", "YOUR AGENT. IN ACTION.", false);
+            configureTopBar("PickPico", getString(R.string.ui_your_agent_in_action), false);
         }
 
         contentHost.addView(content, new FrameLayout.LayoutParams(
@@ -492,21 +512,28 @@ public final class DashboardActivity extends Activity {
         settingsApprovalState = null;
         settingsRemoteState = null;
         settingsPicoAdbState = null;
+        settingsPicoAdbConnectionState = null;
         settingsVersionState = null;
         settingsUpdateState = null;
         updateAction = null;
         picoOrbSwitch = null;
+        buttonPadSwitch = null;
 
         relayUrlInput = null;
         remoteState = null;
         remoteEndpointSummary = null;
 
         picoAdbState = null;
+        picoAdbPairingState = null;
         picoAdbDetail = null;
         picoAdbScanAction = null;
         picoAdbPairAction = null;
         picoAdbConnectAction = null;
+        picoAdbPairingToggle = null;
+        picoAdbSetupCard = picoAdbPairCard = picoAdbConnectCard = null;
         picoAdbPairCodeInput = null;
+        developerControlState = developerControlNote = null;
+        developerEnableAction = developerDisableAction = developerAuthorizeAction = null;
 
         devLocalEndpoint = null;
         devRemoteEndpoint = null;
@@ -520,7 +547,7 @@ public final class DashboardActivity extends Activity {
     private View buildHomePage() {
         LinearLayout root = pageRoot();
         root.setPadding(dp(24), dp(3), dp(24), dp(12));
-        pulseTitle = text("No active agent tasks", 20, Typeface.NORMAL, TEXT);
+        pulseTitle = text(getString(R.string.ui_no_active_agent_tasks), 20, Typeface.NORMAL, TEXT);
         pulseTitle.setGravity(Gravity.CENTER);
         pulseTitle.setMaxLines(2);
         pulseTitle.setEllipsize(TextUtils.TruncateAt.END);
@@ -551,16 +578,16 @@ public final class DashboardActivity extends Activity {
         pulseAgent = text("PickPico", 12, Typeface.BOLD, TEXT);
         pulseAgent.setMaxLines(1); pulseAgent.setEllipsize(TextUtils.TruncateAt.END);
         agentLine.addView(pulseAgent, new LinearLayout.LayoutParams(-2, -2));
-        pulseBadge = text(" · Ready", 11, Typeface.NORMAL, GREEN);
+        pulseBadge = text(getString(R.string.ui_ready_004de6), 11, Typeface.NORMAL, GREEN);
         agentLine.addView(pulseBadge, new LinearLayout.LayoutParams(-2, -2));
         taskCopy.addView(agentLine);
-        pulseFlow = text("Waiting for an agent task", 9, Typeface.NORMAL, DIM);
+        pulseFlow = text(getString(R.string.ui_waiting_for_an_agent_task), 9, Typeface.NORMAL, DIM);
         pulseFlow.setTypeface(Typeface.MONOSPACE);
         pulseFlow.setMaxLines(1); pulseFlow.setEllipsize(TextUtils.TruncateAt.END);
         pulseFlow.setPadding(0, dp(6), 0, 0);
         taskCopy.addView(pulseFlow);
         taskCard.setOnClickListener(v -> openActivityPage());
-        taskCard.setContentDescription("Current agent activity. Open Activity for details.");
+        taskCard.setContentDescription(getString(R.string.ui_current_agent_activity_open_activity_for_details));
         LinearLayout.LayoutParams taskParams = new LinearLayout.LayoutParams(-1, -2);
         taskParams.setMargins(dp(20), -dp(15), dp(20), 0);
         root.addView(taskCard, taskParams);
@@ -572,7 +599,7 @@ public final class DashboardActivity extends Activity {
         View divider = new View(this);
         divider.setBackgroundColor(Color.argb(24, 160, 170, 175));
         root.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
-        TextView summaryLabel = sectionLabel("SYSTEM STATUS");
+        TextView summaryLabel = sectionLabel(getString(R.string.ui_system_status));
         summaryLabel.setTextSize(8);
         summaryLabel.setLetterSpacing(.16f);
         summaryLabel.setPadding(0, dp(14), 0, dp(9));
@@ -581,7 +608,7 @@ public final class DashboardActivity extends Activity {
         summary.setOrientation(LinearLayout.HORIZONTAL);
         summary.setGravity(Gravity.CENTER_VERTICAL);
         summary.setPadding(dp(12), dp(11), dp(12), dp(11));
-        pulseState = text("● READY", 9, Typeface.NORMAL, GREEN);
+        pulseState = text(getString(R.string.ui_ready), 9, Typeface.NORMAL, GREEN);
         pulseState.setLetterSpacing(.08f);
         summary.addView(pulseState, new LinearLayout.LayoutParams(0, dp(30), .85f));
         pulseState.setGravity(Gravity.CENTER_VERTICAL);
@@ -605,7 +632,7 @@ public final class DashboardActivity extends Activity {
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1);
         copyParams.setMargins(dp(11), 0, dp(9), 0);
         pulseAttention.addView(actionCopy, copyParams);
-        TextView caption = text("CURRENT TASK", 7, Typeface.NORMAL, DIM);
+        TextView caption = text(getString(R.string.ui_current_task), 7, Typeface.NORMAL, DIM);
         caption.setLetterSpacing(.2f); actionCopy.addView(caption);
         pulseAttentionTitle = text("", 12, Typeface.BOLD, TEXT);
         pulseAttentionTitle.setMaxLines(2);
@@ -616,7 +643,7 @@ public final class DashboardActivity extends Activity {
         pulseAttentionDetail.setEllipsize(TextUtils.TruncateAt.END);
         pulseAttentionDetail.setPadding(0, dp(4), 0, 0);
         actionCopy.addView(pulseAttentionDetail);
-        pulseAction = text("Open task  →", 10, Typeface.BOLD, TEXT);
+        pulseAction = text(getString(R.string.ui_open_task), 10, Typeface.BOLD, TEXT);
         pulseAction.setGravity(Gravity.CENTER);
         int buttonColor = PickPicoTheme.accentA(theme);
         GradientDrawable button = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -674,7 +701,7 @@ public final class DashboardActivity extends Activity {
             startActivity(new Intent(this, HumanHelpActivity.class)
                     .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId));
         } catch (Exception error) {
-            Toast.makeText(this, "Unable to open Human Help preview", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_unable_to_open_human_help_preview), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -687,7 +714,7 @@ public final class DashboardActivity extends Activity {
             startActivity(new Intent(this, HumanHelpActivity.class)
                     .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, pendingId));
         } catch (Exception error) {
-            Toast.makeText(this, "Unable to open Human Help", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_unable_to_open_human_help), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -775,11 +802,11 @@ public final class DashboardActivity extends Activity {
     private View buildCapabilitiesPage() {
         LinearLayout root = pageRoot();
 
-        TextView intro = text("Choose what your agents can use.", 13, Typeface.NORMAL, MUTED);
+        TextView intro = text(getString(R.string.ui_choose_what_your_agents_can_use), 13, Typeface.NORMAL, MUTED);
         intro.setPadding(dp(2), 0, dp(2), dp(14));
         root.addView(intro);
 
-        TextView runtimeHeading = sectionLabel("BUILT IN");
+        TextView runtimeHeading = sectionLabel(getString(R.string.ui_built_in));
         root.addView(runtimeHeading);
 
         LinearLayout runtimeCard = glassCard(false);
@@ -794,83 +821,83 @@ public final class DashboardActivity extends Activity {
         LinearLayout.LayoutParams runtimeCopyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         runtimeCopyParams.leftMargin = dp(14);
         runtimeCard.addView(runtimeCopy, runtimeCopyParams);
-        runtimeCopy.addView(text("Workspace, shell, background sessions, and embedded Node", 14, Typeface.BOLD, TEXT));
-        TextView runtimeDetail = text("Built into PickPico and available while the Node is running.", 12, Typeface.NORMAL, MUTED);
+        runtimeCopy.addView(text(getString(R.string.ui_workspace_shell_background_sessions_and_embedded_node), 14, Typeface.BOLD, TEXT));
+        TextView runtimeDetail = text(getString(R.string.ui_built_into_pickpico_and_available_while_the_node_is_running), 12, Typeface.NORMAL, MUTED);
         runtimeDetail.setPadding(0, dp(5), 0, 0);
         runtimeCopy.addView(runtimeDetail);
         root.addView(runtimeCard, cardParams(7));
 
-        TextView senseHeading = sectionLabel("PHONE ACCESS");
+        TextView senseHeading = sectionLabel(getString(R.string.ui_phone_access));
         senseHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(senseHeading);
 
         LinearLayout senseCard = glassCard(false);
-        cameraSwitch = capabilityRow(senseCard, "Camera", "Allow agents to capture photos.", checked -> {
+        cameraSwitch = capabilityRow(senseCard, getString(R.string.ui_camera), getString(R.string.ui_allow_agents_to_capture_photos), checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
-            else openAppPermissionSettings("Disable Camera permission in Android settings.");
+            else openAppPermissionSettings(getString(R.string.ui_disable_camera_permission_in_android_settings));
         });
         addDivider(senseCard);
 
-        microphoneSwitch = capabilityRow(senseCard, "Microphone", "Allow agents to record short audio clips.", checked -> {
+        microphoneSwitch = capabilityRow(senseCard, getString(R.string.ui_microphone), getString(R.string.ui_allow_agents_to_record_short_audio_clips), checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
-            else openAppPermissionSettings("Disable Microphone permission in Android settings.");
+            else openAppPermissionSettings(getString(R.string.ui_disable_microphone_permission_in_android_settings));
         });
         addDivider(senseCard);
 
-        locationSwitch = capabilityRow(senseCard, "Location", "Allow agents to read this phone's location.", checked -> {
+        locationSwitch = capabilityRow(senseCard, getString(R.string.ui_location), getString(R.string.ui_allow_agents_to_read_this_phone_s_location), checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
-            else openAppPermissionSettings("Disable Location permission in Android settings.");
+            else openAppPermissionSettings(getString(R.string.ui_disable_location_permission_in_android_settings));
         });
         addDivider(senseCard);
 
-        contactsSwitch = capabilityRow(senseCard, "Contacts", "Allow agents to search and read contacts.", checked -> {
+        contactsSwitch = capabilityRow(senseCard, getString(R.string.ui_contacts), getString(R.string.ui_allow_agents_to_search_and_read_contacts), checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, REQUEST_CONTACTS);
-            else openAppPermissionSettings("Disable Contacts permission in Android settings.");
+            else openAppPermissionSettings(getString(R.string.ui_disable_contacts_permission_in_android_settings));
         });
         addDivider(senseCard);
 
-        calendarSwitch = capabilityRow(senseCard, "Calendar", "Allow agents to read and manage calendar events.", checked -> {
+        calendarSwitch = capabilityRow(senseCard, getString(R.string.ui_calendar), getString(R.string.ui_allow_agents_to_read_and_manage_calendar_events), checked -> {
             if (updatingUi) return;
             if (checked) requestPermissions(new String[]{Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR}, REQUEST_CALENDAR);
-            else openAppPermissionSettings("Disable Calendar permission in Android settings.");
+            else openAppPermissionSettings(getString(R.string.ui_disable_calendar_permission_in_android_settings));
         });
         addDivider(senseCard);
 
-        notificationSwitch = capabilityRow(senseCard, "Notifications", "Allow agents to inspect active Android notifications.", checked -> {
+        notificationSwitch = capabilityRow(senseCard, getString(R.string.ui_notifications), getString(R.string.ui_allow_agents_to_inspect_active_android_notifications), checked -> {
             if (updatingUi) return;
             startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         });
         root.addView(senseCard, cardParams(7));
 
-        TextView interactHeading = sectionLabel("DEVICE ACTIONS");
+        TextView interactHeading = sectionLabel(getString(R.string.ui_device_actions));
         interactHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(interactHeading);
 
         LinearLayout interactCard = glassCard(false);
-        lockPhoneSwitch = capabilityRow(interactCard, "Lock phone", "Allow agents to lock this device.", checked -> {
+        lockPhoneSwitch = capabilityRow(interactCard, getString(R.string.ui_lock_phone), getString(R.string.ui_allow_agents_to_lock_this_device), checked -> {
             if (updatingUi) return;
             if (checked) requestDeviceAdmin();
             else disableDeviceAdmin();
         });
         root.addView(interactCard, cardParams(7));
 
-        TextView advancedHeading = sectionLabel("ADVANCED ACCESS");
+        TextView advancedHeading = sectionLabel(getString(R.string.ui_advanced_access));
         advancedHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(advancedHeading);
 
         LinearLayout advancedCard = glassCard(false);
-        hyperModeSwitch = capabilityRow(advancedCard, "Hyper Mode", "Advanced UI/screen control plus lock-screen dismissal for urgent Agent handoffs. Secure locks still require Android authentication.", checked -> {
+        hyperModeSwitch = capabilityRow(advancedCard, getString(R.string.ui_hyper_mode), getString(R.string.ui_advanced_ui_screen_control_plus_lock_screen_dismissal_for_urgent_agent_handoffs_secure_locks_still_require_android_authentication), checked -> {
             if (updatingUi) return;
             McpocketPolicySettings.setHyperModeEnabled(this, checked);
             boolean openedUnlockSetup = checked && AgentAttention.requestHyperUnlockAccessIfNeeded(this);
             Toast.makeText(this,
                     openedUnlockSetup
-                            ? "Allow full-screen alerts so Hyper Mode can dismiss the lock screen"
-                            : checked ? "Hyper Mode enabled" : "Hyper Mode disabled",
+                            ? getString(R.string.ui_allow_full_screen_alerts_so_hyper_mode_can_dismiss_the_lock_screen)
+                            : checked ? getString(R.string.ui_hyper_mode_enabled) : getString(R.string.ui_hyper_mode_disabled),
                     Toast.LENGTH_SHORT).show();
             refreshStatus();
         });
@@ -878,12 +905,12 @@ public final class DashboardActivity extends Activity {
 
         backgroundLaunchSwitch = capabilityRow(
                 advancedCard,
-                "Background app launch",
-                "Allow Hyper Mode to move between apps while PickPico itself is not on screen.",
+                getString(R.string.ui_background_app_launch),
+                getString(R.string.ui_allow_hyper_mode_to_move_between_apps_while_pickpico_itself_is_not_on_screen),
                 checked -> {
                     if (updatingUi) return;
                     if (!McpocketPolicySettings.isHyperModeEnabled(this)) {
-                        Toast.makeText(this, "Turn on Hyper Mode first", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, getString(R.string.ui_turn_on_hyper_mode_first), Toast.LENGTH_LONG).show();
                         refreshStatus();
                         return;
                     }
@@ -891,8 +918,8 @@ public final class DashboardActivity extends Activity {
                         boolean opened = AgentAttention.requestBackgroundLaunchAccessIfNeeded(this);
                         Toast.makeText(this,
                                 opened
-                                        ? "Allow PickPico to display over other apps so Android permits Agent app switching"
-                                        : "Background app launch is already allowed",
+                                        ? getString(R.string.ui_allow_pickpico_to_display_over_other_apps_so_android_permits_agent_app_switching)
+                                        : getString(R.string.ui_background_app_launch_is_already_allowed),
                                 Toast.LENGTH_LONG).show();
                     } else {
                         Intent settings = new Intent(
@@ -903,10 +930,10 @@ public final class DashboardActivity extends Activity {
                 });
         addDivider(advancedCard);
 
-        accessibilitySwitch = capabilityRow(advancedCard, "Accessibility · UI Control", "Inspect and operate accessible UI elements in other apps.", checked -> {
+        accessibilitySwitch = capabilityRow(advancedCard, getString(R.string.ui_accessibility_ui_control), getString(R.string.ui_inspect_and_operate_accessible_ui_elements_in_other_apps), checked -> {
             if (updatingUi) return;
             if (!McpocketPolicySettings.isHyperModeEnabled(this)) {
-                Toast.makeText(this, "Turn on Hyper Mode first", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, getString(R.string.ui_turn_on_hyper_mode_first), Toast.LENGTH_LONG).show();
                 refreshStatus();
                 return;
             }
@@ -914,7 +941,7 @@ public final class DashboardActivity extends Activity {
         });
         addDivider(advancedCard);
 
-        screenCaptureSwitch = capabilityRow(advancedCard, "Live Screen Share", "Optional MediaProjection fallback. Hyper Mode can capture screenshots on demand through Accessibility.", checked -> {
+        screenCaptureSwitch = capabilityRow(advancedCard, getString(R.string.ui_extra_62cbe28803), getString(R.string.ui_extra_3a16d0094a), checked -> {
             if (updatingUi) return;
             toggleScreenCapture();
         });
@@ -946,7 +973,7 @@ public final class DashboardActivity extends Activity {
 
         TextView titleView = text(title, 14, Typeface.BOLD, TEXT);
         copy.addView(titleView);
-        TextView stateView = text("CHECKING", 10, Typeface.BOLD, DIM);
+        TextView stateView = text(getString(R.string.ui_checking), 10, Typeface.BOLD, DIM);
         stateView.setLetterSpacing(.055f);
         stateView.setPadding(0, dp(4), 0, 0);
         copy.addView(stateView);
@@ -974,66 +1001,76 @@ public final class DashboardActivity extends Activity {
 
     private String capabilityGlyph(String title) {
         String value = title == null ? "" : title.toLowerCase(Locale.ROOT);
-        if (value.contains("pico ball")) return "●";
-        if (value.contains("camera")) return "◉";
-        if (value.contains("microphone")) return "◍";
-        if (value.contains("location")) return "⌖";
-        if (value.contains("contact")) return "○";
-        if (value.contains("calendar")) return "▣";
-        if (value.contains("notification")) return "♢";
-        if (value.contains("lock")) return "◇";
-        if (value.contains("hyper")) return "⚡";
-        if (value.contains("accessibility")) return "◎";
-        if (value.contains("screen")) return "▤";
+        if (title.equals(getString(R.string.ui_pico_ball))) return "●";
+        if (title.equals(getString(R.string.ui_camera))) return "◉";
+        if (title.equals(getString(R.string.ui_microphone))) return "◍";
+        if (title.equals(getString(R.string.ui_location))) return "⌖";
+        if (title.equals(getString(R.string.ui_contacts))) return "○";
+        if (title.equals(getString(R.string.ui_calendar))) return "▣";
+        if (title.equals(getString(R.string.ui_notifications))) return "♢";
+        if (title.equals(getString(R.string.ui_lock_phone))) return "◇";
+        if (title.equals(getString(R.string.ui_hyper_mode))) return "⚡";
+        if (title.equals(getString(R.string.ui_accessibility_ui_control))) return "◎";
+        if (title.equals(getString(R.string.ui_extra_62cbe28803))) return "▤";
         return "•";
     }
 
     private View buildSettingsPage() {
         LinearLayout root = pageRoot();
 
-        TextView behaviorHeading = sectionLabel("AGENT BEHAVIOR");
+        TextView behaviorHeading = sectionLabel(getString(R.string.ui_agent_behavior));
         root.addView(behaviorHeading);
 
         LinearLayout approval = settingsRow(
-                "Approval Policy",
-                "Choose when an agent must ask before it performs an action.",
+                getString(R.string.ui_approval_policy),
+                getString(R.string.ui_choose_when_an_agent_must_ask_before_it_performs_an_action),
                 this::showApprovalModeDialog);
-        settingsApprovalState = rowState(approval, "AUTO APPROVE", GREEN);
+        settingsApprovalState = rowState(approval, getString(R.string.ui_auto_approve), GREEN);
         root.addView(approval, cardParams(7));
 
-        TextView connectionHeading = sectionLabel("CONNECTION");
+        TextView connectionHeading = sectionLabel(getString(R.string.ui_agent_connection));
         connectionHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(connectionHeading);
 
         LinearLayout remote = settingsRow(
-                "Remote Access",
-                "Connect cloud agents when the phone is outside their local network.",
+                getString(R.string.ui_remote_access),
+                getString(R.string.ui_let_your_agent_reach_this_phone_over_the_internet),
                 () -> showPage(PAGE_REMOTE));
-        settingsRemoteState = rowState(remote, "NOT CONFIGURED", AMBER);
+        settingsRemoteState = rowState(remote, getString(R.string.ui_not_configured), AMBER);
         root.addView(remote, cardParams(7));
 
+        TextView systemHeading = sectionLabel(getString(R.string.ui_android_system_access));
+        systemHeading.setPadding(0, dp(20), 0, dp(7));
+        root.addView(systemHeading);
+
         LinearLayout picoAdb = settingsRow(
-                "System Control",
-                "Pair Android Wireless Debugging for full battery and system diagnostics.",
+                getString(R.string.ui_system_control),
+                getString(R.string.ui_add_system_commands_file_transfers_and_apk_installation_your_agent_chooses_when_to_use_them),
                 () -> showPage(PAGE_PICO_ADB));
-        settingsPicoAdbState = rowState(picoAdb, "SETUP REQUIRED", AMBER);
+        settingsPicoAdbConnectionState = rowState(picoAdb, getString(R.string.ui_connection_checking), AMBER);
+        settingsPicoAdbState = rowState(picoAdb, getString(R.string.ui_pairing_checking), AMBER);
         root.addView(picoAdb, cardParams(7));
 
-        TextView appearanceHeading = sectionLabel("APPEARANCE");
+        TextView appearanceHeading = sectionLabel(getString(R.string.ui_appearance_136360));
         appearanceHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(appearanceHeading);
         LinearLayout appearance = settingsRow(
-                "Theme",
-                "Background color, glass style, transparency, and highlights.",
+                getString(R.string.ui_theme),
+                getString(R.string.ui_background_color_glass_style_transparency_and_highlights),
                 () -> showPage(PAGE_APPEARANCE));
-        rowState(appearance, "CUSTOMIZE", DIM);
+        rowState(appearance, getString(R.string.ui_customize), DIM);
         root.addView(appearance, cardParams(7));
+
+        LinearLayout language = settingsRow(getString(R.string.language_title),
+                getString(R.string.language_description), this::showLanguageDialog);
+        rowState(language, languageChoices()[AppLanguage.choice(this)], DIM);
+        root.addView(language, cardParams(7));
 
         LinearLayout orbCard = glassCard(false);
         picoOrbSwitch = capabilityRow(
                 orbCard,
-                "Pico ball",
-                "Keep the HOME fluid orb visible above other apps while the Node is running.",
+                getString(R.string.ui_pico_ball),
+                getString(R.string.ui_keep_the_home_fluid_orb_visible_above_other_apps_while_the_node_is_running),
                 checked -> {
                     if (updatingUi) return;
                     McpocketPolicySettings.setPicoOrbEnabled(this, checked);
@@ -1043,44 +1080,69 @@ public final class DashboardActivity extends Activity {
                                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                     Uri.parse("package:" + getPackageName())));
                         } catch (RuntimeException error) {
-                            Toast.makeText(this, "Open Android settings and allow display over other apps", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, getString(R.string.ui_open_android_settings_and_allow_display_over_other_apps), Toast.LENGTH_LONG).show();
                         }
                     }
                     refreshPicoOrbServiceIfRunning();
                     refreshStatus();
                 });
         root.addView(orbCard, cardParams(7));
-        root.addView(settingsRow("Pico return app", "Choose your default return app and Pico text size.",
+        root.addView(settingsRow(getString(R.string.ui_pico_return_app), getString(R.string.ui_choose_your_default_return_app_and_pico_text_size),
                 () -> startActivity(new Intent(this, CallerReturnSettingsActivity.class))), cardParams(7));
 
-        TextView appHeading = sectionLabel("APP");
+        root.addView(sectionLabel(getString(R.string.ui_accessories)));
+        LinearLayout buttonPadCard = glassCard(false);
+        buttonPadSwitch = capabilityRow(buttonPadCard, getString(R.string.ui_button_pad),
+                getString(R.string.ui_button_pad_detail), checked -> {
+                    if (updatingUi) return;
+                    McpocketPolicySettings.setButtonPadEnabled(this, checked);
+                    refreshButtonPad(false);
+                    refreshStatus();
+                });
+        TextView searchPad = actionButton(getString(R.string.ui_button_pad_search), false, false);
+        searchPad.setOnClickListener(v -> {
+            if (!McpocketPolicySettings.isButtonPadEnabled(this)) {
+                Toast.makeText(this, getString(R.string.ui_button_pad_enable_first), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= 31 && (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT}, 209);
+                return;
+            }
+            refreshButtonPad(true);
+        });
+        buttonPadCard.addView(searchPad);
+        root.addView(buttonPadCard, cardParams(7));
+
+        TextView appHeading = sectionLabel(getString(R.string.ui_app));
         appHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(appHeading);
 
         LinearLayout update = glassCard(true);
-        TextView updateTitle = text("PickPico Update", 14, Typeface.BOLD, TEXT);
+        TextView updateTitle = text(getString(R.string.ui_pickpico_update), 14, Typeface.BOLD, TEXT);
         update.addView(updateTitle);
-        settingsVersionState = text("Version —", 12, Typeface.NORMAL, MUTED);
+        settingsVersionState = text(getString(R.string.ui_version), 12, Typeface.NORMAL, MUTED);
         settingsVersionState.setPadding(0, dp(5), 0, 0);
         update.addView(settingsVersionState);
-        settingsUpdateState = text("Checking update state…", 11, Typeface.BOLD, DIM);
+        settingsUpdateState = text(getString(R.string.ui_checking_update_state), 11, Typeface.BOLD, DIM);
         settingsUpdateState.setPadding(0, dp(8), 0, dp(11));
         update.addView(settingsUpdateState);
-        updateAction = actionButton("CHECK FOR UPDATE", false, false);
+        updateAction = actionButton(getString(R.string.ui_check_for_update), false, false);
         updateAction.setOnClickListener(v -> checkOrInstallUpdate());
         update.addView(updateAction, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
         root.addView(update, cardParams(7));
 
-        TextView advancedHeading = sectionLabel("ADVANCED");
+        TextView advancedHeading = sectionLabel(getString(R.string.ui_advanced));
         advancedHeading.setPadding(0, dp(20), 0, dp(7));
         root.addView(advancedHeading);
 
         LinearLayout diagnostics = settingsRow(
-                "Developer / Diagnostics",
-                "Endpoints, transport state, credentials, runtime, and debug information.",
+                getString(R.string.ui_developer_diagnostics),
+                getString(R.string.ui_endpoints_transport_state_credentials_runtime_and_debug_information),
                 () -> showPage(PAGE_DEVELOPER));
-        rowState(diagnostics, "ADVANCED", DIM);
+        rowState(diagnostics, getString(R.string.ui_advanced), DIM);
         root.addView(diagnostics, cardParams(7));
 
         addBottomSpace(root);
@@ -1089,9 +1151,10 @@ public final class DashboardActivity extends Activity {
 
     private View buildPicoAdbPage() {
         LinearLayout root = pageRoot();
+        picoAdbPairingExpanded = false;
 
         TextView intro = text(
-                "PickPico can use Android's own Wireless Debugging trust flow to gain ADB shell diagnostics. The pairing code stays on this phone and the authorization can be revoked from Android settings.",
+                getString(R.string.ui_your_agent_chooses_tools_automatically_system_access_adds_android_commands_file_transfers_and_apk_installation_through_adb),
                 13,
                 Typeface.NORMAL,
                 MUTED);
@@ -1099,34 +1162,88 @@ public final class DashboardActivity extends Activity {
         root.addView(intro);
 
         LinearLayout statusCard = glassCard(true);
-        statusCard.addView(text("SYSTEM CONTROL", 14, Typeface.BOLD, TEXT));
-        picoAdbState = text("CHECKING", 12, Typeface.BOLD, AMBER);
+        statusCard.addView(text(getString(R.string.ui_system_control_a2fc0e), 14, Typeface.BOLD, TEXT));
+        picoAdbPairingState = text(getString(R.string.ui_pairing_checking), 12, Typeface.BOLD, AMBER);
+        picoAdbPairingState.setPadding(0, dp(8), 0, 0);
+        statusCard.addView(picoAdbPairingState);
+        picoAdbState = text(getString(R.string.ui_connection_checking), 12, Typeface.BOLD, AMBER);
         picoAdbState.setPadding(0, dp(8), 0, 0);
         statusCard.addView(picoAdbState);
-        picoAdbDetail = text("Reading PicoADB state…", 12, Typeface.NORMAL, MUTED);
+        picoAdbDetail = text(getString(R.string.ui_reading_picoadb_state), 12, Typeface.NORMAL, MUTED);
         picoAdbDetail.setPadding(0, dp(6), 0, 0);
         statusCard.addView(picoAdbDetail);
         root.addView(statusCard, cardParams(0));
 
+        LinearLayout controlCard = glassCard(true);
+        controlCard.addView(text(getString(R.string.ui_dev_control_title), 14, Typeface.BOLD, TEXT));
+        developerControlState = text("", 12, Typeface.BOLD, AMBER);
+        developerControlState.setPadding(0, dp(8), 0, 0);
+        controlCard.addView(developerControlState);
+        developerControlNote = text("", 12, Typeface.NORMAL, MUTED);
+        developerControlNote.setPadding(0, dp(6), 0, dp(10));
+        controlCard.addView(developerControlNote);
+        developerAuthorizeAction = actionButton(getString(R.string.ui_dev_control_authorize), false, false);
+        developerAuthorizeAction.setOnClickListener(v -> authorizeDeveloperControl());
+        controlCard.addView(developerAuthorizeAction, new LinearLayout.LayoutParams(-1, dp(44)));
+        developerEnableAction = actionButton(getString(R.string.ui_dev_control_enable), false, false);
+        developerEnableAction.setOnClickListener(v -> setDeveloperControl(true));
+        LinearLayout.LayoutParams enableParams = new LinearLayout.LayoutParams(-1, dp(44));
+        enableParams.topMargin = dp(8);
+        controlCard.addView(developerEnableAction, enableParams);
+        developerDisableAction = actionButton(getString(R.string.ui_dev_control_disable), false, false);
+        developerDisableAction.setOnClickListener(v -> setDeveloperControl(false));
+        LinearLayout.LayoutParams disableParams = new LinearLayout.LayoutParams(-1, dp(44));
+        disableParams.topMargin = dp(8);
+        controlCard.addView(developerDisableAction, disableParams);
+        root.addView(controlCard, cardParams(10));
+
+        LinearLayout connectCard = glassCard(true);
+        picoAdbConnectCard = connectCard;
+        connectCard.addView(text(getString(R.string.ui_ready_when_needed), 14, Typeface.BOLD, TEXT));
+        TextView connectNote = text(
+                getString(R.string.ui_keep_android_wireless_debugging_on_when_you_want_system_access_your_agent_reconnects_automatically_when_it_needs_adb),
+                12, Typeface.NORMAL, MUTED);
+        connectNote.setPadding(0, dp(6), 0, dp(12));
+        connectCard.addView(connectNote);
+        picoAdbConnectAction = actionButton(getString(R.string.ui_reconnect_now), false, false);
+        picoAdbConnectAction.setOnClickListener(v -> connectPicoAdb());
+        connectCard.addView(picoAdbConnectAction, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+        TextView manageSettings = actionButton(getString(R.string.ui_android_wireless_debugging), false, false);
+        manageSettings.setOnClickListener(v -> openWirelessDebuggingSettings());
+        LinearLayout.LayoutParams manageParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        manageParams.topMargin = dp(8);
+        connectCard.addView(manageSettings, manageParams);
+        root.addView(connectCard, cardParams(10));
+
+        picoAdbPairingToggle = actionButton(getString(R.string.ui_pairing_settings), false, false);
+        picoAdbPairingToggle.setOnClickListener(v -> {
+            picoAdbPairingExpanded = !picoAdbPairingExpanded;
+            refreshPicoAdbStatus();
+        });
+        root.addView(picoAdbPairingToggle, cardParams(10));
+
         LinearLayout setupCard = glassCard(true);
-        setupCard.addView(text("1 · ANDROID AUTHORIZATION", 14, Typeface.BOLD, TEXT));
+        picoAdbSetupCard = setupCard;
+        setupCard.addView(text(getString(R.string.ui_1_android_authorization), 14, Typeface.BOLD, TEXT));
         TextView setupNote = text(
-                "Open Wireless Debugging, enable it, then choose “Pair device with pairing code”. Keep that six-digit dialog open. Split screen is the most reliable setup on Samsung.",
+                getString(R.string.ui_open_wireless_debugging_enable_it_then_choose_pair_device_with_pairing_code_keep_that_six_digit_dialog_open_split_screen_is_the_most_reliable_setup_on_samsung),
                 12,
                 Typeface.NORMAL,
                 MUTED);
         setupNote.setPadding(0, dp(6), 0, dp(12));
         setupCard.addView(setupNote);
 
-        TextView openSettings = actionButton("OPEN WIRELESS DEBUGGING", false, false);
+        TextView openSettings = actionButton(getString(R.string.ui_open_wireless_debugging), false, false);
         openSettings.setOnClickListener(v -> openWirelessDebuggingSettings());
         setupCard.addView(openSettings, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
 
-        picoAdbScanAction = actionButton("SCAN FOR ENDPOINTS", false, false);
+        picoAdbScanAction = actionButton(getString(R.string.ui_scan_for_endpoints), false, false);
         picoAdbScanAction.setOnClickListener(v -> {
             PicoAdbManager.get(this).discover();
-            Toast.makeText(this, "Scanning for Wireless Debugging for 15 seconds", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_scanning_for_wireless_debugging_for_15_seconds), Toast.LENGTH_SHORT).show();
             refreshStatus();
         });
         LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
@@ -1136,9 +1253,10 @@ public final class DashboardActivity extends Activity {
         root.addView(setupCard, cardParams(10));
 
         LinearLayout pairCard = glassCard(true);
-        pairCard.addView(text("2 · PAIR THIS PHONE", 14, Typeface.BOLD, TEXT));
+        picoAdbPairCard = pairCard;
+        pairCard.addView(text(getString(R.string.ui_2_pair_this_phone), 14, Typeface.BOLD, TEXT));
         TextView pairNote = text(
-                "Enter the six-digit code shown by Android. PickPico stores its ADB identity in private app storage; the code itself is never saved.",
+                getString(R.string.ui_enter_the_six_digit_code_shown_by_android_pickpico_stores_its_adb_identity_in_private_app_storage_the_code_itself_is_never_saved),
                 12,
                 Typeface.NORMAL,
                 MUTED);
@@ -1148,7 +1266,7 @@ public final class DashboardActivity extends Activity {
         picoAdbPairCodeInput = new EditText(this);
         picoAdbPairCodeInput.setSingleLine(true);
         picoAdbPairCodeInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        picoAdbPairCodeInput.setHint("6-digit pairing code");
+        picoAdbPairCodeInput.setHint(getString(R.string.ui_6_digit_pairing_code));
         picoAdbPairCodeInput.setTextColor(TEXT);
         picoAdbPairCodeInput.setHintTextColor(DIM);
         picoAdbPairCodeInput.setTextSize(18);
@@ -1160,7 +1278,7 @@ public final class DashboardActivity extends Activity {
         pairCard.addView(picoAdbPairCodeInput, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
 
-        picoAdbPairAction = actionButton("PAIR", false, false);
+        picoAdbPairAction = actionButton(getString(R.string.ui_pair), false, false);
         picoAdbPairAction.setOnClickListener(v -> pairPicoAdb());
         LinearLayout.LayoutParams pairParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
@@ -1168,23 +1286,8 @@ public final class DashboardActivity extends Activity {
         pairCard.addView(picoAdbPairAction, pairParams);
         root.addView(pairCard, cardParams(10));
 
-        LinearLayout connectCard = glassCard(true);
-        connectCard.addView(text("3 · ACTIVATE SHELL ACCESS", 14, Typeface.BOLD, TEXT));
-        TextView connectNote = text(
-                "After pairing, scan once more and connect. PickPico then receives the same UID 2000 shell access as an ADB client, while Android's root and app-sandbox boundaries remain intact.",
-                12,
-                Typeface.NORMAL,
-                MUTED);
-        connectNote.setPadding(0, dp(6), 0, dp(12));
-        connectCard.addView(connectNote);
-        picoAdbConnectAction = actionButton("CONNECT", false, false);
-        picoAdbConnectAction.setOnClickListener(v -> connectPicoAdb());
-        connectCard.addView(picoAdbConnectAction, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
-        root.addView(connectCard, cardParams(10));
-
         TextView safety = text(
-                "Privileged MCP tools are allowlisted. Pairing does not expose a free-form remote ADB shell.",
+                getString(R.string.ui_camera_notifications_and_screen_tools_keep_working_without_adb_when_their_permissions_are_enabled_system_commands_follow_your_hyper_mode_and_approval_settings),
                 11,
                 Typeface.NORMAL,
                 DIM);
@@ -1196,6 +1299,15 @@ public final class DashboardActivity extends Activity {
     }
 
     private void openWirelessDebuggingSettings() {
+        if (Settings.Global.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 0) {
+            try {
+                startActivity(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS));
+                Toast.makeText(this, getString(R.string.ui_dev_control_first_setup), Toast.LENGTH_LONG).show();
+            } catch (RuntimeException error) {
+                Toast.makeText(this, getString(R.string.ui_extra_4dd1672772), Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         Intent direct = new Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS");
         try {
             if (direct.resolveActivity(getPackageManager()) != null) {
@@ -1207,7 +1319,64 @@ public final class DashboardActivity extends Activity {
         try {
             startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
         } catch (RuntimeException error) {
-            Toast.makeText(this, "Open Developer options → Wireless debugging", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_extra_4dd1672772), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void authorizeDeveloperControl() {
+        if (picoAdbBusy) return;
+        picoAdbBusy = true;
+        refreshDeveloperControl();
+        new Thread(() -> {
+            String error = null;
+            try {
+                JSONObject result = DeveloperOptionsControl.authorize(this);
+                if (!result.optBoolean("permissionGranted")) error = picoAdbResultMessage(result,
+                        getString(R.string.ui_dev_control_setup_needed));
+            } catch (Exception e) { error = e.getMessage(); }
+            final String message = error;
+            runOnUiThread(() -> {
+                picoAdbBusy = false;
+                Toast.makeText(this, message == null ? getString(R.string.ui_dev_control_ready) : message,
+                        Toast.LENGTH_LONG).show();
+                refreshStatus();
+            });
+        }, "pico-dev-control-grant").start();
+    }
+
+    private void setDeveloperControl(boolean enabled) {
+        try {
+            JSONObject result = DeveloperOptionsControl.setEnabled(this, enabled);
+            Toast.makeText(this, getString(result.optBoolean("pendingUserAction")
+                    ? R.string.ui_dev_control_pending : enabled ? R.string.ui_dev_control_enabled
+                    : R.string.ui_dev_control_disabled), Toast.LENGTH_LONG).show();
+            if (enabled && result.optBoolean("verified"))
+                PicoAdbManager.get(this).connect(ignored -> refreshStatus());
+            refreshStatus();
+        } catch (Exception error) {
+            Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
+            refreshDeveloperControl();
+        }
+    }
+
+    private void refreshDeveloperControl() {
+        if (developerControlState == null) return;
+        try {
+            JSONObject control = DeveloperOptionsControl.status(this);
+            boolean ready = control.getBoolean("permissionGranted");
+            String on = getString(R.string.ui_dev_control_on);
+            String off = getString(R.string.ui_dev_control_off);
+            setTextIfChanged(developerControlState, getString(R.string.ui_dev_control_state,
+                    control.getBoolean("developerOptionsEnabled") ? on : off,
+                    control.getBoolean("wirelessDebuggingEnabled") ? on : off));
+            setTextIfChanged(developerControlNote, getString(ready
+                    ? R.string.ui_dev_control_ready : R.string.ui_dev_control_setup_needed));
+            developerEnableAction.setEnabled(ready && !picoAdbBusy);
+            developerDisableAction.setEnabled(ready && !picoAdbBusy);
+            developerAuthorizeAction.setEnabled(!picoAdbBusy);
+            developerAuthorizeAction.setVisibility(ready ? View.GONE : View.VISIBLE);
+        } catch (JSONException error) {
+            setTextIfChanged(developerControlState, error.getMessage());
         }
     }
 
@@ -1216,7 +1385,7 @@ public final class DashboardActivity extends Activity {
         String code = picoAdbPairCodeInput == null
                 ? "" : picoAdbPairCodeInput.getText().toString().trim();
         if (!PicoAdbClient.isValidPairingCode(code)) {
-            Toast.makeText(this, "Enter the six-digit Android pairing code", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_extra_6bc452d636), Toast.LENGTH_SHORT).show();
             return;
         }
         picoAdbBusy = true;
@@ -1224,11 +1393,14 @@ public final class DashboardActivity extends Activity {
         PicoAdbManager.get(this).pair(code, result -> {
             picoAdbBusy = false;
             boolean paired = result.optBoolean("paired", false);
-            if (paired && picoAdbPairCodeInput != null) picoAdbPairCodeInput.setText("");
+            if (paired) {
+                picoAdbPairingExpanded = false;
+                if (picoAdbPairCodeInput != null) picoAdbPairCodeInput.setText("");
+            }
             Toast.makeText(
                     this,
-                    paired ? "PicoADB paired. Scan again, then connect."
-                            : picoAdbResultMessage(result, "Pairing failed"),
+                    paired ? getString(R.string.ui_pairing_saved_your_agent_can_connect_automatically)
+                            : picoAdbResultMessage(result, getString(R.string.ui_extra_ff9aa7b7f0)),
                     Toast.LENGTH_LONG).show();
             refreshStatus();
         });
@@ -1243,8 +1415,8 @@ public final class DashboardActivity extends Activity {
             boolean connected = result.optBoolean("connected", false);
             Toast.makeText(
                     this,
-                    connected ? "PicoADB shell access is ready."
-                            : picoAdbResultMessage(result, "Connection failed"),
+                    connected ? getString(R.string.ui_extra_16bb313e84)
+                            : picoAdbResultMessage(result, getString(R.string.ui_extra_202caaa870)),
                     Toast.LENGTH_LONG).show();
             refreshStatus();
         });
@@ -1260,7 +1432,7 @@ public final class DashboardActivity extends Activity {
 
     private View buildAppearancePage() {
         LinearLayout root = pageRoot();
-        TextView intro = text("Appearance changes apply immediately across PickPico. These controls do not affect Agent permissions or behavior.", 13, Typeface.NORMAL, MUTED);
+        TextView intro = text(getString(R.string.ui_extra_b9b3a1654c), 13, Typeface.NORMAL, MUTED);
         intro.setPadding(dp(2), 0, dp(2), dp(14));
         root.addView(intro);
         root.addView(buildOrbAppearanceCard(), cardParams(0));
@@ -1276,8 +1448,8 @@ public final class DashboardActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
-        copy.addView(text("PICO ORB", 14, Typeface.BOLD, TEXT));
-        TextView note = text("Choose a look. You can switch back anytime.", 12, Typeface.NORMAL, MUTED);
+        copy.addView(text(getString(R.string.ui_pico_orb), 14, Typeface.BOLD, TEXT));
+        TextView note = text(getString(R.string.ui_extra_a93421b010), 12, Typeface.NORMAL, MUTED);
         note.setPadding(0, dp(5), dp(8), 0);
         copy.addView(note);
         header.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -1287,8 +1459,8 @@ public final class DashboardActivity extends Activity {
         card.addView(header);
 
         LinearLayout choices = new LinearLayout(this);
-        originalOrbChoice = orbAppearanceChoice("Original", PickPicoTheme.ORB_ORIGINAL);
-        flameOrbChoice = orbAppearanceChoice("Flame", PickPicoTheme.ORB_FLAME);
+        originalOrbChoice = orbAppearanceChoice(getString(R.string.ui_extra_c0a8060f3b), PickPicoTheme.ORB_ORIGINAL);
+        flameOrbChoice = orbAppearanceChoice(getString(R.string.ui_extra_245eb6d90c), PickPicoTheme.ORB_FLAME);
         choices.addView(originalOrbChoice, new LinearLayout.LayoutParams(0, dp(46), 1f));
         LinearLayout.LayoutParams flameParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
         flameParams.leftMargin = dp(8);
@@ -1297,7 +1469,7 @@ public final class DashboardActivity extends Activity {
         if (Build.VERSION.SDK_INT < 33) {
             flameOrbChoice.setEnabled(false);
             flameOrbChoice.setAlpha(.45f);
-            TextView compatibility = text("Flame requires Android 13 or later. Original is always available.", 11, Typeface.NORMAL, MUTED);
+            TextView compatibility = text(getString(R.string.ui_extra_26e55d0487), 11, Typeface.NORMAL, MUTED);
             compatibility.setPadding(0, dp(8), 0, 0);
             card.addView(compatibility);
         }
@@ -1312,7 +1484,7 @@ public final class DashboardActivity extends Activity {
         choice.setOnClickListener(view -> {
             if (PickPicoTheme.ORB_FLAME.equals(style)
                     && (appearanceOrbPreview == null || !appearanceOrbPreview.isFlameAvailable())) {
-                Toast.makeText(this, "Flame is unavailable on this device. Original is still available.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, getString(R.string.ui_extra_78d4784b89), Toast.LENGTH_LONG).show();
                 return;
             }
             appearanceOrbStyle = style;
@@ -1326,8 +1498,8 @@ public final class DashboardActivity extends Activity {
         boolean flame = PickPicoTheme.ORB_FLAME.equals(theme.orbStyle);
         originalOrbChoice.setSelected(!flame);
         flameOrbChoice.setSelected(flame);
-        originalOrbChoice.setContentDescription("Original orb" + (!flame ? ", selected" : ""));
-        flameOrbChoice.setContentDescription("Flame orb" + (flame ? ", selected" : ""));
+        originalOrbChoice.setContentDescription(getString(R.string.ui_extra_63add8f1fc) + (!flame ? getString(R.string.ui_extra_d7a1e57362) : ""));
+        flameOrbChoice.setContentDescription(getString(R.string.ui_extra_383a3221cf) + (flame ? getString(R.string.ui_extra_d7a1e57362) : ""));
         originalOrbChoice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), !flame));
         flameOrbChoice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), flame));
     }
@@ -1345,8 +1517,8 @@ public final class DashboardActivity extends Activity {
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         header.addView(copy, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        copy.addView(text("THEME", 14, Typeface.BOLD, TEXT));
-        TextView note = text("Choose a solid color or gradient, then tune how the glass sits above it.", 12, Typeface.NORMAL, MUTED);
+        copy.addView(text(getString(R.string.ui_theme_d91e30), 14, Typeface.BOLD, TEXT));
+        TextView note = text(getString(R.string.ui_choose_a_solid_color_or_gradient_then_tune_how_the_glass_sits_above_it), 12, Typeface.NORMAL, MUTED);
         note.setPadding(0, dp(4), dp(12), 0);
         copy.addView(note);
 
@@ -1355,7 +1527,7 @@ public final class DashboardActivity extends Activity {
         header.addView(appearancePreview, new LinearLayout.LayoutParams(dp(82), dp(38)));
 
         appearanceGradientSwitch = new Switch(this);
-        appearanceGradientSwitch.setText("Gradient background");
+        appearanceGradientSwitch.setText(getString(R.string.ui_gradient_background));
         applyTextColor(appearanceGradientSwitch, TEXT);
         appearanceGradientSwitch.setTextSize(13);
         appearanceGradientSwitch.setChecked(theme.gradient);
@@ -1374,30 +1546,30 @@ public final class DashboardActivity extends Activity {
         appearanceColorB = appearanceColorInput(PickPicoTheme.toHex(theme.colorB));
         LinearLayout colors = new LinearLayout(this);
         colors.setOrientation(LinearLayout.HORIZONTAL);
-        colors.addView(appearanceColorControl("COLOR A", appearanceColorA), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        colors.addView(appearanceColorControl(getString(R.string.ui_color_a), appearanceColorA), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams bParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         bParams.leftMargin = dp(8);
-        appearanceColorBControl = appearanceColorControl("COLOR B", appearanceColorB);
+        appearanceColorBControl = appearanceColorControl(getString(R.string.ui_color_b), appearanceColorB);
         appearanceColorBControl.setVisibility(theme.gradient ? View.VISIBLE : View.GONE);
         colors.addView(appearanceColorBControl, bParams);
         card.addView(colors);
 
-        TextView styleLabel = sectionLabel("GLASS");
+        TextView styleLabel = sectionLabel(getString(R.string.ui_glass));
         styleLabel.setPadding(dp(2), dp(16), 0, dp(7));
         card.addView(styleLabel);
 
         LinearLayout glassPresets = new LinearLayout(this);
         glassPresets.setOrientation(LinearLayout.HORIZONTAL);
-        addGlassPreset(glassPresets, "SOFT", 7, 12, 72);
-        addGlassPreset(glassPresets, "CLEAR", 3, 30, 96);
-        addGlassPreset(glassPresets, "CRISP", 1, 44, 76);
+        addGlassPreset(glassPresets, getString(R.string.ui_soft), 7, 12, 72);
+        addGlassPreset(glassPresets, getString(R.string.ui_clear), 3, 30, 96);
+        addGlassPreset(glassPresets, getString(R.string.ui_crisp), 1, 44, 76);
         card.addView(glassPresets);
 
         LinearLayout glassHeader = new LinearLayout(this);
         glassHeader.setOrientation(LinearLayout.HORIZONTAL);
         glassHeader.setGravity(Gravity.CENTER_VERTICAL);
         glassHeader.setPadding(0, dp(15), 0, 0);
-        TextView glassTitle = text("TRANSPARENCY · SEE MORE BACKGROUND", 10, Typeface.BOLD, MUTED);
+        TextView glassTitle = text(getString(R.string.ui_transparency_see_more_background), 10, Typeface.BOLD, MUTED);
         glassTitle.setLetterSpacing(0.06f);
         glassHeader.addView(glassTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         appearanceGlassValue = text((100 - theme.glassOpacity) + "%", 11, Typeface.BOLD, TEXT);
@@ -1425,7 +1597,7 @@ public final class DashboardActivity extends Activity {
         LinearLayout highlightHeader = new LinearLayout(this);
         highlightHeader.setOrientation(LinearLayout.HORIZONTAL);
         highlightHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView highlightTitle = text("SHINE · BRIGHTER GLASS EDGE", 10, Typeface.BOLD, MUTED);
+        TextView highlightTitle = text(getString(R.string.ui_shine_brighter_glass_edge), 10, Typeface.BOLD, MUTED);
         highlightTitle.setLetterSpacing(0.06f);
         highlightHeader.addView(highlightTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         appearanceHighlightValue = text(theme.highlight + "%", 11, Typeface.BOLD, TEXT);
@@ -1453,7 +1625,7 @@ public final class DashboardActivity extends Activity {
         LinearLayout backgroundHeader = new LinearLayout(this);
         backgroundHeader.setOrientation(LinearLayout.HORIZONTAL);
         backgroundHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView backgroundTitle = text("COLOR STRENGTH · MORE / LESS BACKGROUND", 10, Typeface.BOLD, MUTED);
+        TextView backgroundTitle = text(getString(R.string.ui_color_strength_more_less_background), 10, Typeface.BOLD, MUTED);
         backgroundTitle.setLetterSpacing(0.04f);
         backgroundHeader.addView(backgroundTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         appearanceBackgroundValue = text(theme.backgroundIntensity + "%", 11, Typeface.BOLD, TEXT);
@@ -1490,7 +1662,7 @@ public final class DashboardActivity extends Activity {
         input.setTypeface(Typeface.MONOSPACE);
         input.setGravity(Gravity.CENTER_VERTICAL);
         input.setPadding(dp(12), 0, dp(12), 0);
-        input.setContentDescription("Choose color " + value);
+        input.setContentDescription(getString(R.string.ui_choose_color) + value);
         input.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), false));
         return input;
     }
@@ -1515,7 +1687,7 @@ public final class DashboardActivity extends Activity {
         setColorSwatch(swatch, PickPicoTheme.parseHex(input.getText().toString(), fallback));
         View.OnClickListener chooseColor = v -> showColorPicker(input, swatch);
         row.setOnClickListener(chooseColor);
-        row.setContentDescription(label + ", open color palette");
+        row.setContentDescription(label + getString(R.string.ui_open_color_palette));
         swatch.setOnClickListener(chooseColor);
         input.setOnClickListener(chooseColor);
         row.addView(swatch, new LinearLayout.LayoutParams(dp(44), dp(44)));
@@ -1637,10 +1809,10 @@ public final class DashboardActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(body);
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(primary ? "Color A" : "Color B")
+                .setTitle(primary ? getString(R.string.ui_color_a_263930) : getString(R.string.ui_color_b_46d602))
                 .setView(scroll)
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Apply", null)
+                .setNegativeButton(getString(R.string.ui_cancel), null)
+                .setPositiveButton(getString(R.string.ui_apply), null)
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (!picker.validateColor()) return;
@@ -1654,7 +1826,7 @@ public final class DashboardActivity extends Activity {
             TextView activeTarget = primary ? appearanceColorA : appearanceColorB;
             if (activeTarget != null) {
                 activeTarget.setText(PickPicoTheme.toHex(selected));
-                activeTarget.setContentDescription("Choose color " + PickPicoTheme.toHex(selected));
+                activeTarget.setContentDescription(getString(R.string.ui_choose_color) + PickPicoTheme.toHex(selected));
             }
             setColorSwatch(externalSwatch, selected);
             applyThemeLive(saved);
@@ -1666,13 +1838,13 @@ public final class DashboardActivity extends Activity {
     private LinearLayout settingsRow(String title, String detail, Runnable action) {
         String normalized = title.toLowerCase(Locale.ROOT);
         String icon;
-        if (normalized.contains("approval")) {
+        if (title.equals(getString(R.string.ui_approval_policy))) {
             icon = "✓";
-        } else if (normalized.contains("remote")) {
+        } else if (title.equals(getString(R.string.ui_remote_access))) {
             icon = "☁";
-        } else if (normalized.contains("theme")) {
+        } else if (title.equals(getString(R.string.ui_theme))) {
             icon = "✦";
-        } else if (normalized.contains("developer")) {
+        } else if (title.equals(getString(R.string.ui_developer_diagnostics))) {
             icon = "</>";
         } else {
             icon = "•";
@@ -1684,26 +1856,26 @@ public final class DashboardActivity extends Activity {
         LinearLayout root = pageRoot();
 
         LinearLayout stateCard = glassCard(true);
-        TextView label = sectionLabel("REMOTE ACCESS");
+        TextView label = sectionLabel(getString(R.string.ui_remote_access_e235e3));
         label.setPadding(0, 0, 0, dp(7));
         stateCard.addView(label);
-        remoteState = text("NOT CONFIGURED", 17, Typeface.BOLD, AMBER);
+        remoteState = text(getString(R.string.ui_not_configured), 17, Typeface.BOLD, AMBER);
         stateCard.addView(remoteState);
-        remoteEndpointSummary = text("Local access still works. A compatible relay is required for cloud agents outside your LAN.", 12, Typeface.NORMAL, MUTED);
+        remoteEndpointSummary = text(getString(R.string.ui_local_access_still_works_a_compatible_relay_is_required_for_cloud_agents_outside_your_lan), 12, Typeface.NORMAL, MUTED);
         remoteEndpointSummary.setPadding(0, dp(7), 0, 0);
         stateCard.addView(remoteEndpointSummary);
         root.addView(stateCard, cardParams(0));
 
         LinearLayout explainer = glassCard(false);
-        TextView explainerTitle = text("HOW IT WORKS", 12, Typeface.BOLD, TEXT);
+        TextView explainerTitle = text(getString(R.string.ui_how_it_works), 12, Typeface.BOLD, TEXT);
         explainerTitle.setLetterSpacing(0.05f);
         explainer.addView(explainerTitle);
-        explainer.addView(stepText("1", "Deploy a PickPico-compatible relay. The Cloudflare Worker + Durable Object in the repository is the reference implementation."));
-        explainer.addView(stepText("2", "Paste the relay base URL below. PickPico keeps the outbound connection itself; your PC does not need to stay on."));
-        explainer.addView(stepText("3", "Restart PickPico after saving. When the relay connects, cloud agents can use the stable remote MCP URL."));
+        explainer.addView(stepText("1", getString(R.string.ui_deploy_a_pickpico_compatible_relay_the_cloudflare_worker_durable_object_in_the_repository_is_the_reference_implementation)));
+        explainer.addView(stepText("2", getString(R.string.ui_paste_the_relay_base_url_below_pickpico_keeps_the_outbound_connection_itself_your_pc_does_not_need_to_stay_on)));
+        explainer.addView(stepText("3", getString(R.string.ui_restart_pickpico_after_saving_when_the_relay_connects_cloud_agents_can_use_the_stable_remote_mcp_url)));
         root.addView(explainer, cardParams(12));
 
-        TextView urlLabel = sectionLabel("RELAY URL");
+        TextView urlLabel = sectionLabel(getString(R.string.ui_relay_url));
         urlLabel.setPadding(0, dp(20), 0, dp(7));
         root.addView(urlLabel);
 
@@ -1719,28 +1891,28 @@ public final class DashboardActivity extends Activity {
         root.addView(relayUrlInput, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
 
-        TextView save = actionButton("SAVE RELAY", false, false);
+        TextView save = actionButton(getString(R.string.ui_save_relay), false, false);
         save.setOnClickListener(v -> saveRelayUrl());
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
         saveParams.topMargin = dp(10);
         root.addView(save, saveParams);
 
-        TextView note = text("Leave the field empty to disable remote access. PickPico does not assume that every open-source installation uses the project relay.", 12, Typeface.NORMAL, MUTED);
+        TextView note = text(getString(R.string.ui_leave_the_field_empty_to_disable_remote_access_pickpico_does_not_assume_that_every_open_source_installation_uses_the_project_relay), 12, Typeface.NORMAL, MUTED);
         note.setPadding(dp(2), dp(12), dp(2), 0);
         root.addView(note);
 
-        TextView identityLabel = sectionLabel("RELAY IDENTITY");
+        TextView identityLabel = sectionLabel(getString(R.string.ui_relay_identity));
         identityLabel.setPadding(0, dp(24), 0, dp(7));
         root.addView(identityLabel);
 
         LinearLayout identityCard = glassCard(false);
         identityCard.addView(text(
-                "Reset this phone's remote identity if another device may be using the same Remote MCP URL. Your local settings, inbox, approval mode, and theme are kept.",
+                getString(R.string.ui_reset_this_phone_s_remote_identity_if_another_device_may_be_using_the_same_remote_mcp_url_your_local_settings_inbox_approval_mode_and_theme_are_kept),
                 12,
                 Typeface.NORMAL,
                 MUTED));
-        TextView resetIdentity = actionButton("RESET RELAY IDENTITY", false, false);
+        TextView resetIdentity = actionButton(getString(R.string.ui_reset_relay_identity), false, false);
         LinearLayout.LayoutParams resetParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
         resetParams.topMargin = dp(12);
@@ -1772,34 +1944,34 @@ public final class DashboardActivity extends Activity {
     private View buildDeveloperPage() {
         LinearLayout root = pageRoot();
 
-        TextView warning = text("Technical information for debugging and advanced setup. Normal PickPico use should not require anything on this page.", 12, Typeface.NORMAL, MUTED);
+        TextView warning = text(getString(R.string.ui_technical_information_for_debugging_and_advanced_setup_normal_pickpico_use_should_not_require_anything_on_this_page), 12, Typeface.NORMAL, MUTED);
         warning.setPadding(dp(2), 0, dp(2), dp(14));
         root.addView(warning);
 
         LinearLayout endpoints = glassCard(false);
-        endpoints.addView(sectionLabel("ENDPOINTS"));
-        devLocalEndpoint = diagnosticValue(endpoints, "Local MCP", "—", true);
-        devRemoteEndpoint = diagnosticValue(endpoints, "Remote MCP", "—", true);
+        endpoints.addView(sectionLabel(getString(R.string.ui_endpoints)));
+        devLocalEndpoint = diagnosticValue(endpoints, getString(R.string.ui_local_mcp), "—", true);
+        devRemoteEndpoint = diagnosticValue(endpoints, getString(R.string.ui_remote_mcp), "—", true);
         root.addView(endpoints, cardParams(0));
 
         LinearLayout relay = glassCard(false);
-        relay.addView(sectionLabel("RELAY"));
-        devRelayStatus = diagnosticValue(relay, "Status", "—", false);
-        devRelayUrl = diagnosticValue(relay, "Relay URL", "—", true);
+        relay.addView(sectionLabel(getString(R.string.ui_relay)));
+        devRelayStatus = diagnosticValue(relay, getString(R.string.ui_status), "—", false);
+        devRelayUrl = diagnosticValue(relay, getString(R.string.ui_relay_url_7cfb35), "—", true);
         root.addView(relay, cardParams(12));
 
         LinearLayout auth = glassCard(false);
-        auth.addView(sectionLabel("AUTHENTICATION"));
-        devBearer = diagnosticValue(auth, "Local bearer", "—", true);
+        auth.addView(sectionLabel(getString(R.string.ui_authentication)));
+        devBearer = diagnosticValue(auth, getString(R.string.ui_local_bearer), "—", true);
         root.addView(auth, cardParams(12));
 
         LinearLayout runtime = glassCard(false);
-        runtime.addView(sectionLabel("RUNTIME"));
-        devRuntime = diagnosticValue(runtime, "Node", "—", false);
-        devRecent = diagnosticValue(runtime, "Recent action", "—", false);
+        runtime.addView(sectionLabel(getString(R.string.ui_runtime)));
+        devRuntime = diagnosticValue(runtime, getString(R.string.ui_node), "—", false);
+        devRecent = diagnosticValue(runtime, getString(R.string.ui_recent_action), "—", false);
         root.addView(runtime, cardParams(12));
 
-        TextView legacy = actionButton("OPEN LEGACY ENGINEERING CONSOLE", false, false);
+        TextView legacy = actionButton(getString(R.string.ui_open_legacy_engineering_console), false, false);
         legacy.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class)));
         LinearLayout.LayoutParams legacyParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
@@ -1979,7 +2151,7 @@ public final class DashboardActivity extends Activity {
         pulseRecentKey = key;
         pulseRecents.removeAllViews();
         if (length == 0) {
-            TextView quiet = text("Ready for your next idea", 10, Typeface.NORMAL, DIM);
+            TextView quiet = text(getString(R.string.ui_ready_for_your_next_idea), 10, Typeface.NORMAL, DIM);
             quiet.setGravity(Gravity.CENTER);
             pulseRecents.addView(quiet, new LinearLayout.LayoutParams(-1, dp(32)));
             return;
@@ -1991,14 +2163,14 @@ public final class DashboardActivity extends Activity {
             row.setGravity(Gravity.CENTER_VERTICAL);
             TextView dot = text("●", 8, Typeface.NORMAL, i == length - 1 ? GREEN : DIM);
             row.addView(dot, new LinearLayout.LayoutParams(dp(15), -2));
-            TextView eventText = text(HomePulse.eventTitle(event.optString("command"))
-                    + (event.optBoolean("failed") ? " · failed" : ""), 9, Typeface.NORMAL, MUTED);
+            TextView eventText = text(HomePulse.eventTitle(this, event.optString("command"))
+                    + (event.optBoolean("failed") ? getString(R.string.ui_failed) : ""), 9, Typeface.NORMAL, MUTED);
             eventText.setMaxLines(1); eventText.setEllipsize(TextUtils.TruncateAt.END);
             row.addView(eventText, new LinearLayout.LayoutParams(0, -2, 1));
-            String ago = "Just now";
+            String ago = getString(R.string.ui_just_now);
             try {
                 long minutes = Math.max(0, (System.currentTimeMillis() - java.time.Instant.parse(event.optString("at")).toEpochMilli()) / 60000);
-                if (minutes > 0) ago = minutes < 60 ? minutes + "m ago" : minutes / 60 + "h ago";
+                if (minutes > 0) ago = minutes < 60 ? minutes + getString(R.string.ui_m_ago) : minutes / 60 + getString(R.string.ui_h_ago);
             } catch (Exception ignored) { }
             TextView time = text(ago, 8, Typeface.NORMAL, DIM);
             time.setPadding(dp(8), 0, 0, 0);
@@ -2011,20 +2183,20 @@ public final class DashboardActivity extends Activity {
         if (pulseOrb == null) return;
         JSONObject pending = null;
         try { pending = HumanHelpStore.latestWaiting(this); } catch (Exception ignored) { }
-        HomePulse.Snapshot state = HomePulse.snapshot(running, configured, relay, pending, System.currentTimeMillis());
+        HomePulse.Snapshot state = HomePulse.snapshot(this, running, configured, relay, pending, System.currentTimeMillis());
         pulseOrb.setMode(state.orbMode);
         setTextIfChanged(pulseTitle, state.title);
-        setTextIfChanged(pulseAgent, state.agentLabel());
+        setTextIfChanged(pulseAgent, (state.activeTasks > 1 && !state.identifiedWork ? state.activeTasks + getString(R.string.ui_agents) : state.agent));
         pulseAgent.setMaxWidth(dp(125));
-        String badge = state.mode.equals("running") ? "Running" : state.mode.equals("waiting") ? "Waiting"
-                : state.mode.equals("blocked") ? "Blocked" : state.mode.equals("connecting") ? "Connecting" : state.recent ? "Just finished" : "Ready";
+        String badge = state.mode.equals("running") ? getString(R.string.ui_running) : state.mode.equals("waiting") ? getString(R.string.ui_waiting)
+                : state.mode.equals("blocked") ? getString(R.string.ui_blocked) : state.mode.equals("connecting") ? getString(R.string.ui_connecting) : state.recent ? getString(R.string.ui_just_finished) : getString(R.string.ui_ready_20c7c5);
         setTextIfChanged(pulseBadge, " · " + badge);
         applyTextColor(pulseBadge, PicoOrbState.primary(state.orbMode, GREEN));
         setTextIfChanged(pulseFlow, state.flow);
         setTextIfChanged(pulseState, "● " + state.label);
         applyTextColor(pulseState, PicoOrbState.primary(state.orbMode, GREEN));
-        setTextIfChanged(pulseConnection, !running ? "Node\nstopped" : !configured ? "Local\nconnection"
-                : "connected".equals(relay) ? "Connected\nthrough Relay" : "Relay\n" + (state.mode.equals("connecting") ? "connecting" : "disconnected"));
+        setTextIfChanged(pulseConnection, !running ? getString(R.string.ui_node_nstopped) : !configured ? getString(R.string.ui_local_nconnection)
+                : "connected".equals(relay) ? getString(R.string.ui_connected_nthrough_relay) : getString(R.string.ui_relay_n) + (state.mode.equals("connecting") ? getString(R.string.ui_connecting) : getString(R.string.ui_not_connected)));
         if (running && !pulseCounting && System.currentTimeMillis() - pulseCountAt > 10000) {
             pulseCounting = true;
             pulseCountAt = System.currentTimeMillis();
@@ -2039,16 +2211,16 @@ public final class DashboardActivity extends Activity {
                 finally { pulseCounting = false; }
             }, "pickpico-readiness").start();
         }
-        setTextIfChanged(pulseCapabilities, running ? (pulseAvailable < 0 ? "Checking\ncapabilities" : pulseAvailable + " capabilities\navailable") : "Capabilities\npaused");
+        setTextIfChanged(pulseCapabilities, running ? (pulseAvailable < 0 ? getString(R.string.ui_checking_ncapabilities) : pulseAvailable + getString(R.string.ui_capabilities_navailable)) : getString(R.string.ui_capabilities_npaused));
         refreshPulseRecents();
         pulseActionKind = state.action;
         if (pulseActionKind.isEmpty() && state.mode.equals("idle")) {
             JSONObject update = SelfUpdateManager.status(this, 0);
             if (update.optString("status").equals("pending_user_action")) {
                 pulseActionKind = "update";
-                state.actionTitle = "Your update is ready";
-                state.actionDetail = "Finish installing the verified PickPico update.";
-                state.button = "View update";
+                state.actionTitle = getString(R.string.ui_your_update_is_ready);
+                state.actionDetail = getString(R.string.ui_finish_installing_the_verified_pickpico_update);
+                state.button = getString(R.string.ui_view_update);
             }
         }
         pulseAttention.setVisibility(pulseActionKind.isEmpty() ? View.GONE : View.VISIBLE);
@@ -2076,9 +2248,9 @@ public final class DashboardActivity extends Activity {
         if (topStatusDot != null) {
             int dotColor = !running ? RED : relayConfigured && !relayConnected ? AMBER : GREEN;
             String dotState = !running
-                    ? "Node stopped"
-                    : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready";
-            setTextIfChanged(topStatusDot, running ? "● Online" : "● Offline");
+                    ? getString(R.string.ui_node_stopped)
+                    : relayConfigured && !relayConnected ? getString(R.string.ui_node_local_only_relay_disconnected) : getString(R.string.ui_node_ready);
+            setTextIfChanged(topStatusDot, running ? getString(R.string.ui_online) : getString(R.string.ui_offline));
             applyTextColor(topStatusDot, dotColor);
             topStatusDot.setBackground(currentPage == PAGE_HOME ? null : PickPicoTheme.control(theme, dp(14), dotColor, false));
             topStatusDot.setContentDescription(dotState);
@@ -2088,17 +2260,17 @@ public final class DashboardActivity extends Activity {
         if (settingsApprovalState != null) {
             String approval = McpocketPolicySettings.approvalMode(this);
             if (McpocketPolicySettings.APPROVAL_ASK.equals(approval)) {
-                setState(settingsApprovalState, "ASK ME", BLUE);
+                setState(settingsApprovalState, getString(R.string.ui_ask_me), BLUE);
             } else if (McpocketPolicySettings.APPROVAL_YOLO.equals(approval)) {
-                setState(settingsApprovalState, "YOLO MODE", RED);
+                setState(settingsApprovalState, getString(R.string.ui_yolo_mode), RED);
             } else {
-                setState(settingsApprovalState, "AUTO APPROVE", GREEN);
+                setState(settingsApprovalState, getString(R.string.ui_auto_approve), GREEN);
             }
         }
 
 
         if (topNodeAction != null) {
-            setTextIfChanged(topNodeAction, running ? "STOP" : "START");
+            setTextIfChanged(topNodeAction, running ? getString(R.string.ui_stop) : getString(R.string.ui_start));
             applyTextColor(topNodeAction, running ? RED : GREEN);
             topNodeAction.setBackground(pillDrawable(
                     running ? Color.argb(30, 255, 91, 99) : Color.argb(22, 61, 214, 129),
@@ -2119,45 +2291,50 @@ public final class DashboardActivity extends Activity {
             if (accessibilitySwitch != null) accessibilitySwitch.setChecked(McpAccessibilityService.hasAccess(this));
             if (screenCaptureSwitch != null) screenCaptureSwitch.setChecked(ScreenCaptureService.isActive());
             if (picoOrbSwitch != null) picoOrbSwitch.setChecked(McpocketPolicySettings.isPicoOrbEnabled(this));
+            if (buttonPadSwitch != null) {
+                boolean enabled = McpocketPolicySettings.isButtonPadEnabled(this);
+                buttonPadSwitch.setChecked(enabled);
+                setCapabilityState(buttonPadSwitch, getString(enabled ? R.string.ui_button_pad_enabled : R.string.ui_button_pad_disabled), enabled ? GREEN : DIM);
+            }
         } finally {
             updatingUi = false;
         }
-        setCapabilityState(cameraSwitch, cameraSwitch != null && cameraSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(cameraSwitch, cameraSwitch != null && cameraSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 cameraSwitch != null && cameraSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(microphoneSwitch, microphoneSwitch != null && microphoneSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(microphoneSwitch, microphoneSwitch != null && microphoneSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 microphoneSwitch != null && microphoneSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(locationSwitch, locationSwitch != null && locationSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(locationSwitch, locationSwitch != null && locationSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 locationSwitch != null && locationSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(contactsSwitch, contactsSwitch != null && contactsSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(contactsSwitch, contactsSwitch != null && contactsSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 contactsSwitch != null && contactsSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(calendarSwitch, calendarSwitch != null && calendarSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(calendarSwitch, calendarSwitch != null && calendarSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 calendarSwitch != null && calendarSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(notificationSwitch, notificationSwitch != null && notificationSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(notificationSwitch, notificationSwitch != null && notificationSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 notificationSwitch != null && notificationSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(lockPhoneSwitch, lockPhoneSwitch != null && lockPhoneSwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(lockPhoneSwitch, lockPhoneSwitch != null && lockPhoneSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 lockPhoneSwitch != null && lockPhoneSwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(hyperModeSwitch, hyperModeSwitch != null && hyperModeSwitch.isChecked() ? "READY" : "OFF",
+        setCapabilityState(hyperModeSwitch, hyperModeSwitch != null && hyperModeSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_off),
                 hyperModeSwitch != null && hyperModeSwitch.isChecked() ? GREEN : DIM);
-        setCapabilityState(accessibilitySwitch, accessibilitySwitch != null && accessibilitySwitch.isChecked() ? "READY" : "SETUP REQUIRED",
+        setCapabilityState(accessibilitySwitch, accessibilitySwitch != null && accessibilitySwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 accessibilitySwitch != null && accessibilitySwitch.isChecked() ? GREEN : AMBER);
-        setCapabilityState(screenCaptureSwitch, screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? "READY" : "OFF",
+        setCapabilityState(screenCaptureSwitch, screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_off),
                 screenCaptureSwitch != null && screenCaptureSwitch.isChecked() ? GREEN : DIM);
         boolean picoOrbEnabled = McpocketPolicySettings.isPicoOrbEnabled(this);
         boolean picoOrbAllowed = Settings.canDrawOverlays(this);
         setCapabilityState(
                 picoOrbSwitch,
-                !picoOrbEnabled ? "OFF" : picoOrbAllowed ? "READY" : "SETUP REQUIRED",
+                !picoOrbEnabled ? getString(R.string.ui_off) : picoOrbAllowed ? getString(R.string.ui_ready_fc554d) : getString(R.string.ui_setup_required),
                 !picoOrbEnabled ? DIM : picoOrbAllowed ? GREEN : AMBER);
         if (screenCaptureDetail != null) {
             setState(screenCaptureDetail,
-                    ScreenCaptureService.isActive() ? "ACTIVE SESSION" : "NOT ACTIVE",
+                    ScreenCaptureService.isActive() ? getString(R.string.ui_active_session) : getString(R.string.ui_not_active),
                     ScreenCaptureService.isActive() ? GREEN : AMBER);
         }
 
         if (settingsRemoteState != null) {
-            if (!relayConfigured) setState(settingsRemoteState, "NOT CONFIGURED", AMBER);
-            else if (relayConnected) setState(settingsRemoteState, "CONNECTED", GREEN);
-            else setState(settingsRemoteState, relayStatus.toUpperCase(), AMBER);
+            if (!relayConfigured) setState(settingsRemoteState, getString(R.string.ui_not_configured), AMBER);
+            else if (relayConnected) setState(settingsRemoteState, getString(R.string.ui_connected), GREEN);
+            else setState(settingsRemoteState, UiStatus.label(this, relayStatus), AMBER);
         }
 
         refreshPicoAdbStatus();
@@ -2172,7 +2349,7 @@ public final class DashboardActivity extends Activity {
         boolean hasCandidate = SelfUpdateManager.hasInstallableCandidate(this);
 
         if (settingsVersionState != null) {
-            setTextIfChanged(settingsVersionState, "Version " + version + " · build " + versionCode);
+            setTextIfChanged(settingsVersionState, getString(R.string.ui_version_03283e) + version + getString(R.string.ui_build) + versionCode);
         }
         if (settingsUpdateState != null) {
             setState(
@@ -2186,26 +2363,26 @@ public final class DashboardActivity extends Activity {
             updateAction.setEnabled(!busy);
             updateAction.setAlpha(updateAction.isEnabled() ? 1f : 0.45f);
             if (updateCheckInProgress) {
-                setTextIfChanged(updateAction, "CHECKING FOR UPDATE…");
+                setTextIfChanged(updateAction, getString(R.string.ui_checking_for_update));
             } else if (downloading) {
-                setTextIfChanged(updateAction, "DOWNLOADING UPDATE…");
+                setTextIfChanged(updateAction, getString(R.string.ui_downloading_update));
             } else if (hasCandidate && !TextUtils.isEmpty(candidateVersion)) {
-                setTextIfChanged(updateAction, "INSTALL " + candidateVersion);
+                setTextIfChanged(updateAction, getString(R.string.ui_install) + candidateVersion);
             } else {
-                setTextIfChanged(updateAction, "CHECK FOR UPDATE");
+                setTextIfChanged(updateAction, getString(R.string.ui_check_for_update));
             }
         }
 
         if (remoteState != null) {
             if (!relayConfigured) {
-                setState(remoteState, "NOT CONFIGURED", AMBER);
-                setTextIfChanged(remoteEndpointSummary, "Local access still works. A compatible relay is required for cloud agents outside your LAN.");
+                setState(remoteState, getString(R.string.ui_not_configured), AMBER);
+                setTextIfChanged(remoteEndpointSummary, getString(R.string.ui_local_access_still_works_a_compatible_relay_is_required_for_cloud_agents_outside_your_lan));
             } else if (relayConnected) {
-                setState(remoteState, "CONNECTED", GREEN);
-                setTextIfChanged(remoteEndpointSummary, "Remote MCP is ready. This phone maintains the relay connection itself.");
+                setState(remoteState, getString(R.string.ui_connected), GREEN);
+                setTextIfChanged(remoteEndpointSummary, getString(R.string.ui_remote_mcp_is_ready_this_phone_maintains_the_relay_connection_itself));
             } else {
-                setState(remoteState, relayStatus.toUpperCase(), AMBER);
-                setTextIfChanged(remoteEndpointSummary, "Relay is configured but not currently connected. Local access remains available.");
+                setState(remoteState, UiStatus.label(this, relayStatus), AMBER);
+                setTextIfChanged(remoteEndpointSummary, getString(R.string.ui_relay_is_configured_but_not_currently_connected_local_access_remains_available));
             }
             if (relayUrlInput != null && !relayUrlInput.hasFocus() && !TextUtils.equals(relayUrlInput.getText().toString(), relayUrl)) {
                 relayUrlInput.setText(relayUrl);
@@ -2215,29 +2392,37 @@ public final class DashboardActivity extends Activity {
         if (devLocalEndpoint != null) setTextIfChanged(devLocalEndpoint, orDash(localEndpoint));
         if (devRemoteEndpoint != null) setTextIfChanged(devRemoteEndpoint, orDash(remoteEndpoint));
         if (devRelayStatus != null) {
-            setTextIfChanged(devRelayStatus, relayStatus.toUpperCase());
+            setTextIfChanged(devRelayStatus, UiStatus.label(this, relayStatus));
             applyTextColor(devRelayStatus, relayConnected ? GREEN : AMBER);
         }
         if (devRelayUrl != null) setTextIfChanged(devRelayUrl, orDash(relayUrl));
         if (devBearer != null) setTextIfChanged(devBearer, maskSecret(token));
         if (devRuntime != null) {
             long calls = prefs.getLong(McpNodeService.KEY_CALL_COUNT, 0L);
-            setTextIfChanged(devRuntime, (running ? "RUNNING" : "STOPPED") + " · tool calls " + calls + " · app " + version + "/" + versionCode);
+            setTextIfChanged(devRuntime, (running ? getString(R.string.ui_running_5080a2) : getString(R.string.ui_stopped)) + getString(R.string.ui_tool_calls) + calls + getString(R.string.ui_app_884b0c) + version + "/" + versionCode);
             applyTextColor(devRuntime, running ? GREEN : RED);
         }
-        if (devRecent != null) setTextIfChanged(devRecent, prefs.getString(McpNodeService.KEY_RECENT, "No tool calls yet"));
+        if (devRecent != null) setTextIfChanged(devRecent, prefs.getString(McpNodeService.KEY_RECENT, getString(R.string.ui_no_tool_calls_yet)));
     }
 
     private void refreshPicoAdbStatus() {
         JSONObject status;
         try {
-            status = PicoAdbManager.get(this).status();
+            PicoAdbManager manager = PicoAdbManager.get(this);
+            if (currentPage == PAGE_SETTINGS || currentPage == PAGE_PICO_ADB) manager.refreshConnection();
+            status = manager.status();
         } catch (Exception error) {
-            setState(settingsPicoAdbState, "ERROR", RED);
-            setState(picoAdbState, "ERROR", RED);
+            setState(settingsPicoAdbConnectionState, getString(R.string.ui_connection_error), RED);
+            setState(picoAdbState, getString(R.string.ui_connection_error), RED);
             setTextIfChanged(picoAdbDetail, error.getClass().getSimpleName());
             return;
         }
+
+        applyPicoAdbStatus(status);
+        refreshDeveloperControl();
+    }
+
+    private void applyPicoAdbStatus(JSONObject status) {
 
         String state = status.optString("state", "setup_required");
         boolean paired = status.optBoolean("paired", false);
@@ -2254,76 +2439,111 @@ public final class DashboardActivity extends Activity {
         int color;
         switch (state) {
             case "engine_unavailable":
-                label = "ENGINE MISSING";
-                detail = "This build does not contain the verified PicoADB engine.";
+                label = getString(R.string.ui_engine_missing);
+                detail = getString(R.string.ui_this_build_does_not_contain_the_verified_picoadb_engine);
                 color = RED;
                 break;
             case "pairing":
-                label = "PAIRING";
-                detail = "Authenticating the six-digit code through Android's TLS + SPAKE2 pairing flow.";
+                label = getString(R.string.ui_pairing);
+                detail = getString(R.string.ui_authenticating_the_six_digit_code_through_android_s_tls_spake2_pairing_flow);
                 color = BLUE;
                 break;
             case "connecting":
-                label = "CONNECTING";
-                detail = "Connecting to the trusted local Wireless Debugging endpoint.";
+                label = getString(R.string.ui_connecting_48b998);
+                detail = getString(R.string.ui_connecting_to_the_trusted_local_wireless_debugging_endpoint);
                 color = BLUE;
                 break;
             case "diagnosing":
-                label = "DIAGNOSING";
-                detail = "Collecting privileged Android system diagnostics.";
+                label = getString(R.string.ui_diagnosing);
+                detail = getString(R.string.ui_collecting_privileged_android_system_diagnostics);
+                color = BLUE;
+                break;
+            case "executing":
+                label = getString(R.string.ui_running_command);
+                detail = getString(R.string.ui_executing_an_agent_adb_command_on_this_phone);
                 color = BLUE;
                 break;
             case "ready_to_pair":
-                label = "PAIRING ENDPOINT FOUND";
-                detail = pairingEndpoints + " pairing endpoint found. Enter the code while Android's pairing dialog remains open.";
+                label = getString(R.string.ui_pairing_endpoint_found);
+                detail = pairingEndpoints + getString(R.string.ui_pairing_endpoint_found_enter_the_code_while_android_s_pairing_dialog_remains_open);
                 color = BLUE;
                 break;
             case "ready_to_connect":
-                label = "READY TO CONNECT";
-                detail = connectEndpoints + " trusted endpoint found. Connect to activate shell diagnostics.";
+                label = getString(R.string.ui_ready_to_connect);
+                detail = connectEndpoints + getString(R.string.ui_endpoint_found_connect_or_run_an_agent_adb_command_to_activate_shell_access);
                 color = GREEN;
                 break;
             case "discovering":
-                label = "SCANNING";
-                detail = "Searching briefly for Android Wireless Debugging services on this Wi-Fi network.";
+                label = getString(R.string.ui_scanning);
+                detail = getString(R.string.ui_searching_briefly_for_android_wireless_debugging_services_on_this_wi_fi_network);
                 color = BLUE;
                 break;
             case "paired":
-                label = "PAIRED";
-                detail = "The ADB identity is trusted. Enable Wireless Debugging, scan, then connect when shell access is needed.";
+                label = getString(R.string.ui_paired);
+                detail = getString(R.string.ui_pairing_is_saved_enable_wireless_debugging_to_use_adb_commands);
                 color = GREEN;
                 break;
             default:
-                label = "SETUP REQUIRED";
-                detail = "Enable Wireless Debugging and pair this PickPico installation once.";
+                label = getString(R.string.ui_setup_required);
+                detail = getString(R.string.ui_enable_wireless_debugging_and_pair_this_pickpico_installation_once);
                 color = AMBER;
                 break;
         }
 
-        setState(settingsPicoAdbState, paired ? "PAIRED" : label, paired ? GREEN : color);
-        setState(picoAdbState, picoAdbBusy ? "WORKING" : label, picoAdbBusy ? BLUE : color);
+        JSONObject connection = status.optJSONObject("connection");
+        String transport = connection == null ? "unknown" : connection.optString("state", "unknown");
+        String connectionLabel;
+        int connectionColor;
+        switch (transport) {
+            case "connected": connectionLabel = getString(R.string.ui_connected); connectionColor = GREEN; break;
+            case "offline": connectionLabel = getString(R.string.ui_offline_c68993); connectionColor = AMBER; break;
+            case "unauthorized": connectionLabel = getString(R.string.ui_authorization_required); connectionColor = AMBER; break;
+            case "error": connectionLabel = getString(R.string.ui_check_failed); connectionColor = RED; break;
+            case "disconnected": connectionLabel = getString(R.string.ui_not_connected); connectionColor = AMBER; break;
+            default: connectionLabel = getString(R.string.ui_checking); connectionColor = BLUE; break;
+        }
+        if ("connecting".equals(state)) { connectionLabel = getString(R.string.ui_connecting_48b998); connectionColor = BLUE; }
+        if ("engine_unavailable".equals(state)) { connectionLabel = getString(R.string.ui_engine_missing); connectionColor = RED; }
+        String pairingLabel = getString(R.string.ui_pairing_1f2ce3) + (paired ? getString(R.string.ui_saved) : getString(R.string.ui_not_paired));
+        setState(settingsPicoAdbState, pairingLabel, paired ? GREEN : AMBER);
+        setState(picoAdbPairingState, pairingLabel, paired ? GREEN : AMBER);
+        setState(settingsPicoAdbConnectionState, getString(R.string.ui_connection) + connectionLabel, connectionColor);
+        setState(picoAdbState, getString(R.string.ui_connection) + connectionLabel, connectionColor);
+        boolean busy = picoAdbBusy || "pairing".equals(state) || "connecting".equals(state)
+                || "diagnosing".equals(state) || "executing".equals(state);
+        boolean connected = "connected".equals(transport);
+        boolean showPairing = !paired || picoAdbPairingExpanded;
+        if (picoAdbSetupCard != null) picoAdbSetupCard.setVisibility(showPairing ? View.VISIBLE : View.GONE);
+        if (picoAdbPairCard != null) picoAdbPairCard.setVisibility(showPairing ? View.VISIBLE : View.GONE);
+        if (picoAdbConnectCard != null) picoAdbConnectCard.setVisibility(paired ? View.VISIBLE : View.GONE);
+        if (picoAdbPairingToggle != null) {
+            picoAdbPairingToggle.setVisibility(paired ? View.VISIBLE : View.GONE);
+            setTextIfChanged(picoAdbPairingToggle, showPairing ? getString(R.string.ui_hide_pairing_settings) : getString(R.string.ui_pairing_settings));
+        }
+        if ("connected".equals(transport) && !busy)
+            detail = getString(R.string.ui_adb_shell_access_is_available_your_agent_can_run_commands_transfer_files_and_install_apks);
+        String error = status.optString("lastError", "");
+        if (!error.isEmpty() && !busy && !"connected".equals(transport)) detail += "\n" + error;
         setTextIfChanged(picoAdbDetail, detail);
 
-        boolean busy = picoAdbBusy || "pairing".equals(state)
-                || "connecting".equals(state) || "diagnosing".equals(state);
         if (picoAdbScanAction != null) {
             picoAdbScanAction.setEnabled(!busy);
             picoAdbScanAction.setAlpha(busy ? .45f : 1f);
             setTextIfChanged(picoAdbScanAction,
-                    "discovering".equals(state) ? "SCANNING…" : "SCAN FOR ENDPOINTS");
+                    "discovering".equals(state) ? getString(R.string.ui_scanning_971444) : getString(R.string.ui_scan_for_endpoints));
         }
         if (picoAdbPairAction != null) {
             boolean enabled = !busy && pairingEndpoints > 0;
             picoAdbPairAction.setEnabled(enabled);
             picoAdbPairAction.setAlpha(enabled ? 1f : .45f);
-            setTextIfChanged(picoAdbPairAction, "pairing".equals(state) ? "PAIRING…" : "PAIR");
+            setTextIfChanged(picoAdbPairAction, "pairing".equals(state) ? getString(R.string.ui_pairing_e8690e) : getString(R.string.ui_pair));
         }
         if (picoAdbConnectAction != null) {
-            boolean enabled = !busy && paired;
+            boolean enabled = !busy && paired && !connected;
             picoAdbConnectAction.setEnabled(enabled);
             picoAdbConnectAction.setAlpha(enabled ? 1f : .45f);
             setTextIfChanged(picoAdbConnectAction,
-                    "connecting".equals(state) ? "CONNECTING…" : "CONNECT");
+                    "connecting".equals(state) ? getString(R.string.ui_connecting_f361a7) : connected ? getString(R.string.ui_connected) : getString(R.string.ui_reconnect_now));
         }
     }
 
@@ -2364,8 +2584,8 @@ public final class DashboardActivity extends Activity {
     }
 
     private String formatUpdateStatus(JSONObject state, boolean checking, String transientError) {
-        if (checking) return "Checking the official update channel…";
-        if (!TextUtils.isEmpty(transientError)) return "Update check failed · " + transientError;
+        if (checking) return getString(R.string.ui_checking_the_official_update_channel);
+        if (!TextUtils.isEmpty(transientError)) return getString(R.string.ui_update_check_failed) + transientError;
 
         String status = state.optString("status", "idle");
         String version = state.optString("candidateVersionName", state.optString("latestVersionName", ""));
@@ -2374,29 +2594,29 @@ public final class DashboardActivity extends Activity {
             long total = state.optLong("totalBytes", 0L);
             if (total > 0L) {
                 long percent = Math.min(100L, downloaded * 100L / total);
-                return "Downloading " + percent + "% · " + formatMegabytes(downloaded)
+                return getString(R.string.ui_downloading) + percent + "% · " + formatMegabytes(downloaded)
                         + " / " + formatMegabytes(total);
             }
-            return "Downloading · " + formatMegabytes(downloaded);
+            return getString(R.string.ui_downloading_9069f3) + formatMegabytes(downloaded);
         }
         if ("staging".equals(status) || "verified".equals(status)) {
-            return "Download verified · preparing the installer";
+            return getString(R.string.ui_download_verified_preparing_the_installer);
         }
         if ("pending_user_action".equals(status)) {
             return TextUtils.isEmpty(version)
-                    ? "Update ready · tap Install to continue"
-                    : "Version " + version + " is ready to install";
+                    ? getString(R.string.ui_update_ready_tap_install_to_continue)
+                    : getString(R.string.ui_version_03283e) + version + getString(R.string.ui_is_ready_to_install);
         }
         if ("requires_setup".equals(status)) {
-            return "Android permission needed · allow PickPico to install updates";
+            return getString(R.string.ui_android_permission_needed_allow_pickpico_to_install_updates);
         }
         if ("failed".equals(status)) {
-            String error = state.optString("error", "Unknown update error");
-            return "Update failed · " + simplifyUpdateError(error);
+            String error = state.optString("error", getString(R.string.ui_unknown_update_error));
+            return getString(R.string.ui_update_failed) + simplifyUpdateError(error);
         }
-        if ("up_to_date".equals(status)) return "PickPico is up to date";
-        if ("installed".equals(status)) return "Update installed successfully";
-        return "Ready to check the official update channel";
+        if ("up_to_date".equals(status)) return getString(R.string.ui_pickpico_is_up_to_date);
+        if ("installed".equals(status)) return getString(R.string.ui_update_installed_successfully);
+        return getString(R.string.ui_ready_to_check_the_official_update_channel);
     }
 
     private int updateStatusColor(String status, boolean hasCandidate) {
@@ -2408,7 +2628,7 @@ public final class DashboardActivity extends Activity {
     }
 
     private String simplifyUpdateError(String error) {
-        if (error == null) return "Unknown error";
+        if (error == null) return getString(R.string.ui_unknown_error);
         int separator = error.indexOf(": ");
         return separator > 0 ? error.substring(separator + 2) : error;
     }
@@ -2450,10 +2670,10 @@ public final class DashboardActivity extends Activity {
     private void toggleNodeFromHome() {
         if (McpNodeService.isNodeRunning()) {
             new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("Stop PickPico?")
-                    .setMessage("Agents will not be able to reach this phone until PickPico starts again.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Stop", (dialog, which) -> stopNode())
+                    .setTitle(getString(R.string.ui_stop_pickpico))
+                    .setMessage(getString(R.string.ui_agents_will_not_be_able_to_reach_this_phone_until_pickpico_starts_again))
+                    .setNegativeButton(getString(R.string.ui_cancel), null)
+                    .setPositiveButton(getString(R.string.ui_stop_9e2534), (dialog, which) -> stopNode())
                     .show();
         } else {
             startNode();
@@ -2489,7 +2709,7 @@ public final class DashboardActivity extends Activity {
         intent.putExtra(McpNodeService.EXTRA_TOKEN, generateToken());
         intent.putExtra(McpNodeService.EXTRA_ENABLE_MEDIA_FGS, true);
         startForegroundService(intent);
-        Toast.makeText(this, "Starting PickPico…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.ui_starting_pickpico), Toast.LENGTH_SHORT).show();
         handler.postDelayed(this::refreshStatus, 400L);
     }
 
@@ -2516,6 +2736,14 @@ public final class DashboardActivity extends Activity {
         }
     }
 
+    private void refreshButtonPad(boolean searchNow) {
+        if (!McpNodeService.isNodeRunning()) return;
+        try {
+            startService(new Intent(this, McpNodeService.class)
+                    .setAction(McpNodeService.ACTION_REFRESH_BUTTON_PAD).putExtra("searchNow", searchNow));
+        } catch (RuntimeException ignored) { }
+    }
+
     private void stopNode() {
         Intent intent = new Intent(this, McpNodeService.class);
         intent.setAction(McpNodeService.ACTION_STOP);
@@ -2525,7 +2753,7 @@ public final class DashboardActivity extends Activity {
 
     private void showApprovalModeDialog() {
         String current = McpocketPolicySettings.approvalMode(this);
-        String[] labels = new String[]{"詢問我", "代我核准", "YOLO Mode"};
+        String[] labels = new String[]{getString(R.string.ui_ask_me), getString(R.string.ui_auto_approve), getString(R.string.ui_yolo_mode_af1945)};
         String[] values = new String[]{
                 McpocketPolicySettings.APPROVAL_ASK,
                 McpocketPolicySettings.APPROVAL_AUTO,
@@ -2536,14 +2764,29 @@ public final class DashboardActivity extends Activity {
             if (values[i].equals(current)) selected = i;
         }
         new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle("Approval Mode")
+                .setTitle(getString(R.string.ui_approval_mode))
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     McpocketPolicySettings.setApprovalMode(this, values[which]);
                     dialog.dismiss();
                     refreshStatus();
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.ui_cancel), null)
                 .show();
+    }
+
+    private String[] languageChoices() {
+        return new String[]{getString(R.string.language_system),
+                getString(R.string.language_chinese), getString(R.string.language_english)};
+    }
+
+    private void showLanguageDialog() {
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(getString(R.string.language_title))
+                .setSingleChoiceItems(languageChoices(), AppLanguage.choice(this), (dialog, which) -> {
+                    dialog.dismiss();
+                    AppLanguage.select(this, new String[]{"", "zh-Hant", "en"}[which]);
+                })
+                .setNegativeButton(getString(R.string.ui_cancel), null).show();
     }
 
     private void saveRelayUrl() {
@@ -2551,7 +2794,7 @@ public final class DashboardActivity extends Activity {
         String value = relayUrlInput.getText().toString().trim();
         while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
         if (!value.isEmpty() && !value.startsWith("https://") && !value.startsWith("http://")) {
-            Toast.makeText(this, "Relay URL must start with https://", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_relay_url_must_start_with_https), Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -2564,13 +2807,13 @@ public final class DashboardActivity extends Activity {
 
         if (McpNodeService.isNodeRunning()) {
             new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("Relay saved")
-                    .setMessage("Restart PickPico now to apply the remote access change?")
-                    .setNegativeButton("Later", null)
-                    .setPositiveButton("Restart", (dialog, which) -> restartNode())
+                    .setTitle(getString(R.string.ui_relay_saved))
+                    .setMessage(getString(R.string.ui_restart_pickpico_now_to_apply_the_remote_access_change))
+                    .setNegativeButton(getString(R.string.ui_later), null)
+                    .setPositiveButton(getString(R.string.ui_restart), (dialog, which) -> restartNode())
                     .show();
         } else {
-            Toast.makeText(this, "Relay saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_relay_saved), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -2581,10 +2824,10 @@ public final class DashboardActivity extends Activity {
 
     private void confirmResetRelayIdentity() {
         new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle("Reset Relay identity?")
-                .setMessage("PickPico will create a new Remote MCP URL for this phone. Existing integrations using the old URL will stop working. Local settings and data are kept.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Reset", (dialog, which) -> resetRelayIdentity())
+                .setTitle(getString(R.string.ui_reset_relay_identity_ea7796))
+                .setMessage(getString(R.string.ui_pickpico_will_create_a_new_remote_mcp_url_for_this_phone_existing_integrations_using_the_old_url_will_stop_working_local_settings_and_data_are_kept))
+                .setNegativeButton(getString(R.string.ui_cancel), null)
+                .setPositiveButton(getString(R.string.ui_reset), (dialog, which) -> resetRelayIdentity())
                 .show();
     }
 
@@ -2596,7 +2839,7 @@ public final class DashboardActivity extends Activity {
         } else {
             McpNodeService.resetRelayIdentity(this);
         }
-        Toast.makeText(this, "Relay identity reset. A new Remote MCP URL will be created.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, getString(R.string.ui_relay_identity_reset_a_new_remote_mcp_url_will_be_created), Toast.LENGTH_LONG).show();
         handler.postDelayed(this::refreshStatus, 500L);
     }
 
@@ -2607,7 +2850,7 @@ public final class DashboardActivity extends Activity {
         String endpoint = TextUtils.isEmpty(remoteEndpoint) ? localEndpoint : remoteEndpoint;
         String token = prefs.getString(McpNodeService.KEY_TOKEN, "");
         if (TextUtils.isEmpty(endpoint)) {
-            Toast.makeText(this, "Start PickPico first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_start_pickpico_first), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -2619,7 +2862,7 @@ public final class DashboardActivity extends Activity {
                     "}";
         } else {
             if (TextUtils.isEmpty(token)) {
-                Toast.makeText(this, "Local bearer is not ready", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.ui_extra_194405e182), Toast.LENGTH_SHORT).show();
                 return;
             }
             json = "{\n" +
@@ -2633,7 +2876,7 @@ public final class DashboardActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
             clipboard.setPrimaryClip(ClipData.newPlainText("PickPico connection", json));
-            Toast.makeText(this, "Connection copied", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_extra_cecf3ba368), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -2647,7 +2890,7 @@ public final class DashboardActivity extends Activity {
         Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
                 .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
                 .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                        "Allow PickPico agents to lock this phone when you permit the capability.");
+                        getString(R.string.ui_extra_ca265dedb7));
         startActivity(intent);
     }
 
@@ -2664,21 +2907,21 @@ public final class DashboardActivity extends Activity {
         boolean enabled = McpAccessibilityService.hasAccess(this);
         if (enabled) {
             new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                    .setTitle("Accessibility UI Control")
-                    .setMessage("Android controls this special access. Open Accessibility settings to disable it.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Open settings", (dialog, which) ->
+                    .setTitle(getString(R.string.ui_extra_9b55a452e2))
+                    .setMessage(getString(R.string.ui_extra_20c53c8b5b))
+                    .setNegativeButton(getString(R.string.ui_cancel), null)
+                    .setPositiveButton(getString(R.string.ui_extra_fd7108f831), (dialog, which) ->
                             startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
                     .show();
             return;
         }
         new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle("Enable UI Control")
-                .setMessage("Sideloaded builds may require two Android security steps. First open App info and choose Allow restricted settings if shown. Then enable PickPico in Accessibility settings.")
-                .setNeutralButton("App info", (dialog, which) -> openAppDetailsSettings())
-                .setPositiveButton("Accessibility", (dialog, which) ->
+                .setTitle(getString(R.string.ui_extra_7fe2a5b980))
+                .setMessage(getString(R.string.ui_extra_a2497a1268))
+                .setNeutralButton(getString(R.string.ui_extra_64dec0b01a), (dialog, which) -> openAppDetailsSettings())
+                .setPositiveButton(getString(R.string.ui_extra_d660049bc1), (dialog, which) ->
                         startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.ui_cancel), null)
                 .show();
     }
 
@@ -2691,13 +2934,13 @@ public final class DashboardActivity extends Activity {
             return;
         }
         if (!McpocketPolicySettings.isHyperModeEnabled(this)) {
-            Toast.makeText(this, "Turn on Hyper Mode first", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_turn_on_hyper_mode_first), Toast.LENGTH_LONG).show();
             refreshStatus();
             return;
         }
         MediaProjectionManager manager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         if (manager == null) {
-            Toast.makeText(this, "Screen capture is unavailable on this device", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_extra_39c84fd306), Toast.LENGTH_LONG).show();
             refreshStatus();
             return;
         }
@@ -2709,7 +2952,7 @@ public final class DashboardActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQUEST_SCREEN_CAPTURE) return;
         if (resultCode != RESULT_OK || data == null) {
-            Toast.makeText(this, "Screen capture was not authorized", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_extra_5157e0610f), Toast.LENGTH_LONG).show();
             refreshStatus();
             return;
         }
@@ -2724,12 +2967,13 @@ public final class DashboardActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 209) refreshButtonPad(true);
         if (requestCode == REQUEST_NODE_MEDIA && !McpNodeService.isNodeRunning()) {
             if (hasNodeStartupPermissions()) {
                 startNodeService();
             } else {
                 Toast.makeText(this,
-                        "PickPico was not started because required permissions were not granted.",
+                        getString(R.string.ui_extra_1c7a1da2ac),
                         Toast.LENGTH_LONG).show();
             }
         }
@@ -2769,7 +3013,7 @@ public final class DashboardActivity extends Activity {
             updateCheckError = null;
             try {
                 JSONObject state = SelfUpdateManager.installStagedFromForeground(this);
-                Toast.makeText(this, "PickPico update: " + state.optString("status", "staging"), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.ui_extra_1e214136aa) + state.optString("status", "staging"), Toast.LENGTH_SHORT).show();
             } catch (RuntimeException error) {
                 Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
             }
@@ -2809,7 +3053,7 @@ public final class DashboardActivity extends Activity {
                 return;
             }
             JSONObject state = SelfUpdateManager.startResolvedLatest(this, latest, 0L);
-            Toast.makeText(this, "PickPico update: " + state.optString("status", "staging"), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_extra_1e214136aa) + state.optString("status", "staging"), Toast.LENGTH_SHORT).show();
             handler.postDelayed(this::refreshStatus, 250L);
         } catch (RuntimeException startError) {
             Toast.makeText(this, startError.getMessage(), Toast.LENGTH_LONG).show();

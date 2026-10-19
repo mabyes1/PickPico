@@ -72,6 +72,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public static final String ACTION_RESET_RELAY_IDENTITY = "com.mcpocket.poc.action.RESET_RELAY_IDENTITY";
     public static final String ACTION_REFRESH_MEDIA_FOREGROUND = "com.mcpocket.poc.action.REFRESH_MEDIA_FOREGROUND";
     public static final String ACTION_REFRESH_PICO_ORB = "com.mcpocket.poc.action.REFRESH_PICO_ORB";
+    public static final String ACTION_REFRESH_BUTTON_PAD = "com.mcpocket.poc.action.REFRESH_BUTTON_PAD";
     public static final String EXTRA_TOKEN = "token";
     public static final String EXTRA_ENABLE_MEDIA_FGS = "enableMediaForegroundCapabilities";
 
@@ -193,6 +194,14 @@ public final class McpNodeService extends Service implements McpToolActions {
             if (picoOrbOverlay != null) picoOrbOverlay.refreshNow();
             return nodeActive ? START_STICKY : START_NOT_STICKY;
         }
+        if (ACTION_REFRESH_BUTTON_PAD.equals(action)) {
+            if (buttonBridge != null) {
+                if (intent.getBooleanExtra("searchNow", false)) buttonBridge.stop();
+                if (McpocketPolicySettings.isButtonPadEnabled(this)) buttonBridge.start();
+                else buttonBridge.stop();
+            }
+            return nodeActive ? START_STICKY : START_NOT_STICKY;
+        }
         if (!ACTION_START.equals(action) || server != null || nodeActive) {
             return nodeActive ? START_STICKY : START_NOT_STICKY;
         }
@@ -286,7 +295,7 @@ public final class McpNodeService extends Service implements McpToolActions {
             pending = HumanHelpStore.latestWaiting(this);
         } catch (Exception ignored) {
         }
-        return HomePulse.snapshot(nodeActive, relayConfigured, relayStatus(prefs), pending, System.currentTimeMillis());
+        return HomePulse.snapshot(AppLanguage.wrap(this), nodeActive, relayConfigured, relayStatus(prefs), pending, System.currentTimeMillis());
     }
 
     @Override
@@ -307,9 +316,16 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public void onAgentTasksChanged(int activeTasks) {
-        // Tasks remain useful for Agent progress/history, but never own the screen.
-        // Screen lifetime is tied strictly to operational command start/finish.
-        postAgentScreenAction(() -> awakeTaskCount = activeTasks);
+        postAgentScreenAction(() -> {
+            awakeTaskCount = activeTasks;
+            agentScreenLease.tasksChanged(activeTasks, SystemClock.elapsedRealtime());
+            if (activeTasks > 0) {
+                try { phoneWake(0L); } catch (Exception ignored) { }
+            }
+            refreshAgentScreenAwakeState();
+            mainHandler.removeCallbacks(agentScreenRetryRunnable);
+            if (activeTasks > 0) mainHandler.postDelayed(agentScreenRetryRunnable, 750L);
+        });
     }
 
     private void postAgentScreenAction(Runnable action) {
@@ -331,16 +347,17 @@ public final class McpNodeService extends Service implements McpToolActions {
         long now = SystemClock.elapsedRealtime();
         agentScreenLease.expireIfNeeded(now);
         long remaining = agentScreenLease.remaining(now);
-        if (agentScreenLease.activeOperations() == 0) {
+        if (!agentScreenLease.holdsScreen(now)) {
             releaseAgentScreenKeepAwakeWindow();
             releaseAgentScreenLease();
             return;
         }
-        // A bounded watchdog is only crash/hang protection. Normal completion
-        // releases the display immediately from onAgentCommandFinished().
+        // Commands have a watchdog; unfinished tasks bridge calls until their
+        // activity lease expires. The last terminal task update releases at once.
         mainHandler.postDelayed(agentScreenIdleReleaseRunnable, Math.max(1L, remaining));
-        if (ensureAgentScreenKeepAwakeWindow()) releaseAgentScreenLease();
-        else refreshAgentScreenLease(Math.max(1L, remaining));
+        // One UI accepts a transparent overlay but does not honor its
+        // KEEP_SCREEN_ON flag. Use the bounded display lock for the actual hold.
+        refreshAgentScreenLease(Math.max(1L, remaining));
     }
 
     private synchronized boolean ensureAgentScreenKeepAwakeWindow() {
@@ -412,10 +429,10 @@ public final class McpNodeService extends Service implements McpToolActions {
                         "PickPico:agentOperation");
                 agentScreenWakeLock.setReferenceCounted(false);
             }
-            if (agentScreenWakeLock.isHeld()) {
-                agentScreenWakeLock.release();
-            }
-            agentScreenWakeLock.acquire(leaseMs);
+            // One hold, one deadline owner. Repeated acquire(timeout) can leave
+            // earlier timeout callbacks queued on Android; the lease runnable
+            // above owns renewal, idle/watchdog expiry and terminal release.
+            if (!agentScreenWakeLock.isHeld()) agentScreenWakeLock.acquire();
         } catch (RuntimeException ignored) {
         }
     }
@@ -575,14 +592,18 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("connectionDiagnostics", ConnectionDiagnostics.snapshot(this))
                 .put("processUptimeSeconds", PickPicoApplication.processUptimeSeconds())
                 .put("picoAdb", PicoAdbManager.get(this).status())
+                .put("buttonPad", buttonBridge == null ? new JSONObject()
+                        .put("enabled", McpocketPolicySettings.isButtonPadEnabled(this))
+                        .put("scanning", false).put("connected", false) : buttonBridge.status())
                 .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
                         .put("activeOperations", agentScreenLease.activeOperations())
-                        .put("requested", agentScreenLease.activeOperations() > 0)
+                        .put("requested", agentScreenLease.holdsScreen(SystemClock.elapsedRealtime()))
+                        .put("taskIdleTimeoutMs", AgentScreenLease.IDLE_MS)
                         .put("watchdogMs", AgentScreenLease.WATCHDOG_MS)
                         .put("remainingWatchdogMs", agentScreenLease.remaining(SystemClock.elapsedRealtime()))
                         .put("overlayHeld", agentScreenKeepAwakeView != null)
                         .put("wakeLockHeld", agentScreenWakeLock != null && agentScreenWakeLock.isHeld())
-                        .put("restoration", "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"))
+                        .put("restoration", "Active tasks keep the screen awake between commands; finish/cancel releases it. Three minutes without Agent activity also releases it; standalone commands release on completion."))
                 .put("toolCallCount", callCount);
         if (relayClient != null) {
             result.put("relay", relayClient.diagnostics());
@@ -642,7 +663,9 @@ public final class McpNodeService extends Service implements McpToolActions {
 
     @Override
     public JSONObject picoAdbStatus(long callCount) throws JSONException {
-        return PicoAdbManager.get(this).status()
+        PicoAdbManager manager = PicoAdbManager.get(this);
+        manager.refreshConnectionNow();
+        return manager.status()
                 .put("toolCallCount", callCount);
     }
 
@@ -664,6 +687,19 @@ public final class McpNodeService extends Service implements McpToolActions {
     @Override
     public JSONObject picoAdbBatteryDiagnostics(long callCount) throws JSONException {
         return PicoAdbManager.get(this).batteryDiagnostics(callCount);
+    }
+
+    @Override
+    public JSONObject picoAdbExecute(JSONObject arguments, boolean shell, long callCount) throws JSONException {
+        return PicoAdbManager.get(this).execute(arguments, shell, callCount);
+    }
+
+    @Override public JSONObject picoAdbSetEnabled(boolean enabled, long callCount) throws JSONException {
+        return DeveloperOptionsControl.setEnabled(this, enabled).put("toolCallCount", callCount);
+    }
+
+    @Override public JSONObject picoAdbAuthorizeControl(long callCount) throws JSONException {
+        return DeveloperOptionsControl.authorize(this).put("toolCallCount", callCount);
     }
 
     @Override
@@ -1296,8 +1332,11 @@ public final class McpNodeService extends Service implements McpToolActions {
                         .put("dismissRequested", true)
                         .put("homeRequested", true)
                         .put("atHome", false)
-                        .put("requiresUserAction", secureKeyguard)
+                        // A secure keyguard may dismiss automatically via Extend Unlock.
+                        // Starting the asynchronous transition does not prove owner input is needed.
+                        .put("transitionPending", true)
                         .put("transition", "keyguard_dismiss_requested")
+                        .put("next", "Recheck phone.status and ui_inspect after the transition before requesting owner authentication")
                         .put("toolCallCount", callCount);
             } catch (RuntimeException error) {
                 return new JSONObject()

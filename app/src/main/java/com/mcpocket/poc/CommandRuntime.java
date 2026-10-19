@@ -132,6 +132,18 @@ final class CommandRuntime {
                 picoAdbDiscoverSchema(),
                 (arguments, callCount) -> actions.picoAdbDiscover(arguments, callCount));
 
+        register("picoadb.set_enabled",
+                "Directly enable Developer options and Wi-Fi ADB, or disable Developer options plus USB/Wi-Fi ADB. Works while ADB is off after one-time WRITE_SECURE_SETTINGS authorization; enabling requires an unlocked phone. Pairing is retained.",
+                "system", "security_action", true,
+                new JSONObject().put("type", "object").put("properties", new JSONObject()
+                        .put("enabled", new JSONObject().put("type", "boolean")))
+                        .put("required", new JSONArray().put("enabled")).put("additionalProperties", false),
+                (arguments, callCount) -> actions.picoAdbSetEnabled(arguments.getBoolean("enabled"), callCount));
+        register("picoadb.authorize_control",
+                "One-time grant of WRITE_SECURE_SETTINGS to PickPico through existing paired ADB; ADB must be enabled for this setup only. Afterwards picoadb.set_enabled works without ADB.",
+                "system", "security_action", true, noArgumentsSchema(),
+                (arguments, callCount) -> actions.picoAdbAuthorizeControl(callCount));
+
         register(
                 "picoadb.battery_diagnostics",
                 "Use the user-paired local ADB identity to collect full batterystats, power, device-idle, alarm, and job-scheduler dumps into workspace files.",
@@ -140,6 +152,15 @@ final class CommandRuntime {
                 true,
                 noArgumentsSchema(),
                 (arguments, callCount) -> actions.picoAdbBatteryDiagnostics(callCount));
+
+        register("picoadb.shell",
+                "Run an Android shell command through the paired ADB transport with shell UID 2000 access. Automatically reconnects; complete output is saved in the workspace.",
+                "system", "arbitrary_process", true, PicoAdbCommand.schema(true),
+                (arguments, callCount) -> actions.picoAdbExecute(arguments, true, callCount));
+        register("picoadb.exec",
+                "Run an ADB command using the paired phone: shell, push, pull, install, logcat, package management, forwarding and other ADB operations. Local paths use the phone workspace; target serial is supplied automatically.",
+                "system", "arbitrary_process", true, PicoAdbCommand.schema(false),
+                (arguments, callCount) -> actions.picoAdbExecute(arguments, false, callCount));
 
         register(
                 "capability.list",
@@ -1393,6 +1414,8 @@ final class CommandRuntime {
     }
 
     private static void validateBeforeApproval(String id, JSONObject args) {
+        if (id.equals("picoadb.shell") || id.equals("picoadb.exec"))
+            PicoAdbCommand.validate(args, id.equals("picoadb.shell"));
         if (id.equals("notification.dismiss")) validateNotificationDismiss(args);
         if (id.startsWith("workspace.") && !id.equals("workspace.info")) validateWorkspacePath(args.optString("path", "."));
         if (id.equals("node.start")) validateWorkspacePath(args.optString("entry"));

@@ -25,7 +25,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Product-facing Agent Activity history using the same glass language as DashboardActivity. */
-public final class AgentInboxActivity extends Activity {
+public final class AgentInboxActivity extends LocalizedActivity {
     static final String EXTRA_ENTRY_ID = "entryId";
 
     private static final int BG = PickPicoTheme.BASE_BG;
@@ -111,14 +111,14 @@ public final class AgentInboxActivity extends Activity {
         summaryIcon.setBackground(PickPicoTheme.control(theme, dp(14), GREEN, false));
         summary.addView(summaryIcon, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        inboxCount = text("0 messages", 14, Typeface.BOLD, TEXT);
+        inboxCount = text(getString(R.string.ui_0_messages), 14, Typeface.BOLD, TEXT);
         inboxCount.setLetterSpacing(.035f);
         inboxCount.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         countParams.leftMargin = dp(14);
         summary.addView(inboxCount, countParams);
 
-        clearAction = actionButton("CLEAR", RED);
+        clearAction = actionButton(getString(R.string.ui_clear), RED);
         clearAction.setOnClickListener(v -> confirmClearInbox());
         LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dp(78), dp(36));
         clearParams.leftMargin = dp(8);
@@ -130,7 +130,7 @@ public final class AgentInboxActivity extends Activity {
         pendingContainer.setVisibility(View.GONE);
         root.addView(pendingContainer);
 
-        TextView section = text("RECENT", 10, Typeface.BOLD, DIM);
+        TextView section = text(getString(R.string.ui_recent), 10, Typeface.BOLD, DIM);
         section.setLetterSpacing(.12f);
         section.setPadding(dp(2), dp(20), 0, dp(10));
         root.addView(section);
@@ -154,10 +154,10 @@ public final class AgentInboxActivity extends Activity {
         nav.setPadding(dp(8), dp(7), dp(8), dp(7));
         nav.setBackground(PickPicoTheme.strongGlass(theme, dp(26)));
         nav.setElevation(dp(8));
-        nav.addView(navItem("⌂", "HOME", false, DashboardActivity.PAGE_HOME), navParams());
-        nav.addView(navItem("◷", "ACTIVITY", true, -1), navParams());
-        nav.addView(navItem("▦", "CAPABILITIES", false, DashboardActivity.PAGE_CAPABILITIES), navParams());
-        nav.addView(navItem("⚙", "SETTINGS", false, DashboardActivity.PAGE_SETTINGS), navParams());
+        nav.addView(navItem("⌂", getString(R.string.ui_home), false, DashboardActivity.PAGE_HOME), navParams());
+        nav.addView(navItem("◷", getString(R.string.ui_activity), true, -1), navParams());
+        nav.addView(navItem("▦", getString(R.string.ui_capabilities), false, DashboardActivity.PAGE_CAPABILITIES), navParams());
+        nav.addView(navItem("⚙", getString(R.string.ui_settings), false, DashboardActivity.PAGE_SETTINGS), navParams());
         return nav;
     }
 
@@ -186,13 +186,13 @@ public final class AgentInboxActivity extends Activity {
     private void confirmClearInbox() {
         if (AgentInboxStore.count(this) == 0) return;
         new AlertDialog.Builder(this)
-                .setTitle("Clear Agent Activity?")
-                .setMessage("This removes every saved request and message from this phone.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Clear", (dialog, which) -> {
+                .setTitle(getString(R.string.ui_clear_agent_activity))
+                .setMessage(getString(R.string.ui_this_removes_every_saved_request_and_message_from_this_phone))
+                .setNegativeButton(getString(R.string.ui_cancel), null)
+                .setPositiveButton(getString(R.string.ui_clear_719ea3), (dialog, which) -> {
                     AgentInboxStore.clear(this);
                     renderItems();
-                    Toast.makeText(this, "Agent Activity cleared", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, getString(R.string.ui_agent_activity_cleared), Toast.LENGTH_SHORT).show();
                 })
                 .show();
     }
@@ -207,13 +207,13 @@ public final class AgentInboxActivity extends Activity {
         titles.setOrientation(LinearLayout.VERTICAL);
         titles.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-        titles.addView(text("Activity", 19, Typeface.BOLD, TEXT));
-        TextView meta = text("YOUR AGENT. IN ACTION.", 6, Typeface.NORMAL, DIM);
+        titles.addView(text(getString(R.string.ui_activity_81c0d9), 19, Typeface.BOLD, TEXT));
+        TextView meta = text(getString(R.string.ui_your_agent_in_action), 6, Typeface.NORMAL, DIM);
         meta.setLetterSpacing(.10f);
         meta.setPadding(0, dp(4), 0, 0);
         titles.addView(meta);
 
-        topStatusDot = text("● READY", 10, Typeface.BOLD, GREEN);
+        topStatusDot = text(getString(R.string.ui_ready), 10, Typeface.BOLD, GREEN);
         topStatusDot.setGravity(Gravity.CENTER);
         topStatusDot.setLetterSpacing(.035f);
         topStatusDot.setBackground(null);
@@ -230,12 +230,12 @@ public final class AgentInboxActivity extends Activity {
         boolean relayConfigured = !TextUtils.isEmpty(relayUrl);
         boolean relayConnected = "connected".equals(relayStatus);
         int color = !running ? RED : relayConfigured && !relayConnected ? Color.rgb(246, 169, 69) : GREEN;
-        topStatusDot.setText(running ? "● Online" : "● Offline");
+        topStatusDot.setText(running ? getString(R.string.ui_online) : getString(R.string.ui_offline));
         topStatusDot.setTextColor(resolveThemeTextColor(color));
         topStatusDot.setBackground(null);
         topStatusDot.setContentDescription(!running
-                ? "Node stopped"
-                : relayConfigured && !relayConnected ? "Node local only; relay disconnected" : "Node ready");
+                ? getString(R.string.ui_node_stopped)
+                : relayConfigured && !relayConnected ? getString(R.string.ui_node_local_only_relay_disconnected) : getString(R.string.ui_node_ready));
     }
 
     private void renderItems() {
@@ -248,7 +248,7 @@ public final class AgentInboxActivity extends Activity {
             if (task == null) continue;
             LinearLayout card = glassCard(false);
             String agent = task.isNull("agent") ? "Agent" : task.optString("agent", "Agent");
-            card.addView(text(agent + " · " + task.optString("status", "created"), 12, Typeface.BOLD, BLUE));
+            card.addView(text(agent + " · " + UiStatus.label(this, task.optString("status", "created")), 12, Typeface.BOLD, BLUE));
             String title = task.isNull("title") ? task.optString("objective") : task.optString("title");
             TextView heading = text(title, 14, Typeface.BOLD, TEXT);
             heading.setPadding(0, dp(8), 0, dp(6));
@@ -269,18 +269,18 @@ public final class AgentInboxActivity extends Activity {
         JSONArray commands = HomePulse.commandHistory();
         if (commands.length() > 0) {
             LinearLayout history = glassCard(false);
-            history.addView(text("RECENT COMMANDS · THIS SESSION", 10, Typeface.BOLD, DIM));
+            history.addView(text(getString(R.string.ui_recent_commands_this_session), 10, Typeface.BOLD, DIM));
             for (int index = commands.length() - 1; index >= 0; index--) {
                 JSONObject command = commands.optJSONObject(index);
                 if (command == null) continue;
-                TextView line = text(command.optString("command") + (command.optBoolean("failed") ? " · failed" : " · finished")
+                TextView line = text(command.optString("command") + (command.optBoolean("failed") ? getString(R.string.ui_failed) : getString(R.string.ui_finished))
                         + "\n" + compactTimestamp(command.optString("at")), 12, Typeface.NORMAL, MUTED);
                 line.setPadding(0, dp(9), 0, dp(5));
                 history.addView(line);
             }
             itemsContainer.addView(history);
         }
-        if (inboxCount != null) inboxCount.setText(items.length() + (items.length() == 1 ? " saved message" : " saved messages"));
+        if (inboxCount != null) inboxCount.setText(items.length() + (items.length() == 1 ? getString(R.string.ui_saved_message) : getString(R.string.ui_saved_messages)));
         if (clearAction != null) {
             clearAction.setEnabled(items.length() > 0);
             clearAction.setAlpha(items.length() > 0 ? 1f : 0.35f);
@@ -289,8 +289,8 @@ public final class AgentInboxActivity extends Activity {
         String highlightedId = getIntent() == null ? "" : getIntent().getStringExtra(EXTRA_ENTRY_ID);
         if (items.length() == 0 && taskHistory.length() == 0 && commands.length() == 0) {
             LinearLayout empty = glassCard(false);
-            empty.addView(text("No activity yet", 15, Typeface.BOLD, TEXT));
-            TextView detail = text("Agent requests, notifications, and human-help handoffs will appear here.", 12, Typeface.NORMAL, MUTED);
+            empty.addView(text(getString(R.string.ui_no_activity_yet), 15, Typeface.BOLD, TEXT));
+            TextView detail = text(getString(R.string.ui_agent_requests_notifications_and_human_help_handoffs_will_appear_here), 12, Typeface.NORMAL, MUTED);
             detail.setPadding(0, dp(6), 0, 0);
             empty.addView(detail);
             itemsContainer.addView(empty);
@@ -334,13 +334,13 @@ public final class AgentInboxActivity extends Activity {
 
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
-            TextView copy = actionButton("COPY", BLUE);
+            TextView copy = actionButton(getString(R.string.ui_copy), BLUE);
             copy.setOnClickListener(v -> copyText(body));
             actions.addView(copy, new LinearLayout.LayoutParams(dp(72), dp(34)));
 
             String openableUrl = extractUrl(body);
             if (openableUrl != null) {
-                TextView open = actionButton("OPEN", GREEN);
+                TextView open = actionButton(getString(R.string.ui_open), GREEN);
                 open.setOnClickListener(v -> openUrl(openableUrl));
                 LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(dp(72), dp(34));
                 openParams.leftMargin = dp(8);
@@ -366,7 +366,7 @@ public final class AgentInboxActivity extends Activity {
                 return;
             }
             pendingContainer.setVisibility(View.VISIBLE);
-            TextView label = text("NEEDS RESPONSE", 10, Typeface.BOLD, DIM);
+            TextView label = text(getString(R.string.ui_needs_response), 10, Typeface.BOLD, DIM);
             label.setLetterSpacing(.12f);
             label.setPadding(dp(2), dp(20), 0, dp(10));
             pendingContainer.addView(label);
@@ -379,16 +379,16 @@ public final class AgentInboxActivity extends Activity {
                         .putExtra(HumanHelpStore.EXTRA_REQUEST_ID, requestId));
             });
             TextView state = text(
-                    "approval".equals(pending.optString("requestType", "help")) ? "APPROVAL NEEDED" : "HUMAN HELP",
+                    "approval".equals(pending.optString("requestType", "help")) ? getString(R.string.ui_approval_needed) : getString(R.string.ui_human_help),
                     11,
                     Typeface.BOLD,
                     BLUE);
             state.setLetterSpacing(.08f);
             card.addView(state);
-            TextView title = text(pending.optString("title", "Agent is waiting for you"), 16, Typeface.BOLD, TEXT);
+            TextView title = text(pending.optString("title", getString(R.string.ui_agent_is_waiting_for_you)), 16, Typeface.BOLD, TEXT);
             title.setPadding(0, dp(8), 0, dp(4));
             card.addView(title);
-            TextView detail = text("Open to respond and let the Agent continue.", 12, Typeface.NORMAL, MUTED);
+            TextView detail = text(getString(R.string.ui_open_to_respond_and_let_the_agent_continue), 12, Typeface.NORMAL, MUTED);
             card.addView(detail);
             pendingContainer.addView(card);
         } catch (Exception ignored) {
@@ -417,7 +417,7 @@ public final class AgentInboxActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
             clipboard.setPrimaryClip(ClipData.newPlainText("PickPico Agent message", value));
-            Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_copied), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -434,7 +434,7 @@ public final class AgentInboxActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(value)));
         } catch (Throwable error) {
-            Toast.makeText(this, "No app can open this link", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_no_app_can_open_this_link), Toast.LENGTH_LONG).show();
         }
     }
 

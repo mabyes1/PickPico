@@ -352,7 +352,7 @@ public final class McpHttpServerTest {
         assertEquals(200, list.status);
         JSONObject listed = new JSONObject(list.body).getJSONObject("result");
         JSONArray tools = listed.getJSONArray("tools");
-        assertEquals(34, tools.length());
+        assertEquals(38, tools.length());
         assertTrue(tools.toString().contains("caller_register"));
         assertEquals("thin-v1", listed.getString("toolProfile"));
         String toolText = tools.toString();
@@ -365,6 +365,8 @@ public final class McpHttpServerTest {
         assertTrue(toolText.contains("picoadb_status"));
         assertTrue(toolText.contains("picoadb_discover"));
         assertTrue(toolText.contains("picoadb_battery_diagnostics"));
+        assertTrue(toolText.contains("picoadb_shell"));
+        assertTrue(toolText.contains("picoadb_exec"));
         assertTrue(!toolText.contains("exec_command"));
 
         capabilityStateProbeCount.set(0);

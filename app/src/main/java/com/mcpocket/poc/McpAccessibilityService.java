@@ -337,9 +337,9 @@ public final class McpAccessibilityService extends AccessibilityService {
 
     private static String fingerprint(JSONObject snapshot) {
         try {
-            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(snapshot.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(UiObservationStore.guardSnapshot(snapshot).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return android.util.Base64.encodeToString(digest, android.util.Base64.NO_WRAP);
-        } catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        } catch (java.security.NoSuchAlgorithmException | JSONException e) { throw new IllegalStateException(e); }
     }
 
     private static void requireObservation(McpAccessibilityService service, JSONObject arguments) throws JSONException {

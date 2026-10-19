@@ -47,6 +47,16 @@ final class AndroidCapabilityRegistry {
             boolean engineReady = picoAdb.optJSONObject("engine") != null
                     && picoAdb.optJSONObject("engine").optBoolean("enginePresent", false);
             result.put("picoAdb", picoAdb);
+            if ("picoadb.set_enabled".equals(commandId)) {
+                return setupState(result, DeveloperOptionsControl.hasPermission(context),
+                        "write_secure_settings", "Run picoadb.authorize_control once while ADB is enabled")
+                        .put("systemControl", DeveloperOptionsControl.status(context));
+            }
+            if ("picoadb.authorize_control".equals(commandId)) {
+                return setupState(result, DeveloperOptionsControl.hasPermission(context)
+                        || engineReady && picoAdb.optBoolean("paired"),
+                        "wireless_debugging_pairing", "Enable and pair Wireless Debugging for one-time authorization");
+            }
             if ("picoadb.status".equals(commandId)) {
                 return result
                         .put("available", true)
@@ -59,7 +69,8 @@ final class AndroidCapabilityRegistry {
                         "picoadb_engine",
                         "PicoADB engine is unavailable");
             }
-            if ("picoadb.battery_diagnostics".equals(commandId)) {
+            if ("picoadb.battery_diagnostics".equals(commandId)
+                    || "picoadb.shell".equals(commandId) || "picoadb.exec".equals(commandId)) {
                 return setupState(
                         result,
                         engineReady && picoAdb.optBoolean("paired", false),
@@ -193,6 +204,10 @@ final class AndroidCapabilityRegistry {
                 || "ui.scroll".equals(commandId)
                 || "picoadb.discover".equals(commandId)
                 || "picoadb.battery_diagnostics".equals(commandId)
+                || "picoadb.shell".equals(commandId)
+                || "picoadb.exec".equals(commandId)
+                || "picoadb.set_enabled".equals(commandId)
+                || "picoadb.authorize_control".equals(commandId)
                 || "screen.capture".equals(commandId);
     }
 

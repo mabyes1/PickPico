@@ -2,13 +2,14 @@ plugins {
     id 'com.android.application'
 }
 
-def nodeMobileVersion = '18.20.4'
-def nodeMobileSha256 = 'BD7321EAA1A7602FBE0BB87302DF2D79D87835CF4363FBDD17C350DBB485C2AF'
+// Same Node 18.20.4 sources, rebuilt from upstream's 16 KB alignment branch.
+def nodeMobileVersion = '18.20.4-capawesome.1'
+def nodeMobileSha256 = '1B3C7979C81AEC89A7F51B29AF1F4875A5D637727AD6E2C392CDF2E127715DA9'
 def nodeMobileRoot = layout.buildDirectory.dir("generated/node-mobile-${nodeMobileVersion}").get().asFile
 def nodeMobileZip = layout.buildDirectory.file("downloads/nodejs-mobile-v${nodeMobileVersion}-android.zip").get().asFile
-def adbEngineCommit = '60f48029cf9d8e0bc848ca41a7bd76694d4ab796'
-def adbEngineSha256 = '47EA035FA5ED57F6149A2B025BBBD4B21584C355C05D0400416804715E4C12DE'
-def adbEngineRoot = layout.buildDirectory.dir('generated/picoadb-jni').get().asFile
+def adbEngineVersion = 'v36.0.1-baklava-16kb-pair'
+def adbEngineSha256 = 'B73CDFB58E85ED7EF3DC95E80A5F2F9B99EFDA6B3FA5F7353A1337E2F09D8818'
+def adbEngineRoot = layout.buildDirectory.dir("generated/picoadb-jni-${adbEngineVersion}").get().asFile
 def adbEngineFile = new File(adbEngineRoot, 'arm64-v8a/libadb.so')
 def pickpicoDebugKeystore = providers.gradleProperty('pickpicoDebugKeystore').orNull
 
@@ -19,7 +20,7 @@ tasks.register('prepareNodeMobileRuntime') {
     doLast {
         if (!nodeMobileZip.isFile()) {
             nodeMobileZip.parentFile.mkdirs()
-            def url = new URL("https://github.com/nodejs-mobile/nodejs-mobile/releases/download/v${nodeMobileVersion}/nodejs-mobile-v${nodeMobileVersion}-android.zip")
+            def url = new URL("https://github.com/capawesome-team/nodejs-mobile/releases/download/v${nodeMobileVersion}/nodejs-mobile-v${nodeMobileVersion}-android.zip")
             url.withInputStream { input ->
                 nodeMobileZip.withOutputStream { output -> output << input }
             }
@@ -58,7 +59,7 @@ tasks.register('preparePicoAdbEngine') {
     doLast {
         if (!adbEngineFile.isFile()) {
             adbEngineFile.parentFile.mkdirs()
-            def url = new URL("https://raw.githubusercontent.com/tytydraco/LADB/${adbEngineCommit}/app/src/main/jniLibs/arm64-v8a/libadb.so")
+            def url = new URL("https://github.com/che2n3jigw/aosp-adb-arm64/releases/download/${adbEngineVersion}/adb_arm64")
             url.withInputStream { input ->
                 adbEngineFile.withOutputStream { output -> output << input }
             }
@@ -105,8 +106,8 @@ android {
         applicationId 'com.mcpocket.poc'
         minSdk 26
         targetSdk 35
-        versionCode 130
-        versionName '0.17.4'
+        versionCode 142
+        versionName '0.17.16'
 
         ndk {
             abiFilters 'arm64-v8a'

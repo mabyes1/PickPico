@@ -8,6 +8,7 @@ import java.util.Set;
 final class CapabilityIndex {
     static final Set<String> DIRECT = new LinkedHashSet<>(Arrays.asList(
             "phone.status", "picoadb.status", "picoadb.discover", "picoadb.battery_diagnostics",
+            "picoadb.shell", "picoadb.exec", "picoadb.set_enabled", "picoadb.authorize_control",
             "phone.wake", "phone.home", "camera.capture", "phone.speak",
             "human.help", "human.help.status", "notification.list", "notification.reply",
             "ui.inspect", "ui.action", "ui.type", "ui.scroll", "screen.capture",
@@ -25,12 +26,16 @@ final class CapabilityIndex {
     }
     static String label(String id) {
         switch (id) {
-            case "guide.get": return "Read an operation guide";
+            case "guide.get": return "Read an operation guide; guideId=picoadb.connect: toggle Developer options and Wi-Fi ADB with direct controls or PICO UI, retaining pairing";
             case "node.info": return "Device and connection information";
             case "phone.status": return "Battery, network and storage";
-            case "picoadb.status": return "Wireless Debugging and privileged access state";
+            case "picoadb.status": return "Wireless Debugging, saved pairing and direct-control authorization; ADB off: guide.get(picoadb.connect) explains direct toggles or first-time PICO UI setup";
             case "picoadb.discover": return "Scan for Wireless Debugging endpoints";
             case "picoadb.battery_diagnostics": return "Collect full privileged battery diagnostics";
+            case "picoadb.shell": return "Run an ADB shell command with Android shell access";
+            case "picoadb.exec": return "Run ADB commands: push, pull, install, shell and debugging";
+            case "picoadb.set_enabled": return "Toggle Developer options and Wi-Fi ADB without opening Settings; requires one-time picoadb.authorize_control";
+            case "picoadb.authorize_control": return "Grant direct Developer options control once through paired ADB; permission persists when ADB is off";
             case "capability.list": return "All capability names and availability";
             case "capability.status": return "Exact input schema and availability";
             case "policy.status": return "Local approval policy";
@@ -107,7 +112,11 @@ final class CapabilityIndex {
             }
             return ids("phone.status");
         }
-        if (has(q, "wireless debugging adb picoadb 無線偵錯 无线调试") ) {
+        if (has(q, "developer development 開發者 開發人員 wireless debugging adb picoadb 無線偵錯 无线调试") ) {
+            if (has(q, "authorize grant 授權 授权")) return ids("picoadb.authorize_control", "picoadb.status");
+            if (has(q, "toggle enable disable control 開關 開啟 關閉")) return ids("picoadb.set_enabled", "picoadb.status");
+            if (has(q, "push pull install apk 傳檔 传文件 安裝 安装")) return ids("picoadb.exec");
+            if (has(q, "shell command exec 指令 命令")) return ids("picoadb.shell", "picoadb.exec");
             if (has(q, "scan discover pairing connect 掃描 搜尋 搜索 配對 配对 連線 连接")) {
                 return ids("picoadb.discover", "picoadb.status");
             }

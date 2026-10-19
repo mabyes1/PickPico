@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -20,14 +21,12 @@ import java.util.concurrent.TimeUnit;
  *
  * The engine owns the wire protocol and cryptography. This class owns process
  * isolation, persistent key location, bounded execution and safe result data.
- * Raw execution is package-private so MCP capabilities can expose only audited
- * operations instead of turning PicoADB into a remote arbitrary shell.
+ * MCP execution uses the same persistent identity and bounded process runner.
  */
 final class PicoAdbClient {
     private static final long PAIR_TIMEOUT_MS = 30_000L;
     private static final long CONNECT_TIMEOUT_MS = 20_000L;
-    // dumpsys batterystats can easily exceed a chat-sized payload. Keep enough
-    // data to write a complete workspace artifact; MCP returns only metadata.
+    // Interactive command output is bounded in memory. Diagnostics stream to disk.
     private static final int MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 
     private final Context context;
@@ -73,18 +72,56 @@ final class PicoAdbClient {
         return run(list("devices", "-l"), CONNECT_TIMEOUT_MS);
     }
 
+    Result probeDevices() {
+        // Starting the daemon after an app update takes over 3 seconds on the S23.
+        // This runs off the UI thread; allow cold startup to finish before checking.
+        return run(list("devices", "-l"), 10_000L);
+    }
+
+    /** Match the exact transport row; the header also contains the word devices. */
+    static String transportState(String output, String serial) {
+        if (serial == null || serial.isEmpty()) return "disconnected";
+        for (String line : (output == null ? "" : output).split("\\r?\\n")) {
+            String[] columns = line.trim().split("\\s+");
+            if (columns.length < 2 || !serial.equals(columns[0])) continue;
+            switch (columns[1]) {
+                case "device": return "connected";
+                case "offline": return "offline";
+                case "unauthorized": return "unauthorized";
+                default: return "disconnected";
+            }
+        }
+        return "disconnected";
+    }
+
+    Result runInWorkspace(List<String> arguments, long timeoutMs, File workspace, File outputFile) {
+        return run(new ArrayList<>(arguments), timeoutMs, outputFile, workspace);
+    }
+
     /** Execute one already-audited adb argument vector. */
     Result runChecked(List<String> arguments, long timeoutMs) {
+        return runChecked(arguments, timeoutMs, null);
+    }
+
+    Result runChecked(List<String> arguments, long timeoutMs, File outputFile) {
         if (arguments == null || arguments.isEmpty()) {
             return Result.validation("ADB arguments are empty");
         }
         if (timeoutMs < 100L || timeoutMs > 120_000L) {
             return Result.validation("ADB timeout must be between 100 and 120000 ms");
         }
-        return run(new ArrayList<>(arguments), timeoutMs);
+        return run(new ArrayList<>(arguments), timeoutMs, outputFile);
     }
 
     private Result run(List<String> arguments, long timeoutMs) {
+        return run(arguments, timeoutMs, null);
+    }
+
+    private Result run(List<String> arguments, long timeoutMs, File outputFile) {
+        return run(arguments, timeoutMs, outputFile, adbHome);
+    }
+
+    private Result run(List<String> arguments, long timeoutMs, File outputFile, File cwd) {
         if (!adbBinary.isFile()) {
             return Result.failure(-1, false, "PicoADB engine is unavailable");
         }
@@ -94,27 +131,49 @@ final class PicoAdbClient {
         command.add(adbBinary.getAbsolutePath());
         command.addAll(arguments);
 
-        Process process = null;
-        StreamCollector collector = null;
         try {
             ProcessBuilder builder = new ProcessBuilder(command)
-                    .directory(adbHome)
+                    .directory(cwd)
                     .redirectErrorStream(true);
             builder.environment().put("HOME", adbHome.getAbsolutePath());
             builder.environment().put("TMPDIR", context.getCacheDir().getAbsolutePath());
             builder.environment().put("ANDROID_SDK_HOME", adbHome.getAbsolutePath());
 
+            return execute(builder, timeoutMs, outputFile);
+        } catch (Exception error) {
+            return Result.failure(-1, false,
+                    error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage()));
+        }
+    }
+
+    static Result execute(ProcessBuilder builder, long timeoutMs, File outputFile) {
+        Process process = null;
+        StreamCollector collector = null;
+        try {
+            builder.redirectErrorStream(true);
+            if (outputFile != null) builder.redirectOutput(outputFile);
             process = builder.start();
-            collector = new StreamCollector(process.getInputStream(), MAX_OUTPUT_BYTES);
-            collector.start();
+            process.getOutputStream().close(); // Non-interactive MCP calls never wait for host stdin.
+            if (outputFile == null) {
+                collector = new StreamCollector(process.getInputStream(), MAX_OUTPUT_BYTES);
+                collector.start();
+            }
 
             boolean finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
             if (!finished) {
                 process.destroy();
                 if (!process.waitFor(750L, TimeUnit.MILLISECONDS)) process.destroyForcibly();
             }
-            collector.join(2_000L);
-            String output = collector.output();
+            if (collector != null) collector.join(2_000L);
+            String output = collector == null ? "" : collector.output();
+            // Keep only a small error excerpt in the response, never the full dump.
+            if (outputFile != null && (!finished || process.exitValue() != 0)) {
+                try (InputStream input = new FileInputStream(outputFile)) {
+                    byte[] excerpt = new byte[2_000];
+                    int read = input.read(excerpt);
+                    output = read < 0 ? "" : new String(excerpt, 0, read, StandardCharsets.UTF_8);
+                }
+            }
             if (!finished) return Result.failure(-1, true, output);
             return new Result(process.exitValue(), false, false, output);
         } catch (Exception error) {

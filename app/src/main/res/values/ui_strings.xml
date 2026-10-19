@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_ready" formatted="false">"● READY"</string>
+    <string name="ui_stop" formatted="false">"STOP"</string>
+    <string name="ui_home" formatted="false">"HOME"</string>
+    <string name="ui_activity" formatted="false">"ACTIVITY"</string>
+    <string name="ui_capabilities" formatted="false">"CAPABILITIES"</string>
+    <string name="ui_settings" formatted="false">"SETTINGS"</string>
+    <string name="ui_capabilities_ca09c5" formatted="false">"Capabilities"</string>
+    <string name="ui_what_agents_can_do" formatted="false">"WHAT AGENTS CAN DO"</string>
+    <string name="ui_settings_c7f73b" formatted="false">"Settings"</string>
+    <string name="ui_remote_access" formatted="false">"Remote Access"</string>
+    <string name="ui_connect_from_anywhere" formatted="false">"CONNECT FROM ANYWHERE"</string>
+    <string name="ui_developer_diagnostics" formatted="false">"Developer / Diagnostics"</string>
+    <string name="ui_advanced" formatted="false">"ADVANCED"</string>
+    <string name="ui_appearance" formatted="false">"Appearance"</string>
+    <string name="ui_personalization" formatted="false">"PERSONALIZATION"</string>
+    <string name="ui_system_control" formatted="false">"System Control"</string>
+    <string name="ui_wireless_debugging" formatted="false">"WIRELESS DEBUGGING"</string>
+    <string name="ui_your_agent_in_action" formatted="false">"YOUR AGENT. IN ACTION."</string>
+    <string name="ui_no_active_agent_tasks" formatted="false">"No active agent tasks"</string>
+    <string name="ui_ready_004de6" formatted="false">" · Ready"</string>
+    <string name="ui_waiting_for_an_agent_task" formatted="false">"Waiting for an agent task"</string>
+    <string name="ui_current_agent_activity_open_activity_for_details" formatted="false">"Current agent activity. Open Activity for details."</string>
+    <string name="ui_system_status" formatted="false">"SYSTEM STATUS"</string>
+    <string name="ui_current_task" formatted="false">"CURRENT TASK"</string>
+    <string name="ui_open_task" formatted="false">"Open task  →"</string>
+    <string name="ui_unable_to_open_human_help_preview" formatted="false">"Unable to open Human Help preview"</string>
+    <string name="ui_unable_to_open_human_help" formatted="false">"Unable to open Human Help"</string>
+    <string name="ui_choose_what_your_agents_can_use" formatted="false">"Choose what your agents can use."</string>
+    <string name="ui_built_in" formatted="false">"BUILT IN"</string>
+    <string name="ui_workspace_shell_background_sessions_and_embedded_node" formatted="false">"Workspace, shell, background sessions, and embedded Node"</string>
+    <string name="ui_built_into_pickpico_and_available_while_the_node_is_running" formatted="false">"Built into PickPico and available while the Node is running."</string>
+    <string name="ui_phone_access" formatted="false">"PHONE ACCESS"</string>
+    <string name="ui_camera" formatted="false">"Camera"</string>
+    <string name="ui_allow_agents_to_capture_photos" formatted="false">"Allow agents to capture photos."</string>
+    <string name="ui_disable_camera_permission_in_android_settings" formatted="false">"Disable Camera permission in Android settings."</string>
+    <string name="ui_microphone" formatted="false">"Microphone"</string>
+    <string name="ui_allow_agents_to_record_short_audio_clips" formatted="false">"Allow agents to record short audio clips."</string>
+    <string name="ui_disable_microphone_permission_in_android_settings" formatted="false">"Disable Microphone permission in Android settings."</string>
+    <string name="ui_location" formatted="false">"Location"</string>
+    <string name="ui_allow_agents_to_read_this_phone_s_location" formatted="false">"Allow agents to read this phone\'s location."</string>
+    <string name="ui_disable_location_permission_in_android_settings" formatted="false">"Disable Location permission in Android settings."</string>
+    <string name="ui_contacts" formatted="false">"Contacts"</string>
+    <string name="ui_allow_agents_to_search_and_read_contacts" formatted="false">"Allow agents to search and read contacts."</string>
+    <string name="ui_disable_contacts_permission_in_android_settings" formatted="false">"Disable Contacts permission in Android settings."</string>
+    <string name="ui_calendar" formatted="false">"Calendar"</string>
+    <string name="ui_allow_agents_to_read_and_manage_calendar_events" formatted="false">"Allow agents to read and manage calendar events."</string>
+    <string name="ui_disable_calendar_permission_in_android_settings" formatted="false">"Disable Calendar permission in Android settings."</string>
+    <string name="ui_notifications" formatted="false">"Notifications"</string>
+    <string name="ui_allow_agents_to_inspect_active_android_notifications" formatted="false">"Allow agents to inspect active Android notifications."</string>
+    <string name="ui_device_actions" formatted="false">"DEVICE ACTIONS"</string>
+    <string name="ui_lock_phone" formatted="false">"Lock phone"</string>
+    <string name="ui_allow_agents_to_lock_this_device" formatted="false">"Allow agents to lock this device."</string>
+    <string name="ui_advanced_access" formatted="false">"ADVANCED ACCESS"</string>
+    <string name="ui_hyper_mode" formatted="false">"Hyper Mode"</string>
+    <string name="ui_advanced_ui_screen_control_plus_lock_screen_dismissal_for_urgent_agent_handoffs_secure_locks_still_require_android_authentication" formatted="false">"Advanced UI/screen control plus lock-screen dismissal for urgent Agent handoffs. Secure locks still require Android authentication."</string>
+    <string name="ui_allow_full_screen_alerts_so_hyper_mode_can_dismiss_the_lock_screen" formatted="false">"Allow full-screen alerts so Hyper Mode can dismiss the lock screen"</string>
+    <string name="ui_hyper_mode_enabled" formatted="false">"Hyper Mode enabled"</string>
+    <string name="ui_hyper_mode_disabled" formatted="false">"Hyper Mode disabled"</string>
+    <string name="ui_background_app_launch" formatted="false">"Background app launch"</string>
+    <string name="ui_allow_hyper_mode_to_move_between_apps_while_pickpico_itself_is_not_on_screen" formatted="false">"Allow Hyper Mode to move between apps while PickPico itself is not on screen."</string>
+    <string name="ui_turn_on_hyper_mode_first" formatted="false">"Turn on Hyper Mode first"</string>
+    <string name="ui_allow_pickpico_to_display_over_other_apps_so_android_permits_agent_app_switching" formatted="false">"Allow PickPico to display over other apps so Android permits Agent app switching"</string>
+    <string name="ui_background_app_launch_is_already_allowed" formatted="false">"Background app launch is already allowed"</string>
+    <string name="ui_accessibility_ui_control" formatted="false">"Accessibility · UI Control"</string>
+    <string name="ui_inspect_and_operate_accessible_ui_elements_in_other_apps" formatted="false">"Inspect and operate accessible UI elements in other apps."</string>
+    <string name="ui_checking" formatted="false">"CHECKING"</string>
+    <string name="ui_agent_behavior" formatted="false">"AGENT BEHAVIOR"</string>
+    <string name="ui_approval_policy" formatted="false">"Approval Policy"</string>
+    <string name="ui_choose_when_an_agent_must_ask_before_it_performs_an_action" formatted="false">"Choose when an agent must ask before it performs an action."</string>
+    <string name="ui_auto_approve" formatted="false">"AUTO APPROVE"</string>
+    <string name="ui_agent_connection" formatted="false">"AGENT CONNECTION"</string>
+    <string name="ui_let_your_agent_reach_this_phone_over_the_internet" formatted="false">"Let your agent reach this phone over the internet."</string>
+    <string name="ui_not_configured" formatted="false">"NOT CONFIGURED"</string>
+    <string name="ui_android_system_access" formatted="false">"ANDROID SYSTEM ACCESS"</string>
+    <string name="ui_add_system_commands_file_transfers_and_apk_installation_your_agent_chooses_when_to_use_them" formatted="false">"Add system commands, file transfers, and APK installation. Your agent chooses when to use them."</string>
+    <string name="ui_connection_checking" formatted="false">"CONNECTION · CHECKING"</string>
+    <string name="ui_pairing_checking" formatted="false">"PAIRING · CHECKING"</string>
+    <string name="ui_appearance_136360" formatted="false">"APPEARANCE"</string>
+    <string name="ui_theme" formatted="false">"Theme"</string>
+    <string name="ui_background_color_glass_style_transparency_and_highlights" formatted="false">"Background color, glass style, transparency, and highlights."</string>
+    <string name="ui_customize" formatted="false">"CUSTOMIZE"</string>
+    <string name="ui_pico_ball" formatted="false">"Pico ball"</string>
+    <string name="ui_keep_the_home_fluid_orb_visible_above_other_apps_while_the_node_is_running" formatted="false">"Keep the HOME fluid orb visible above other apps while the Node is running."</string>
+    <string name="ui_open_android_settings_and_allow_display_over_other_apps" formatted="false">"Open Android settings and allow display over other apps"</string>
+    <string name="ui_pico_return_app" formatted="false">"Pico return app"</string>
+    <string name="ui_choose_your_default_return_app_and_pico_text_size" formatted="false">"Choose your default return app and Pico text size."</string>
+    <string name="ui_app" formatted="false">"APP"</string>
+    <string name="ui_pickpico_update" formatted="false">"PickPico Update"</string>
+    <string name="ui_version" formatted="false">"Version —"</string>
+    <string name="ui_checking_update_state" formatted="false">"Checking update state…"</string>
+    <string name="ui_check_for_update" formatted="false">"CHECK FOR UPDATE"</string>
+    <string name="ui_endpoints_transport_state_credentials_runtime_and_debug_information" formatted="false">"Endpoints, transport state, credentials, runtime, and debug information."</string>
+    <string name="ui_your_agent_chooses_tools_automatically_system_access_adds_android_commands_file_transfers_and_apk_installation_through_adb" formatted="false">"Your agent chooses tools automatically. System access adds Android commands, file transfers, and APK installation through ADB."</string>
+    <string name="ui_system_control_a2fc0e" formatted="false">"SYSTEM CONTROL"</string>
+    <string name="ui_reading_picoadb_state" formatted="false">"Reading PicoADB state…"</string>
+    <string name="ui_ready_when_needed" formatted="false">"READY WHEN NEEDED"</string>
+    <string name="ui_keep_android_wireless_debugging_on_when_you_want_system_access_your_agent_reconnects_automatically_when_it_needs_adb" formatted="false">"Keep Android Wireless Debugging on when you want system access. Your agent reconnects automatically when it needs ADB."</string>
+    <string name="ui_reconnect_now" formatted="false">"RECONNECT NOW"</string>
+    <string name="ui_android_wireless_debugging" formatted="false">"ANDROID WIRELESS DEBUGGING"</string>
+    <string name="ui_pairing_settings" formatted="false">"PAIRING SETTINGS"</string>
+    <string name="ui_1_android_authorization" formatted="false">"1 · ANDROID AUTHORIZATION"</string>
+    <string name="ui_open_wireless_debugging_enable_it_then_choose_pair_device_with_pairing_code_keep_that_six_digit_dialog_open_split_screen_is_the_most_reliable_setup_on_samsung" formatted="false">"Open Wireless Debugging, enable it, then choose “Pair device with pairing code”. Keep that six-digit dialog open. Split screen is the most reliable setup on Samsung."</string>
+    <string name="ui_open_wireless_debugging" formatted="false">"OPEN WIRELESS DEBUGGING"</string>
+    <string name="ui_scan_for_endpoints" formatted="false">"SCAN FOR ENDPOINTS"</string>
+    <string name="ui_scanning_for_wireless_debugging_for_15_seconds" formatted="false">"Scanning for Wireless Debugging for 15 seconds"</string>
+    <string name="ui_2_pair_this_phone" formatted="false">"2 · PAIR THIS PHONE"</string>
+    <string name="ui_enter_the_six_digit_code_shown_by_android_pickpico_stores_its_adb_identity_in_private_app_storage_the_code_itself_is_never_saved" formatted="false">"Enter the six-digit code shown by Android. PickPico stores its ADB identity in private app storage; the code itself is never saved."</string>
+    <string name="ui_6_digit_pairing_code" formatted="false">"6-digit pairing code"</string>
+    <string name="ui_pair" formatted="false">"PAIR"</string>
+    <string name="ui_camera_notifications_and_screen_tools_keep_working_without_adb_when_their_permissions_are_enabled_system_commands_follow_your_hyper_mode_and_approval_settings" formatted="false">"Camera, notifications, and screen tools keep working without ADB when their permissions are enabled. System commands follow your Hyper Mode and approval settings."</string>
+    <string name="ui_pairing_saved_your_agent_can_connect_automatically" formatted="false">"Pairing saved. Your agent can connect automatically."</string>
+    <string name="ui_pico_orb" formatted="false">"PICO ORB"</string>
+    <string name="ui_theme_d91e30" formatted="false">"THEME"</string>
+    <string name="ui_choose_a_solid_color_or_gradient_then_tune_how_the_glass_sits_above_it" formatted="false">"Choose a solid color or gradient, then tune how the glass sits above it."</string>
+    <string name="ui_gradient_background" formatted="false">"Gradient background"</string>
+    <string name="ui_color_a" formatted="false">"COLOR A"</string>
+    <string name="ui_color_b" formatted="false">"COLOR B"</string>
+    <string name="ui_glass" formatted="false">"GLASS"</string>
+    <string name="ui_soft" formatted="false">"SOFT"</string>
+    <string name="ui_clear" formatted="false">"CLEAR"</string>
+    <string name="ui_crisp" formatted="false">"CRISP"</string>
+    <string name="ui_transparency_see_more_background" formatted="false">"TRANSPARENCY · SEE MORE BACKGROUND"</string>
+    <string name="ui_shine_brighter_glass_edge" formatted="false">"SHINE · BRIGHTER GLASS EDGE"</string>
+    <string name="ui_color_strength_more_less_background" formatted="false">"COLOR STRENGTH · MORE / LESS BACKGROUND"</string>
+    <string name="ui_choose_color" formatted="false">"Choose color "</string>
+    <string name="ui_open_color_palette" formatted="false">", open color palette"</string>
+    <string name="ui_color_a_263930" formatted="false">"Color A"</string>
+    <string name="ui_color_b_46d602" formatted="false">"Color B"</string>
+    <string name="ui_cancel" formatted="false">"Cancel"</string>
+    <string name="ui_apply" formatted="false">"Apply"</string>
+    <string name="ui_remote_access_e235e3" formatted="false">"REMOTE ACCESS"</string>
+    <string name="ui_local_access_still_works_a_compatible_relay_is_required_for_cloud_agents_outside_your_lan" formatted="false">"Local access still works. A compatible relay is required for cloud agents outside your LAN."</string>
+    <string name="ui_how_it_works" formatted="false">"HOW IT WORKS"</string>
+    <string name="ui_deploy_a_pickpico_compatible_relay_the_cloudflare_worker_durable_object_in_the_repository_is_the_reference_implementation" formatted="false">"Deploy a PickPico-compatible relay. The Cloudflare Worker + Durable Object in the repository is the reference implementation."</string>
+    <string name="ui_paste_the_relay_base_url_below_pickpico_keeps_the_outbound_connection_itself_your_pc_does_not_need_to_stay_on" formatted="false">"Paste the relay base URL below. PickPico keeps the outbound connection itself; your PC does not need to stay on."</string>
+    <string name="ui_restart_pickpico_after_saving_when_the_relay_connects_cloud_agents_can_use_the_stable_remote_mcp_url" formatted="false">"Restart PickPico after saving. When the relay connects, cloud agents can use the stable remote MCP URL."</string>
+    <string name="ui_relay_url" formatted="false">"RELAY URL"</string>
+    <string name="ui_save_relay" formatted="false">"SAVE RELAY"</string>
+    <string name="ui_leave_the_field_empty_to_disable_remote_access_pickpico_does_not_assume_that_every_open_source_installation_uses_the_project_relay" formatted="false">"Leave the field empty to disable remote access. PickPico does not assume that every open-source installation uses the project relay."</string>
+    <string name="ui_relay_identity" formatted="false">"RELAY IDENTITY"</string>
+    <string name="ui_reset_this_phone_s_remote_identity_if_another_device_may_be_using_the_same_remote_mcp_url_your_local_settings_inbox_approval_mode_and_theme_are_kept" formatted="false">"Reset this phone\'s remote identity if another device may be using the same Remote MCP URL. Your local settings, inbox, approval mode, and theme are kept."</string>
+    <string name="ui_reset_relay_identity" formatted="false">"RESET RELAY IDENTITY"</string>
+    <string name="ui_technical_information_for_debugging_and_advanced_setup_normal_pickpico_use_should_not_require_anything_on_this_page" formatted="false">"Technical information for debugging and advanced setup. Normal PickPico use should not require anything on this page."</string>
+    <string name="ui_endpoints" formatted="false">"ENDPOINTS"</string>
+    <string name="ui_local_mcp" formatted="false">"Local MCP"</string>
+    <string name="ui_remote_mcp" formatted="false">"Remote MCP"</string>
+    <string name="ui_relay" formatted="false">"RELAY"</string>
+    <string name="ui_status" formatted="false">"Status"</string>
+    <string name="ui_relay_url_7cfb35" formatted="false">"Relay URL"</string>
+    <string name="ui_authentication" formatted="false">"AUTHENTICATION"</string>
+    <string name="ui_local_bearer" formatted="false">"Local bearer"</string>
+    <string name="ui_runtime" formatted="false">"RUNTIME"</string>
+    <string name="ui_node" formatted="false">"Node"</string>
+    <string name="ui_recent_action" formatted="false">"Recent action"</string>
+    <string name="ui_open_legacy_engineering_console" formatted="false">"OPEN LEGACY ENGINEERING CONSOLE"</string>
+    <string name="ui_ready_for_your_next_idea" formatted="false">"Ready for your next idea"</string>
+    <string name="ui_failed" formatted="false">" · failed"</string>
+    <string name="ui_just_now" formatted="false">"Just now"</string>
+    <string name="ui_m_ago" formatted="false">"m ago"</string>
+    <string name="ui_h_ago" formatted="false">"h ago"</string>
+    <string name="ui_running" formatted="false">"Running"</string>
+    <string name="ui_waiting" formatted="false">"Waiting"</string>
+    <string name="ui_blocked" formatted="false">"Blocked"</string>
+    <string name="ui_connecting" formatted="false">"Connecting"</string>
+    <string name="ui_just_finished" formatted="false">"Just finished"</string>
+    <string name="ui_ready_20c7c5" formatted="false">"Ready"</string>
+    <string name="ui_node_nstopped" formatted="false">"Node\nstopped"</string>
+    <string name="ui_local_nconnection" formatted="false">"Local\nconnection"</string>
+    <string name="ui_connected_nthrough_relay" formatted="false">"Connected\nthrough Relay"</string>
+    <string name="ui_relay_n" formatted="false">"Relay\n"</string>
+    <string name="ui_checking_ncapabilities" formatted="false">"Checking\ncapabilities"</string>
+    <string name="ui_capabilities_navailable" formatted="false">" capabilities\navailable"</string>
+    <string name="ui_capabilities_npaused" formatted="false">"Capabilities\npaused"</string>
+    <string name="ui_your_update_is_ready" formatted="false">"Your update is ready"</string>
+    <string name="ui_finish_installing_the_verified_pickpico_update" formatted="false">"Finish installing the verified PickPico update."</string>
+    <string name="ui_view_update" formatted="false">"View update"</string>
+    <string name="ui_node_stopped" formatted="false">"Node stopped"</string>
+    <string name="ui_node_local_only_relay_disconnected" formatted="false">"Node local only; relay disconnected"</string>
+    <string name="ui_node_ready" formatted="false">"Node ready"</string>
+    <string name="ui_online" formatted="false">"● Online"</string>
+    <string name="ui_offline" formatted="false">"● Offline"</string>
+    <string name="ui_ask_me" formatted="false">"ASK ME"</string>
+    <string name="ui_yolo_mode" formatted="false">"YOLO MODE"</string>
+    <string name="ui_start" formatted="false">"START"</string>
+    <string name="ui_ready_fc554d" formatted="false">"READY"</string>
+    <string name="ui_setup_required" formatted="false">"SETUP REQUIRED"</string>
+    <string name="ui_off" formatted="false">"OFF"</string>
+    <string name="ui_active_session" formatted="false">"ACTIVE SESSION"</string>
+    <string name="ui_not_active" formatted="false">"NOT ACTIVE"</string>
+    <string name="ui_connected" formatted="false">"CONNECTED"</string>
+    <string name="ui_version_03283e" formatted="false">"Version "</string>
+    <string name="ui_build" formatted="false">" · build "</string>
+    <string name="ui_checking_for_update" formatted="false">"CHECKING FOR UPDATE…"</string>
+    <string name="ui_downloading_update" formatted="false">"DOWNLOADING UPDATE…"</string>
+    <string name="ui_install" formatted="false">"INSTALL "</string>
+    <string name="ui_remote_mcp_is_ready_this_phone_maintains_the_relay_connection_itself" formatted="false">"Remote MCP is ready. This phone maintains the relay connection itself."</string>
+    <string name="ui_relay_is_configured_but_not_currently_connected_local_access_remains_available" formatted="false">"Relay is configured but not currently connected. Local access remains available."</string>
+    <string name="ui_running_5080a2" formatted="false">"RUNNING"</string>
+    <string name="ui_stopped" formatted="false">"STOPPED"</string>
+    <string name="ui_tool_calls" formatted="false">" · tool calls "</string>
+    <string name="ui_app_884b0c" formatted="false">" · app "</string>
+    <string name="ui_no_tool_calls_yet" formatted="false">"No tool calls yet"</string>
+    <string name="ui_connection_error" formatted="false">"CONNECTION · ERROR"</string>
+    <string name="ui_engine_missing" formatted="false">"ENGINE MISSING"</string>
+    <string name="ui_this_build_does_not_contain_the_verified_picoadb_engine" formatted="false">"This build does not contain the verified PicoADB engine."</string>
+    <string name="ui_pairing" formatted="false">"PAIRING"</string>
+    <string name="ui_authenticating_the_six_digit_code_through_android_s_tls_spake2_pairing_flow" formatted="false">"Authenticating the six-digit code through Android\'s TLS + SPAKE2 pairing flow."</string>
+    <string name="ui_connecting_48b998" formatted="false">"CONNECTING"</string>
+    <string name="ui_connecting_to_the_trusted_local_wireless_debugging_endpoint" formatted="false">"Connecting to the trusted local Wireless Debugging endpoint."</string>
+    <string name="ui_diagnosing" formatted="false">"DIAGNOSING"</string>
+    <string name="ui_collecting_privileged_android_system_diagnostics" formatted="false">"Collecting privileged Android system diagnostics."</string>
+    <string name="ui_running_command" formatted="false">"RUNNING COMMAND"</string>
+    <string name="ui_executing_an_agent_adb_command_on_this_phone" formatted="false">"Executing an agent ADB command on this phone."</string>
+    <string name="ui_pairing_endpoint_found" formatted="false">"PAIRING ENDPOINT FOUND"</string>
+    <string name="ui_pairing_endpoint_found_enter_the_code_while_android_s_pairing_dialog_remains_open" formatted="false">" pairing endpoint found. Enter the code while Android\'s pairing dialog remains open."</string>
+    <string name="ui_ready_to_connect" formatted="false">"READY TO CONNECT"</string>
+    <string name="ui_endpoint_found_connect_or_run_an_agent_adb_command_to_activate_shell_access" formatted="false">" endpoint found. Connect or run an agent ADB command to activate shell access."</string>
+    <string name="ui_scanning" formatted="false">"SCANNING"</string>
+    <string name="ui_searching_briefly_for_android_wireless_debugging_services_on_this_wi_fi_network" formatted="false">"Searching briefly for Android Wireless Debugging services on this Wi-Fi network."</string>
+    <string name="ui_paired" formatted="false">"PAIRED"</string>
+    <string name="ui_pairing_is_saved_enable_wireless_debugging_to_use_adb_commands" formatted="false">"Pairing is saved. Enable Wireless Debugging to use ADB commands."</string>
+    <string name="ui_enable_wireless_debugging_and_pair_this_pickpico_installation_once" formatted="false">"Enable Wireless Debugging and pair this PickPico installation once."</string>
+    <string name="ui_offline_c68993" formatted="false">"OFFLINE"</string>
+    <string name="ui_authorization_required" formatted="false">"AUTHORIZATION REQUIRED"</string>
+    <string name="ui_check_failed" formatted="false">"CHECK FAILED"</string>
+    <string name="ui_not_connected" formatted="false">"NOT CONNECTED"</string>
+    <string name="ui_pairing_1f2ce3" formatted="false">"PAIRING · "</string>
+    <string name="ui_saved" formatted="false">"SAVED"</string>
+    <string name="ui_not_paired" formatted="false">"NOT PAIRED"</string>
+    <string name="ui_connection" formatted="false">"CONNECTION · "</string>
+    <string name="ui_hide_pairing_settings" formatted="false">"HIDE PAIRING SETTINGS"</string>
+    <string name="ui_adb_shell_access_is_available_your_agent_can_run_commands_transfer_files_and_install_apks" formatted="false">"ADB shell access is available. Your agent can run commands, transfer files, and install APKs."</string>
+    <string name="ui_scanning_971444" formatted="false">"SCANNING…"</string>
+    <string name="ui_pairing_e8690e" formatted="false">"PAIRING…"</string>
+    <string name="ui_connecting_f361a7" formatted="false">"CONNECTING…"</string>
+    <string name="ui_checking_the_official_update_channel" formatted="false">"Checking the official update channel…"</string>
+    <string name="ui_update_check_failed" formatted="false">"Update check failed · "</string>
+    <string name="ui_downloading" formatted="false">"Downloading "</string>
+    <string name="ui_downloading_9069f3" formatted="false">"Downloading · "</string>
+    <string name="ui_download_verified_preparing_the_installer" formatted="false">"Download verified · preparing the installer"</string>
+    <string name="ui_update_ready_tap_install_to_continue" formatted="false">"Update ready · tap Install to continue"</string>
+    <string name="ui_is_ready_to_install" formatted="false">" is ready to install"</string>
+    <string name="ui_android_permission_needed_allow_pickpico_to_install_updates" formatted="false">"Android permission needed · allow PickPico to install updates"</string>
+    <string name="ui_unknown_update_error" formatted="false">"Unknown update error"</string>
+    <string name="ui_update_failed" formatted="false">"Update failed · "</string>
+    <string name="ui_pickpico_is_up_to_date" formatted="false">"PickPico is up to date"</string>
+    <string name="ui_update_installed_successfully" formatted="false">"Update installed successfully"</string>
+    <string name="ui_ready_to_check_the_official_update_channel" formatted="false">"Ready to check the official update channel"</string>
+    <string name="ui_unknown_error" formatted="false">"Unknown error"</string>
+    <string name="ui_stop_pickpico" formatted="false">"Stop PickPico?"</string>
+    <string name="ui_agents_will_not_be_able_to_reach_this_phone_until_pickpico_starts_again" formatted="false">"Agents will not be able to reach this phone until PickPico starts again."</string>
+    <string name="ui_stop_9e2534" formatted="false">"Stop"</string>
+    <string name="ui_starting_pickpico" formatted="false">"Starting PickPico…"</string>
+    <string name="ui_yolo_mode_af1945" formatted="false">"YOLO Mode"</string>
+    <string name="ui_approval_mode" formatted="false">"Approval Mode"</string>
+    <string name="ui_relay_url_must_start_with_https" formatted="false">"Relay URL must start with https://"</string>
+    <string name="ui_relay_saved" formatted="false">"Relay saved"</string>
+    <string name="ui_restart_pickpico_now_to_apply_the_remote_access_change" formatted="false">"Restart PickPico now to apply the remote access change?"</string>
+    <string name="ui_later" formatted="false">"Later"</string>
+    <string name="ui_restart" formatted="false">"Restart"</string>
+    <string name="ui_reset_relay_identity_ea7796" formatted="false">"Reset Relay identity?"</string>
+    <string name="ui_pickpico_will_create_a_new_remote_mcp_url_for_this_phone_existing_integrations_using_the_old_url_will_stop_working_local_settings_and_data_are_kept" formatted="false">"PickPico will create a new Remote MCP URL for this phone. Existing integrations using the old URL will stop working. Local settings and data are kept."</string>
+    <string name="ui_reset" formatted="false">"Reset"</string>
+    <string name="ui_relay_identity_reset_a_new_remote_mcp_url_will_be_created" formatted="false">"Relay identity reset. A new Remote MCP URL will be created."</string>
+    <string name="ui_start_pickpico_first" formatted="false">"Start PickPico first"</string>
+    <string name="ui_0_messages" formatted="false">"0 messages"</string>
+    <string name="ui_recent" formatted="false">"RECENT"</string>
+    <string name="ui_clear_agent_activity" formatted="false">"Clear Agent Activity?"</string>
+    <string name="ui_this_removes_every_saved_request_and_message_from_this_phone" formatted="false">"This removes every saved request and message from this phone."</string>
+    <string name="ui_clear_719ea3" formatted="false">"Clear"</string>
+    <string name="ui_agent_activity_cleared" formatted="false">"Agent Activity cleared"</string>
+    <string name="ui_activity_81c0d9" formatted="false">"Activity"</string>
+    <string name="ui_recent_commands_this_session" formatted="false">"RECENT COMMANDS · THIS SESSION"</string>
+    <string name="ui_finished" formatted="false">" · finished"</string>
+    <string name="ui_saved_message" formatted="false">" saved message"</string>
+    <string name="ui_saved_messages" formatted="false">" saved messages"</string>
+    <string name="ui_no_activity_yet" formatted="false">"No activity yet"</string>
+    <string name="ui_agent_requests_notifications_and_human_help_handoffs_will_appear_here" formatted="false">"Agent requests, notifications, and human-help handoffs will appear here."</string>
+    <string name="ui_copy" formatted="false">"COPY"</string>
+    <string name="ui_open" formatted="false">"OPEN"</string>
+    <string name="ui_needs_response" formatted="false">"NEEDS RESPONSE"</string>
+    <string name="ui_approval_needed" formatted="false">"APPROVAL NEEDED"</string>
+    <string name="ui_human_help" formatted="false">"HUMAN HELP"</string>
+    <string name="ui_agent_is_waiting_for_you" formatted="false">"Agent is waiting for you"</string>
+    <string name="ui_open_to_respond_and_let_the_agent_continue" formatted="false">"Open to respond and let the Agent continue."</string>
+    <string name="ui_copied" formatted="false">"Copied"</string>
+    <string name="ui_no_app_can_open_this_link" formatted="false">"No app can open this link"</string>
+    <string name="ui_pico_settings" formatted="false">"Pico settings"</string>
+    <string name="ui_text_size" formatted="false">"Text size  ·  "</string>
+    <string name="ui_text_size_for_pico_and_this_page" formatted="false">"Text size for Pico and this page"</string>
+    <string name="ui_default_100" formatted="false">"Default · 100%"</string>
+    <string name="ui_larger_120" formatted="false">"Larger · 120%"</string>
+    <string name="ui_largest_140" formatted="false">"Largest · 140%"</string>
+    <string name="ui_use_the_task_s_return_destination_when_provided_otherwise_open_your_selected_app" formatted="false">"Use the task’s return destination when provided, otherwise open your selected app."</string>
+    <string name="ui_search_apps" formatted="false">"Search apps"</string>
+    <string name="ui_no_matching_apps" formatted="false">"No matching apps"</string>
+    <string name="ui_clear_default_return_app" formatted="false">"Clear default return app"</string>
+    <string name="ui_return_app" formatted="false">"Return app: "</string>
+    <string name="ui_default_return_app_n" formatted="false">"Default return app\n"</string>
+    <string name="ui_not_selected" formatted="false">"Not selected"</string>
+    <string name="ui_last" formatted="false">"Last · "</string>
+    <string name="ui_recent_94045a" formatted="false">"Recent · "</string>
+    <string name="ui_node_is_stopped" formatted="false">"Node is stopped"</string>
+    <string name="ui_local_connection" formatted="false">"Local connection"</string>
+    <string name="ui_connected_through_relay" formatted="false">"Connected through Relay"</string>
+    <string name="ui_remote_access_unavailable" formatted="false">"Remote access unavailable"</string>
+    <string name="ui_waiting_c271b6" formatted="false">"WAITING"</string>
+    <string name="ui_waiting_for_your_help" formatted="false">"Waiting for your help"</string>
+    <string name="ui_approval_required" formatted="false">"Approval required"</string>
+    <string name="ui_your_help_is_needed" formatted="false">"Your help is needed"</string>
+    <string name="ui_an_agent_is_waiting_for_your_response" formatted="false">"An agent is waiting for your response."</string>
+    <string name="ui_review" formatted="false">"Review"</string>
+    <string name="ui_respond" formatted="false">"Respond"</string>
+    <string name="ui_pickpico_is_resting" formatted="false">"PickPico is resting"</string>
+    <string name="ui_start_the_node_to_welcome_agents" formatted="false">"Start the node to welcome agents"</string>
+    <string name="ui_ready_when_you_are" formatted="false">"Ready when you are"</string>
+    <string name="ui_start_pickpico_to_make_this_phone_available" formatted="false">"Start PickPico to make this phone available."</string>
+    <string name="ui_start_952f37" formatted="false">"Start"</string>
+    <string name="ui_blocked_fcc4cc" formatted="false">"BLOCKED"</string>
+    <string name="ui_task_needs_attention" formatted="false">"Task needs attention"</string>
+    <string name="ui_task_blocked" formatted="false">"Task blocked"</string>
+    <string name="ui_review_issue" formatted="false">"Review issue"</string>
+    <string name="ui_active" formatted="false">"ACTIVE"</string>
+    <string name="ui_agent_task_in_progress" formatted="false">"Agent task in progress"</string>
+    <string name="ui_waiting_for_the_agent_s_next_step" formatted="false">"Waiting for the agent’s next step"</string>
+    <string name="ui_waiting_on_a_task" formatted="false">"Waiting on a task"</string>
+    <string name="ui_review_the_task_for_the_next_step" formatted="false">"Review the task for the next step."</string>
+    <string name="ui_open_task_a1f175" formatted="false">"Open task"</string>
+    <string name="ui_open_current_task" formatted="false">"Open current task"</string>
+    <string name="ui_view_details_and_live_progress" formatted="false">"View details and live progress"</string>
+    <string name="ui_connecting_pickpico" formatted="false">"Connecting PickPico"</string>
+    <string name="ui_relay_connection_lost" formatted="false">"Relay connection lost"</string>
+    <string name="ui_establishing_a_relay_session" formatted="false">"Establishing a Relay session"</string>
+    <string name="ui_local_access_is_still_available" formatted="false">"Local access is still available"</string>
+    <string name="ui_relay_disconnected" formatted="false">"Relay disconnected"</string>
+    <string name="ui_remote_access_needs_attention" formatted="false">"Remote access needs attention."</string>
+    <string name="ui_review_connection" formatted="false">"Review connection"</string>
+    <string name="ui_an_action_needs_attention" formatted="false">"An action needs attention"</string>
+    <string name="ui_failed_f8d53c" formatted="false">" → failed"</string>
+    <string name="ui_action_did_not_finish" formatted="false">"Action did not finish"</string>
+    <string name="ui_check_activity_for_the_latest_context" formatted="false">"Check Activity for the latest context."</string>
+    <string name="ui_task_completed" formatted="false">"Task completed"</string>
+    <string name="ui_starting" formatted="false">"Starting"</string>
+    <string name="ui_agent_tasks" formatted="false">" agent tasks · "</string>
+    <string name="ui_active_a733b8" formatted="false">"Active"</string>
+    <string name="ui_checking_the_camera_feed" formatted="false">"Checking the camera feed"</string>
+    <string name="ui_reviewing_the_current_screen" formatted="false">"Reviewing the current screen"</string>
+    <string name="ui_opening_an_app" formatted="false">"Opening an app"</string>
+    <string name="ui_finding_an_app" formatted="false">"Finding an app"</string>
+    <string name="ui_checking_notifications" formatted="false">"Checking notifications"</string>
+    <string name="ui_working_on_the_device" formatted="false">"Working on the device"</string>
+    <string name="ui_working_with_files" formatted="false">"Working with files"</string>
+    <string name="ui_preparing_the_next_steps" formatted="false">"Preparing the next steps"</string>
+    <string name="ui_checking_the_device_update" formatted="false">"Checking the device update"</string>
+    <string name="ui_helping_with_an_agent_task" formatted="false">"Helping with an agent task"</string>
+    <string name="ui_captured_camera" formatted="false">"Captured camera"</string>
+    <string name="ui_captured_screen" formatted="false">"Captured screen"</string>
+    <string name="ui_reviewed_current_screen" formatted="false">"Reviewed current screen"</string>
+    <string name="ui_app_launched" formatted="false">"App launched"</string>
+    <string name="ui_found_installed_apps" formatted="false">"Found installed apps"</string>
+    <string name="ui_human_help_finished" formatted="false">"Human Help finished"</string>
+    <string name="ui_entered_text" formatted="false">"Entered text"</string>
+    <string name="ui_interacted_with_screen" formatted="false">"Interacted with screen"</string>
+    <string name="ui_scrolled_current_screen" formatted="false">"Scrolled current screen"</string>
+    <string name="ui_replied_to_notification" formatted="false">"Replied to notification"</string>
+    <string name="ui_read_operation_guide" formatted="false">"Read operation guide"</string>
+    <string name="ui_extra_62cbe28803" formatted="false">"Live Screen Share"</string>
+    <string name="ui_extra_3a16d0094a" formatted="false">"Optional MediaProjection fallback. Hyper Mode can capture screenshots on demand through Accessibility."</string>
+    <string name="ui_extra_4dd1672772" formatted="false">"Open Developer options → Wireless debugging"</string>
+    <string name="ui_extra_6bc452d636" formatted="false">"Enter the six-digit Android pairing code"</string>
+    <string name="ui_extra_ff9aa7b7f0" formatted="false">"Pairing failed"</string>
+    <string name="ui_extra_16bb313e84" formatted="false">"PicoADB shell access is ready."</string>
+    <string name="ui_extra_202caaa870" formatted="false">"Connection failed"</string>
+    <string name="ui_extra_b9b3a1654c" formatted="false">"Appearance changes apply immediately across PickPico. These controls do not affect Agent permissions or behavior."</string>
+    <string name="ui_extra_a93421b010" formatted="false">"Choose a look. You can switch back anytime."</string>
+    <string name="ui_extra_c0a8060f3b" formatted="false">"Original"</string>
+    <string name="ui_extra_245eb6d90c" formatted="false">"Flame"</string>
+    <string name="ui_extra_26e55d0487" formatted="false">"Flame requires Android 13 or later. Original is always available."</string>
+    <string name="ui_extra_78d4784b89" formatted="false">"Flame is unavailable on this device. Original is still available."</string>
+    <string name="ui_extra_63add8f1fc" formatted="false">"Original orb"</string>
+    <string name="ui_extra_d7a1e57362" formatted="false">", selected"</string>
+    <string name="ui_extra_383a3221cf" formatted="false">"Flame orb"</string>
+    <string name="ui_extra_194405e182" formatted="false">"Local bearer is not ready"</string>
+    <string name="ui_extra_cecf3ba368" formatted="false">"Connection copied"</string>
+    <string name="ui_extra_ca265dedb7" formatted="false">"Allow PickPico agents to lock this phone when you permit the capability."</string>
+    <string name="ui_extra_9b55a452e2" formatted="false">"Accessibility UI Control"</string>
+    <string name="ui_extra_20c53c8b5b" formatted="false">"Android controls this special access. Open Accessibility settings to disable it."</string>
+    <string name="ui_extra_fd7108f831" formatted="false">"Open settings"</string>
+    <string name="ui_extra_7fe2a5b980" formatted="false">"Enable UI Control"</string>
+    <string name="ui_extra_a2497a1268" formatted="false">"Sideloaded builds may require two Android security steps. First open App info and choose Allow restricted settings if shown. Then enable PickPico in Accessibility settings."</string>
+    <string name="ui_extra_64dec0b01a" formatted="false">"App info"</string>
+    <string name="ui_extra_d660049bc1" formatted="false">"Accessibility"</string>
+    <string name="ui_extra_39c84fd306" formatted="false">"Screen capture is unavailable on this device"</string>
+    <string name="ui_extra_5157e0610f" formatted="false">"Screen capture was not authorized"</string>
+    <string name="ui_extra_1c7a1da2ac" formatted="false">"PickPico was not started because required permissions were not granted."</string>
+    <string name="ui_extra_1e214136aa" formatted="false">"PickPico update: "</string>
+    <string name="ui_extra_f2d520d627" formatted="false">"Human-help request not found"</string>
+    <string name="ui_extra_46258f6dbc" formatted="false">"AI needs approval"</string>
+    <string name="ui_extra_b7d25c3c92" formatted="false">"AI paused"</string>
+    <string name="ui_extra_e6688f2ddc" formatted="false">"Your input is required."</string>
+    <string name="ui_extra_e982def1af" formatted="false">"AI needs your help"</string>
+    <string name="ui_extra_35fabd891f" formatted="false">"Additional notes from AI"</string>
+    <string name="ui_extra_9120423983" formatted="false">"DETAILS"</string>
+    <string name="ui_extra_c256d9bd28" formatted="false">"Add context, a note, or an image when the Agent needs more information."</string>
+    <string name="ui_extra_c9414f7e6b" formatted="false">"Add a note (optional)"</string>
+    <string name="ui_extra_e8056001a1" formatted="false">"Optional note for the Agent…"</string>
+    <string name="ui_extra_f804d60449" formatted="false">"Type a message to AI…"</string>
+    <string name="ui_extra_7da8c7087f" formatted="false">"Add an image · optional"</string>
+    <string name="ui_extra_e828e6e82d" formatted="false">"No images attached"</string>
+    <string name="ui_extra_f35dec5f75" formatted="false">"Upload image"</string>
+    <string name="ui_extra_7ebd5d4c91" formatted="false">"Take photo"</string>
+    <string name="ui_extra_3091c8446f" formatted="false">"Voice"</string>
+    <string name="ui_extra_dc3decbb93" formatted="false">"Details"</string>
+    <string name="ui_extra_3cd46e950e" formatted="false">"●  PICO DOCK CONNECTED"</string>
+    <string name="ui_extra_c888ab1ad8" formatted="false">"   ·   Voice   ·   Details"</string>
+    <string name="ui_extra_d623d3887b" formatted="false">"Use phone controls"</string>
+    <string name="ui_extra_47a7097872" formatted="false">"Sent to Agent"</string>
+    <string name="ui_extra_2ec46e92c9" formatted="false">"No camera app available"</string>
+    <string name="ui_extra_6dc279ba73" formatted="false">"Image failed: "</string>
+    <string name="ui_extra_350c9e9192" formatted="false">"Unable to decode image"</string>
+    <string name="ui_extra_cfd84dded8" formatted="false">"Unable to compress image"</string>
+    <string name="ui_extra_8b461f9c52" formatted="false">" image(s) attached"</string>
+    <string name="ui_extra_b52b36b726" formatted="false">"Back"</string>
+    <string name="ui_extra_97efc8640f" formatted="false">"APPROVAL"</string>
+    <string name="ui_extra_4644b5262c" formatted="false">"H U M A N   H E L P"</string>
+    <string name="ui_extra_d20150227f" formatted="false">"AI is paused · waiting for you"</string>
+    <string name="ui_extra_67e1442d0b" formatted="false">"Speak your reply to the Agent"</string>
+    <string name="ui_extra_520f7ef562" formatted="false">"Voice input is not available on this phone"</string>
+    <string name="ui_extra_64cc7c9c45" formatted="false">"VOICE REPLY"</string>
+    <string name="ui_extra_386306f929" formatted="false">"Close Pico panel"</string>
+    <string name="ui_extra_575e50f241" formatted="false">"OPEN  →"</string>
+    <string name="ui_extra_076b846007" formatted="false">"Return app &amp; text size"</string>
+    <string name="ui_extra_2b485494ee" formatted="false">"Return to "</string>
+    <string name="ui_extra_bcb7e60b53" formatted="false">"No return app selected"</string>
+    <string name="ui_extra_27f621cf47" formatted="false">"View activity or return to your agent"</string>
+    <string name="ui_extra_083ddda4bd" formatted="false">"Open help"</string>
+    <string name="ui_extra_8ef81c3d5e" formatted="false">"View connection"</string>
+    <string name="ui_extra_f327dd9753" formatted="false">"Open Activity"</string>
+    <string name="ui_extra_cc78a57042" formatted="false">"Open PickPico"</string>
+    <string name="ui_extra_3228b1fc7d" formatted="false">"Human Help"</string>
+    <string name="ui_extra_259476cdfc" formatted="false">"PickPico is working"</string>
+    <string name="ui_extra_362a26cfd5" formatted="false">"PickPico is ready"</string>
+    <string name="ui_agents" formatted="false">" agents"</string>
+    <string name="ui_accessories">Accessories</string>
+    <string name="ui_button_pad">Four-button Bluetooth pad</string>
+    <string name="ui_button_pad_detail">Enable only when using the phone-stand remote. Search uses low power and stops after three attempts. Use Search again if the remote is unavailable.</string>
+    <string name="ui_button_pad_search">Search again</string>
+    <string name="ui_button_pad_enable_first">Enable the button pad first.</string>
+    <string name="ui_button_pad_enabled">Enabled · bounded search</string>
+    <string name="ui_button_pad_disabled">Off · no Bluetooth scanning</string>
+    <string name="ui_dev_control_title">One-tap developer mode</string>
+    <string name="ui_dev_control_authorize">Enable one-tap control (one-time)</string>
+    <string name="ui_dev_control_enable">Turn on Developer options + Wi-Fi ADB</string>
+    <string name="ui_dev_control_disable">Turn off Developer options + debugging</string>
+    <string name="ui_dev_control_on">On</string>
+    <string name="ui_dev_control_off">Off</string>
+    <string name="ui_dev_control_state">Developer options: %1$s · Wi-Fi ADB: %2$s</string>
+    <string name="ui_dev_control_ready">Direct controls work even when ADB is off. Saved pairing is retained. Turning off also stops USB debugging.</string>
+    <string name="ui_dev_control_setup_needed">Enable Wireless debugging once, then authorize one-tap control. Afterwards use these buttons directly in PickPico.</string>
+    <string name="ui_dev_control_first_setup">Open Software information and tap Build number seven times to enable Developer options, then return to PickPico.</string>
+    <string name="ui_dev_control_pending">Developer options are enabled. Connect to Wi-Fi and accept the Android network confirmation if shown.</string>
+    <string name="ui_dev_control_enabled">Developer options and Wi-Fi debugging enabled</string>
+    <string name="ui_dev_control_disabled">Developer options and debugging disabled; saved pairing retained</string>
+</resources>

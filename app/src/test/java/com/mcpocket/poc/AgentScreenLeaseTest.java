@@ -48,4 +48,25 @@ public class AgentScreenLeaseTest {
         assertTrue(AgentScreenLease.isActivity("picoadb.discover"));
         assertTrue(AgentScreenLease.isActivity("picoadb.battery_diagnostics"));
     }
+
+    @Test public void taskBridgesCallsAndTerminalUpdateReleases() {
+        AgentScreenLease lease = new AgentScreenLease();
+        lease.tasksChanged(1, 100L);
+        lease.started("ui.inspect", 200L);
+        lease.finished("ui.inspect");
+        assertTrue(lease.holdsScreen(30_000L));
+        lease.tasksChanged(0, 30_001L);
+        assertFalse(lease.holdsScreen(30_001L));
+    }
+
+    @Test public void abandonedTaskExpiresAndRealActivityRenews() {
+        AgentScreenLease lease = new AgentScreenLease();
+        lease.tasksChanged(1, 100L);
+        assertTrue(lease.holdsScreen(100L + AgentScreenLease.IDLE_MS - 1L));
+        lease.expireIfNeeded(100L + AgentScreenLease.IDLE_MS);
+        assertFalse(lease.holdsScreen(100L + AgentScreenLease.IDLE_MS));
+        lease.started("ui.inspect", 200_000L);
+        lease.finished("ui.inspect");
+        assertTrue(lease.holdsScreen(200_001L));
+    }
 }

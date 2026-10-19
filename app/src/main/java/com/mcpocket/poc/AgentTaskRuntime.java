@@ -84,7 +84,7 @@ final class AgentTaskRuntime {
 
         if (awakeTaskCount() >= MAX_TASKS)
             throw new CommandRuntime.CommandInputException("Finish or cancel an existing task before creating another");
-        task.put("screenAwakeUntilTerminal", false).put("screenAwakeIdleTimeoutMs", AgentScreenLease.IDLE_MS);
+        task.put("screenAwakeUntilTerminal", true).put("screenAwakeIdleTimeoutMs", AgentScreenLease.IDLE_MS);
         tasks.put(taskId, task);
         HomePulse.task(task);
         trim();
@@ -127,7 +127,7 @@ final class AgentTaskRuntime {
             task.put("leaseExpiresAt", now.plusMillis(ACTIVE_PROJECTION_LEASE_MS).toString());
         }
         HomePulse.task(task);
-        task.put("screenAwakeUntilTerminal", false);
+        task.put("screenAwakeUntilTerminal", !isTerminal(task.optString("status")));
         awakeTasksChanged.accept(awakeTaskCount());
         return copy(task);
     }

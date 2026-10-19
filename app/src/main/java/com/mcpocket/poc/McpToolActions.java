@@ -73,6 +73,18 @@ interface McpToolActions {
         return unsupported("picoadb.battery_diagnostics", callCount);
     }
 
+    default JSONObject picoAdbExecute(JSONObject arguments, boolean shell, long callCount) throws JSONException {
+        return unsupported(shell ? "picoadb.shell" : "picoadb.exec", callCount);
+    }
+
+    default JSONObject picoAdbSetEnabled(boolean enabled, long callCount) throws JSONException {
+        return unsupported("picoadb.set_enabled", callCount);
+    }
+
+    default JSONObject picoAdbAuthorizeControl(long callCount) throws JSONException {
+        return unsupported("picoadb.authorize_control", callCount);
+    }
+
     JSONObject phoneExec(String command, long callCount) throws JSONException;
 
     JSONObject execCommand(JSONObject arguments, long callCount) throws JSONException;

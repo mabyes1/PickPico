@@ -18,9 +18,24 @@ public final class HybridToolsTest {
     private JSONObject call(String name, JSONObject args) throws Exception {
         return tools.call(new JSONObject().put("name", name).put("arguments", args), false, "thin-v1", 1);
     }
+    @Test public void toolsListExposesWirelessAdbRecoveryWithoutSearchingFirst() throws Exception {
+        JSONArray listed = tools.list(false, "thin-v1").getJSONArray("tools");
+        for (String name : new String[]{"command_run", "picoadb_status"}) {
+            JSONObject found = null;
+            for (int i = 0; i < listed.length(); i++) {
+                if (listed.getJSONObject(i).getString("name").equals(name)) found = listed.getJSONObject(i);
+            }
+            assertNotNull(name, found);
+            assertTrue(found.getString("description").contains("picoadb.connect"));
+        }
+        JSONArray ids = OperationGuides.get("picoadb.connect").getJSONArray("capabilityIds");
+        for (int i = 0; i < ids.length(); i++) {
+            assertTrue(runtime.commandIds().toString().contains("\"" + ids.getString(i) + "\""));
+        }
+    }
     @Test public void completeCatalogAndDirectSchemasStayAligned() throws Exception {
         JSONArray listed = tools.list(false, "thin-v1").getJSONArray("tools");
-        assertEquals(34, listed.length());
+        assertEquals(38, listed.length());
         assertTrue(runtime.commandIds().length() >= 64);
         assertTrue(runtime.commandIds().toString().contains("picoadb.status"));
         assertTrue(runtime.commandIds().toString().contains("picoadb.discover"));
@@ -28,6 +43,10 @@ public final class HybridToolsTest {
         assertTrue(listed.toString().contains("picoadb_status"));
         assertTrue(listed.toString().contains("picoadb_discover"));
         assertTrue(listed.toString().contains("picoadb_battery_diagnostics"));
+        assertTrue(listed.toString().contains("picoadb_shell"));
+        assertTrue(listed.toString().contains("picoadb_exec"));
+        assertTrue(listed.toString().contains("picoadb_set_enabled"));
+        assertTrue(listed.toString().contains("picoadb_authorize_control"));
         for (String id : CapabilityIndex.DIRECT) {
             JSONObject found = null;
             for (int i = 0; i < listed.length(); i++) if (listed.getJSONObject(i).getString("name").equals(CapabilityIndex.tool(id))) found = listed.getJSONObject(i);
@@ -45,6 +64,28 @@ public final class HybridToolsTest {
             JSONObject status = runtime.execute("capability.status", new JSONObject().put("id", id), 1);
             assertEquals(id, runtime.schema(id).toString(), status.getJSONObject("inputSchema").toString());
         }
+    }
+
+    @Test public void adbShellUsesExistingApprovalAndOperationLifecycle() throws Exception {
+        when(actions.approvalMode()).thenReturn(McpocketPolicySettings.APPROVAL_AUTO);
+        when(actions.picoAdbExecute(any(), eq(true), anyLong())).thenReturn(new JSONObject().put("success", true));
+        JSONObject run = call("picoadb_shell", new JSONObject().put("agent", "Test 1").put("command", "id"));
+        assertFalse(run.toString(), run.getBoolean("isError"));
+        verify(actions).requestApproval(eq("picoadb.shell"), anyString(), eq("arbitrary_process"), any(), anyLong());
+        verify(actions).picoAdbExecute(any(), eq(true), anyLong());
+        verify(actions).onAgentCommandStarted("picoadb.shell");
+        verify(actions).onAgentCommandFinished("picoadb.shell");
+        assertTrue(AndroidCapabilityRegistry.isHyperCommand("picoadb.shell"));
+        assertTrue(AndroidCapabilityRegistry.isHyperCommand("picoadb.exec"));
+    }
+
+    @Test public void malformedAdbArgumentsAreRejectedBeforeApprovalOrExecution() throws Exception {
+        JSONObject bad = call("picoadb_exec", new JSONObject().put("agent", "Test 1")
+                .put("args", new JSONArray().put("-s").put("other-phone").put("shell").put("id")));
+        assertTrue(bad.getBoolean("isError"));
+        assertTrue(call("picoadb_shell", new JSONObject().put("agent", "Test 1").put("command", " ")).getBoolean("isError"));
+        verify(actions, never()).picoAdbExecute(any(), anyBoolean(), anyLong());
+        verify(actions, never()).requestApproval(anyString(), anyString(), anyString(), any(), anyLong());
     }
     @Test public void searchPreservesReadWriteIntentAndExactIds() throws Exception {
         String[][] cases = {{"check battery level","phone.status"},{"lower volume","audio.set"},{"calendar list","calendar.list"},{"calendar create","calendar.create"},{"clipboard read","clipboard.get"},{"clipboard write","clipboard.set"},{"notification dismiss","notification.dismiss"},{"notification list","notification.list"},{"查看行事曆","calendar.list"},{"開相機","app.list"}};

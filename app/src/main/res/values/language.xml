@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_title">Language / 語言</string>
+    <string name="language_description">Choose the language used in PickPico.</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_chinese" translatable="false">繁體中文</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="status_created">Created</string>
+    <string name="status_failed">Failed</string>
+    <string name="command_typing">Filling in the details</string>
+    <string name="command_ui">Working on the current screen</string>
+    <string name="command_listen">Listening to the surroundings</string>
+    <string name="command_reply">Replying to a notification</string>
+    <string name="voice_empty">No speech recognized. Please try again.</string>
+    <string name="voice_review">Is the transcription correct?</string>
+    <string name="voice_confirm">Your reply is sent only after confirmation.</string>
+    <string name="voice_retry">Record again</string>
+    <string name="voice_send">Confirm and send</string>
+</resources>

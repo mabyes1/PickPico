@@ -75,4 +75,16 @@ final class PicoOrbState {
             default: return "PickPico is ready";
         }
     }
+
+    static String label(android.content.Context context, String mode) {
+        switch (mode) {
+            case HUMAN_HELP: return context.getString(R.string.ui_extra_3228b1fc7d);
+            case BLOCKED: return context.getString(R.string.ui_task_needs_attention);
+            case RUNNING: return context.getString(R.string.ui_extra_259476cdfc);
+            case CONNECTING: return context.getString(R.string.ui_connecting_pickpico);
+            case CONNECTION_ATTENTION: return context.getString(R.string.ui_connecting_pickpico);
+            case COMPLETED: return context.getString(R.string.ui_task_completed);
+            default: return context.getString(R.string.ui_extra_362a26cfd5);
+        }
+    }
 }

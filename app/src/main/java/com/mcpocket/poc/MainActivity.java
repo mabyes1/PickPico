@@ -38,7 +38,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends LocalizedActivity {
     private static final int REQUEST_NOTIFICATION = 100;
     private static final int REQUEST_NODE_MEDIA = 101;
     private static final int REQUEST_LOCATION = 102;

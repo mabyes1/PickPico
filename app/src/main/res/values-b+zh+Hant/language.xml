@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_title">語言 / Language</string>
+    <string name="language_description">選擇 PickPico 的顯示語言。</string>
+    <string name="language_system">跟隨系統</string>
+    <string name="status_cancelled">已取消</string>
+    <string name="status_created">已建立</string>
+    <string name="status_failed">失敗</string>
+    <string name="command_typing">正在填寫內容</string>
+    <string name="command_ui">正在操作目前畫面</string>
+    <string name="command_listen">正在聆聽周遭聲音</string>
+    <string name="command_reply">正在回覆通知</string>
+    <string name="voice_empty">沒有辨識到文字，請重新錄音</string>
+    <string name="voice_review">辨識結果正確嗎？</string>
+    <string name="voice_confirm">確認後才會傳給 AI。</string>
+    <string name="voice_retry">不正確，重錄</string>
+    <string name="voice_send">正確，傳送</string>
+</resources>
