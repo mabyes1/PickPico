@@ -3,9 +3,11 @@ package com.mcpocket.poc;
 /**
  * Display hold for commands and the gaps inside an active Agent task.
  *
- * Every operational Agent command acquires a hold at dispatch start and must
- * release it from the command runtime's finally block. Task activity has a
- * separate idle deadline so a disconnected Agent cannot hold the display forever.
+ * Every screen-driving Agent command (see {@link ScreenPolicy#holdsScreen})
+ * acquires a hold at dispatch start and must release it from the command
+ * runtime's finally block. Background commands never touch the display. Task
+ * activity has a separate idle deadline so a disconnected Agent cannot hold
+ * the display forever.
  */
 final class AgentScreenLease {
     static final long WATCHDOG_MS = 360_000L;
@@ -16,6 +18,12 @@ final class AgentScreenLease {
     private int activeTasks;
     private long taskDeadline;
 
+    /**
+     * An open task bridges the gaps between screen-driving calls for up to
+     * {@link #IDLE_MS}. Whether that lease physically holds a wake lock depends
+     * on the device being unlocked; {@link McpNodeService} never wakes or holds
+     * a locked screen for a task alone.
+     */
     synchronized void tasksChanged(int count, long now) {
         activeTasks = Math.max(0, count);
         taskDeadline = activeTasks > 0 ? now + IDLE_MS : 0L;
@@ -69,10 +77,8 @@ final class AgentScreenLease {
         taskDeadline = 0L;
     }
 
+    /** Allowlist: only screen-driving capabilities own the display. */
     static boolean isActivity(String command) {
-        return !command.equals("node.info") && !command.equals("guide.get")
-                && !command.startsWith("capability.") && !command.equals("policy.status")
-                && !command.equals("picoadb.status")
-                && !command.equals("app.update_check") && !command.equals("app.update_status");
+        return ScreenPolicy.holdsScreen(command);
     }
 }

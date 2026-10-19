@@ -5,6 +5,17 @@ import org.json.JSONObject;
 
 /** Android-facing actions that can be exposed as MCP tools. */
 interface McpToolActions {
+    default void onAgentCommandDispatched(String commandId, String agent) {
+    }
+
+    default JSONObject awaitUnlockIfRequired(
+            String commandId,
+            String description,
+            JSONObject arguments,
+            long callCount) throws JSONException {
+        return null;
+    }
+
     default void onAgentCommandStarted(String commandId) {
         onAgentCommandActivity(commandId);
     }

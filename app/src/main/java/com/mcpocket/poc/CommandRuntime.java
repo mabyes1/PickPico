@@ -1359,16 +1359,29 @@ final class CommandRuntime {
                     .put("next", new JSONObject().put("tool", "capability_status")
                             .put("arguments", new JSONObject().put("id", command.id)));
         }
-        // Every capability funnels through here. Android uses these lifecycle
-        // hooks to keep the display awake for the whole Agent operation and to
-        // renew a short idle lease after the command finishes. The finish hook
-        // matters for commands such as phone.wake that turn the display on only
-        // after the start hook has already observed a sleeping device.
-        actions.onAgentCommandStarted(command.id);
+        // Every capability funnels through here. Background capabilities never
+        // wake or hold the display; screen-requiring capabilities alert the
+        // owner and pend until the phone is unlocked, then hold the unlocked
+        // display awake for the operation and active task bridge.
+        actions.onAgentCommandDispatched(command.id, AgentIdentity.current());
         long pulseId = HomePulse.begin(command.id, AgentIdentity.current());
         boolean pulseFailed = true;
         boolean dispatched = false;
+        boolean startedHook = false;
         try {
+            if (ScreenPolicy.requiresUnlock(command.id, arguments)) {
+                JSONObject unlockBlocked = actions.awaitUnlockIfRequired(
+                        command.id,
+                        command.description,
+                        arguments,
+                        callCount);
+                if (unlockBlocked != null) {
+                    if (!AgentIdentity.current().isEmpty()) unlockBlocked.put("agent", AgentIdentity.current());
+                    return unlockBlocked.put("isError", true);
+                }
+            }
+            actions.onAgentCommandStarted(command.id);
+            startedHook = true;
             if (requiresApproval(command)) {
                 JSONObject approval = actions.requestApproval(
                         command.id,
@@ -1409,7 +1422,7 @@ final class CommandRuntime {
                     .put("next", unknown ? "Verify current device state before retrying; the action may have happened." : "Inspect the error before retrying.");
         } finally {
             HomePulse.finish(pulseId, pulseFailed);
-            actions.onAgentCommandFinished(command.id);
+            if (startedHook) actions.onAgentCommandFinished(command.id);
         }
     }
 
