@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","params":{"arguments":{"arguments":{"guideId":"ui.recover"},"agent":"GPT-6","commandId":"guide.get"},"name":"command_run"},"id":1789207167254,"method":"tools/call"}

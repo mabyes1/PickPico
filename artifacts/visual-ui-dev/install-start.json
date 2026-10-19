@@ -1,0 +1,34 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207242163,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"executionId\":\"cmd-bbad4073-541a-4361-8076-4d94d64f20a6\",\"commandId\":\"app.update\",\"status\":\"running\",\"isError\":false,\"startedAt\":\"2026-09-12T10:00:41.661466Z\",\"completedAt\":\"2026-09-12T10:00:41.672523Z\",\"result\":{\"status\":\"downloading\",\"running\":true,\"started\":true,\"alreadyRunning\":false,\"url\":\"http:\\/\\/192.168.0.20:41288\\/pickpico-0.16.77.apk\",\"expectedSha256\":\"52052e220a42afa8a2febe1e92ad5c125993dfd4295088553a5d89df76b84370\",\"bytesDownloaded\":0,\"startedAt\":\"2026-09-12T10:00:41.667855Z\",\"toolCallCount\":285,\"agent\":\"GPT-6\",\"isError\":false}}"
+      }
+    ],
+    "structuredContent": {
+      "executionId": "cmd-bbad4073-541a-4361-8076-4d94d64f20a6",
+      "commandId": "app.update",
+      "status": "running",
+      "isError": false,
+      "startedAt": "2026-09-12T10:00:41.661466Z",
+      "completedAt": "2026-09-12T10:00:41.672523Z",
+      "result": {
+        "status": "downloading",
+        "running": true,
+        "started": true,
+        "alreadyRunning": false,
+        "url": "http://192.168.0.20:41288/pickpico-0.16.77.apk",
+        "expectedSha256": "52052e220a42afa8a2febe1e92ad5c125993dfd4295088553a5d89df76b84370",
+        "bytesDownloaded": 0,
+        "startedAt": "2026-09-12T10:00:41.667855Z",
+        "toolCallCount": 285,
+        "agent": "GPT-6",
+        "isError": false
+      }
+    },
+    "isError": false
+  }
+}

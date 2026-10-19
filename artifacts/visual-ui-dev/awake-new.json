@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207470732,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"woke\":true,\"wasInteractive\":false,\"interactive\":true,\"observationMs\":566,\"keyguardLocked\":true,\"unlocked\":false,\"keepsScreenAwake\":false,\"backgroundKeepAlive\":false,\"timestamp\":\"2026-09-12T10:04:30.666253Z\",\"toolCallCount\":8,\"agent\":\"GPT-6\",\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "woke": true,
+      "wasInteractive": false,
+      "interactive": true,
+      "observationMs": 566,
+      "keyguardLocked": true,
+      "unlocked": false,
+      "keepsScreenAwake": false,
+      "backgroundKeepAlive": false,
+      "timestamp": "2026-09-12T10:04:30.666253Z",
+      "toolCallCount": 8,
+      "agent": "GPT-6",
+      "isError": false
+    },
+    "isError": false
+  }
+}

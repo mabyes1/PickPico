@@ -1,0 +1,34 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207481328,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"executionId\":\"cmd-afc032d3-067f-4881-9f6b-ee3c15c02364\",\"commandId\":\"workspace.read\",\"status\":\"completed\",\"isError\":false,\"startedAt\":\"2026-09-12T10:04:40.748061Z\",\"completedAt\":\"2026-09-12T10:04:40.753242Z\",\"result\":{\"content\":\"{\\\"fixtureVersion\\\":1,\\\"url\\\":\\\"http:\\/\\/127.0.0.1:37085\\\",\\\"pid\\\":7796}\\n\",\"offset\":0,\"nextOffset\":63,\"bytesRead\":63,\"sizeBytes\":63,\"version\":\"e41d08b38f7363606a8d43082cd52ea7519bce1a2d0cdf1d289dcbaab922ec2e\",\"truncated\":false,\"path\":\"benchmarks\\/VISUAL-20260912-1800\\/startup.log\",\"toolCallCount\":10,\"agent\":\"GPT-6\",\"isError\":false}}"
+      }
+    ],
+    "structuredContent": {
+      "executionId": "cmd-afc032d3-067f-4881-9f6b-ee3c15c02364",
+      "commandId": "workspace.read",
+      "status": "completed",
+      "isError": false,
+      "startedAt": "2026-09-12T10:04:40.748061Z",
+      "completedAt": "2026-09-12T10:04:40.753242Z",
+      "result": {
+        "content": "{\"fixtureVersion\":1,\"url\":\"http://127.0.0.1:37085\",\"pid\":7796}\n",
+        "offset": 0,
+        "nextOffset": 63,
+        "bytesRead": 63,
+        "sizeBytes": 63,
+        "version": "e41d08b38f7363606a8d43082cd52ea7519bce1a2d0cdf1d289dcbaab922ec2e",
+        "truncated": false,
+        "path": "benchmarks/VISUAL-20260912-1800/startup.log",
+        "toolCallCount": 10,
+        "agent": "GPT-6",
+        "isError": false
+      }
+    },
+    "isError": false
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207291272,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"process.exec\",\"description\":\"Run a phone shell command\",\"category\":\"process\",\"risk\":\"arbitrary_process\",\"sideEffect\":true,\"tool\":\"command_run\",\"group\":\"core\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":8192,\"description\":\"Shell command executed by \\/system\\/bin\\/sh -c.\"},\"cwd\":{\"type\":\"string\",\"maxLength\":1024,\"description\":\"Optional working directory visible to the MCPocket app sandbox.\"},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Optional environment variables added or overridden for the process.\"},\"stdin\":{\"type\":\"string\",\"maxLength\":65536,\"description\":\"Optional UTF-8 stdin payload, sent asynchronously under the startup deadline. stdinState\\/stdinError report delivery.\"},\"timeoutMs\":{\"type\":\"integer\",\"minimum\":100,\"maximum\":120000,\"default\":30000,\"description\":\"Shared startup\\/stdin\\/process deadline for foreground execution. With background=true, bounds startup and stdin delivery only; a successfully started server stays alive until stopped. Cleanup may add a short bounded grace period.\"},\"maxOutputBytes\":{\"type\":\"integer\",\"minimum\":1024,\"maximum\":262144,\"default\":65536},\"background\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Keep the process alive as a managed session and return immediately.\"}},\"required\":[\"command\"],\"additionalProperties\":false},\"schemaVersion\":\"0.16.76\",\"call\":{\"tool\":\"command_run\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{\"commandId\":\"process.exec\",\"arguments\":{}},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "process.exec",
+      "description": "Run a phone shell command",
+      "category": "process",
+      "risk": "arbitrary_process",
+      "sideEffect": true,
+      "tool": "command_run",
+      "group": "core",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "description": "Shell command executed by /system/bin/sh -c."
+          },
+          "cwd": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Optional working directory visible to the MCPocket app sandbox."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Optional environment variables added or overridden for the process."
+          },
+          "stdin": {
+            "type": "string",
+            "maxLength": 65536,
+            "description": "Optional UTF-8 stdin payload, sent asynchronously under the startup deadline. stdinState/stdinError report delivery."
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 120000,
+            "default": 30000,
+            "description": "Shared startup/stdin/process deadline for foreground execution. With background=true, bounds startup and stdin delivery only; a successfully started server stays alive until stopped. Cleanup may add a short bounded grace period."
+          },
+          "maxOutputBytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 262144,
+            "default": 65536
+          },
+          "background": {
+            "type": "boolean",
+            "default": false,
+            "description": "Keep the process alive as a managed session and return immediately."
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.76",
+      "call": {
+        "tool": "command_run",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {
+          "commandId": "process.exec",
+          "arguments": {}
+        },
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

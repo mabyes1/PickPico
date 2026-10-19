@@ -175,6 +175,13 @@ final class AndroidCapabilityRegistry {
             boolean granted = manager != null && manager.isAdminActive(receiver);
             return setupState(result, granted, "device_admin", "PickPico is not an active Device Admin");
         }
+        if ("phone.extend_unlock".equals(commandId)) {
+            return setupState(
+                    result,
+                    ExtendUnlockControl.hasPermission(context),
+                    "write_secure_settings",
+                    "Run picoadb.authorize_control once while ADB is enabled");
+        }
 
         return result
                 .put("available", true)
@@ -192,6 +199,7 @@ final class AndroidCapabilityRegistry {
     static boolean isHyperCommand(String commandId) {
         return "phone.lock".equals(commandId)
                 || "phone.home".equals(commandId)
+                || "phone.extend_unlock".equals(commandId)
                 || "notification.list".equals(commandId)
                 || "notification.get".equals(commandId)
                 || "notification.dismiss".equals(commandId)

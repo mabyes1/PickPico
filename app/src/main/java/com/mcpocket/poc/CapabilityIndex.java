@@ -43,6 +43,7 @@ final class CapabilityIndex {
             case "phone.lock": return "Lock the screen";
             case "phone.wake": return "Wake display; does not unlock or navigate";
             case "phone.home": return "Wake, request system unlock, then go Home";
+            case "phone.extend_unlock": return "Extend unlock timeout so the phone stays unlocked when screen turns off";
             case "camera.capture": return "Take a camera photo, not a screenshot";
             case "phone.notify": return "Post a phone notification";
             case "phone.speak": return "Speak text aloud";
@@ -122,6 +123,7 @@ final class CapabilityIndex {
             }
             return ids("picoadb.status");
         }
+        if (has(q, "extend unlock 延長解鎖 延遲鎖定 保持解鎖")) return ids("phone.extend_unlock");
         if (has(q, "volume audio 音量 音效")) return ids(edit ? "audio.set" : "audio.status");
         if (has(q, "calendar agenda schedule event events 行事曆 日曆 日历 行程")) {
             if (remove) return ids("calendar.delete");

@@ -1,0 +1,46 @@
+{"phase":"preflight","tool":"pickpico_server_info","status":"completed","device":"samsung SM-S9110","androidRelease":"16","version":"0.16.76","remoteEndpoint":"https://relay.pickpico.workers.dev/v3/nodes/wjLVc8x8sGvNvNRzjYOhtQ/mcp","relayStatus":"connected","loopbackHealthy":true}
+{"phase":"preflight","tool":"pickpico_capability_list","status":"completed","count":60,"schemaVersion":"0.16.76"}
+{"phase":"preflight","tool":"pickpico_policy_status","status":"completed","hyperMode":true,"approvalMode":"yolo"}
+{"phase":"preflight","tool":"pickpico_task_create","status":"completed","taskId":"task-d2d80cc2-d914-490e-9fd5-8ee526e79110","agent":"gpt-5.6-luna"}
+{"phase":"preflight","tool":"workspace.write","path":"benchmarks/PICO-BENCH-20260912-170705/index.html","status":"completed","bytesWritten":5466}
+{"phase":"preflight","tool":"workspace.write","path":"benchmarks/PICO-BENCH-20260912-170705/server.js","status":"completed","bytesWritten":2672}
+{"phase":"preflight","tool":"node.start","entry":"benchmarks/PICO-BENCH-20260912-170705/server.js","status":"running","note":"initial start returned running without URL; stopped before launcher retry"}
+{"phase":"preflight","tool":"guide.get","status":"error","raw":"arguments.guideId: expected required field"}
+{"phase":"preflight","tool":"guide.get","status":"error","raw":"Unknown guideId: node.start. Use capability_search to discover guide IDs."}
+{"phase":"preflight","tool":"node.start","entry":"benchmarks/PICO-BENCH-20260912-170705/launcher.js","status":"running","pid":7204,"url":"http://127.0.0.1:41227"}
+{"case":"B01","tool":"ui.inspect","status":"completed","packageName":"com.sec.android.app.sbrowser","observationId":"ui-0f5ec0b5-536e-4879-adde-c1efd0206521","note":"browser foreground; page screenshot separately confirms fixed page"}
+{"case":"B01","tool":"phone_status","status":"completed","batteryPercent":47,"charging":false,"network":"wifi","device":"SM-S9110"}
+{"case":"B01","tool":"notification_list","status":"completed","count":14,"includeOwn":false,"note":"other notification bodies intentionally omitted"}
+{"case":"B03","tool":"phone.notify","status":"completed","notificationId":9201,"title":"PICO-BENCH-20260912-170705 測試通知","body":"PICO 測試通知，完成後可移除"}
+{"case":"B03","tool":"notification.list","status":"completed","foundOwn":true,"key":"0|com.mcpocket.poc|9201|null|10376"}
+{"case":"B03","tool":"notification.get","status":"completed","key":"0|com.mcpocket.poc|9201|null|10376","title":"PICO-BENCH-20260912-170705 測試通知","body":"PICO 測試通知，完成後可移除"}
+{"case":"B03","tool":"notification.dismiss","status":"completed","key":"0|com.mcpocket.poc|9201|null|10376","dismissed":true}
+{"case":"B03","tool":"notification.list","status":"completed","foundOwn":false,"count":17}
+{"case":"B04","tool":"workspace.write","path":"benchmarks/PICO-BENCH-20260912-170705/unicode.txt","status":"completed","bytesWritten":60000,"sha256":"1C9D82B2DB0BB0658FCFEBC3FE05F2220097FC4FA686F138B6518D71DE79BE53"}
+{"case":"B04","tool":"workspace.read","status":"completed","chunkBytes":1024,"chunks":59,"totalOffset":60000,"lineCount":2000,"reconstructedExact":true,"version":"1c9d82b2db0bb0658fcfebc3fe05f2220097fc4fa686f138b6518d71de79be53"}
+{"case":"B04","tool":"workspace.write","path":"benchmarks/PICO-BENCH-20260912-170705/unicode.txt","status":"completed","bytesWritten":16,"content":"檔案已更新\n"}
+{"case":"B04","tool":"workspace.read","status":"error","raw":"FILE_CHANGED: restart from offset 0","oldVersionRejected":true}
+{"case":"B04","tool":"workspace.read","status":"completed","offset":0,"content":"檔案已更新\n","bytesRead":16,"truncated":false}
+{"case":"B05","attempt":1,"tool":"process.exec","status":"running","background":true,"intervalMs":300,"exitCode":null}
+{"case":"B05","attempt":1,"tool":"process.output","status":"completed","processStatus":"exited","stdout":"OUT-01\\nOUT-02\\nOUT-03\\nOUT-04\\nOUT-05\\nOUT-06\\nOUT-07\\nOUT-08\\n","stderr":"ERR-04\\n","exitCode":7,"note":"first read arrived after exit; no live-read proof"}
+{"case":"B05","attempt":2,"tool":"process.exec","status":"running","background":true,"sessionId":"proc-4d6f8edd-5523-4a4c-a183-e823698f2107","intervalMs":1000,"exitCode":null}
+{"case":"B05","attempt":2,"tool":"process.output","status":"running","sessionId":"proc-4d6f8edd-5523-4a4c-a183-e823698f2107","stdout":"OUT-01\\n","stderr":"","stdoutNextOffset":7,"exitCode":null}
+{"case":"B05","attempt":2,"tool":"process.output","status":"completed","sessionId":"proc-4d6f8edd-5523-4a4c-a183-e823698f2107","stdout":"OUT-02\\nOUT-03\\nOUT-04","stderr":"ERR-04\\n","stdoutOffset":7,"stdoutNextOffset":27,"exitCode":7}
+{"case":"B05","attempt":2,"tool":"process.output","status":"completed","sessionId":"proc-4d6f8edd-5523-4a4c-a183-e823698f2107","stdout":"\\nOUT-05\\nOUT-06\\nOUT-07\\nOUT-08\\n","stderr":"","stdoutOffset":27,"stdoutNextOffset":56,"exitCode":7}
+{"case":"B06","tool":"human.help","status":"waiting_human","requestId":"hh-f13b4515-df8b-43e0-ab68-9254148703ef","waitSeconds":120}
+{"case":"B06","tool":"human.help.status","status":"waiting_human","requestId":"hh-f13b4515-df8b-43e0-ab68-9254148703ef","lastHumanActivity":"opened"}
+{"case":"B06","tool":"human.help.status","status":"completed","requestId":"hh-f13b4515-df8b-43e0-ab68-9254148703ef","responseAction":"完成","responseText":"0426"}
+{"case":"B06","tool":"ui.type","status":"error","raw":"ui_target_not_found","performed":false}
+{"case":"G01","tool":"ui.type","status":"CLIENT_REJECTED","subitem":"missing_text","raw":"Parameters failed connector schema validation: text [required]: Missing required property"}
+{"case":"G01","tool":"ui.type","status":"CLIENT_REJECTED","subitem":"text_number","raw":"Parameters failed connector schema validation: text [type]: Expected type ['string'], got int"}
+{"case":"G01","tool":"command_run","status":"CLIENT_REJECTED","subitem":"unknown_field","raw":"arguments.bogus: expected no unknown fields"}
+{"case":"G01","tool":"command_run","status":"CLIENT_REJECTED","subitem":"unknown_capability","raw":"commandId [enum]: Value 'does.not.exist' not in allowed enum"}
+{"case":"G01","tool":"workspace.write","path":"benchmarks/PICO-BENCH-20260912-170705/guard.txt","status":"completed","bytesWritten":16,"content":"原始內容🦊"}
+{"case":"G02","tool":"ui.action","status":"error","raw":"STALE_OBSERVATION: call ui_inspect and choose a current target; no action was performed"}
+{"case":"G02","tool":"ui.action","status":"error","raw":"STALE_OBSERVATION: call ui_inspect and choose a current target; no action was performed","selector":{"path":"0/999/999","text":"儲存"}}
+{"case":"G02","tool":"ui.action","status":"error","raw":"STALE_OBSERVATION: call ui_inspect and choose a current target; no action was performed","selector":{"text":"防呆儲存"}}
+{"case":"G03","tool":"capability_search","queries":["battery","volume","calendar list","clipboard read","notification dismiss"],"status":"completed","note":"short searches returned only matching IDs"}
+{"case":"G03","tool":"capability_status","ids":["phone.status","audio.status","calendar.list","clipboard.get","notification.dismiss"],"status":"completed","schemaVersion":"0.16.76","note":"agent caller requirement present; no agent pattern; calendarId pattern is numeric"}
+{"case":"G03","tool":"phone_status","status":"completed","batteryPercent":47,"network":"wifi","device":"SM-S9110"}
+{"case":"G03","tool":"command_run","commandIds":["phone.status","audio.status","calendar.list","clipboard.get"],"status":"completed","calendarEventCount":0,"clipboardHasClip":false,"personalPayloads":"omitted"}
+{"phase":"cleanup","tool":"node.stop","status":"completed","wasRunning":true,"running":false}

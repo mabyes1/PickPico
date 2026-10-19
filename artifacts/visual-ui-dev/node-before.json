@@ -1,0 +1,34 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207449758,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"executionId\":\"cmd-5b6cc57c-0cf7-40f4-b7c7-b9313ca1a40d\",\"commandId\":\"node.status\",\"status\":\"completed\",\"isError\":false,\"startedAt\":\"2026-09-12T10:04:09.109118Z\",\"completedAt\":\"2026-09-12T10:04:09.114625Z\",\"result\":{\"status\":\"stopped\",\"running\":false,\"stopped\":true,\"wasRunning\":true,\"force\":false,\"runtime\":\"nodejs-mobile\",\"nodeVersion\":\"18.20.4\",\"completedAt\":\"2026-09-12T09:37:35.458678Z\",\"toolCallCount\":4,\"agent\":\"GPT-6\",\"isError\":false}}"
+      }
+    ],
+    "structuredContent": {
+      "executionId": "cmd-5b6cc57c-0cf7-40f4-b7c7-b9313ca1a40d",
+      "commandId": "node.status",
+      "status": "completed",
+      "isError": false,
+      "startedAt": "2026-09-12T10:04:09.109118Z",
+      "completedAt": "2026-09-12T10:04:09.114625Z",
+      "result": {
+        "status": "stopped",
+        "running": false,
+        "stopped": true,
+        "wasRunning": true,
+        "force": false,
+        "runtime": "nodejs-mobile",
+        "nodeVersion": "18.20.4",
+        "completedAt": "2026-09-12T09:37:35.458678Z",
+        "toolCallCount": 4,
+        "agent": "GPT-6",
+        "isError": false
+      }
+    },
+    "isError": false
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "name": "PickPico",
+  "version": "0.17.10",
+  "device": "samsung SM-S9110",
+  "androidRelease": "16",
+  "apiLevel": 36,
+  "endpoint": "http://192.168.0.15:8765/mcp",
+  "remoteEndpoint": "https://relay.pickpico.workers.dev/v4/nodes/wjLVc8x8sGvNvNRzjYOhtQ/mcp",
+  "relayStatus": "connected",
+  "workspaceRoot": "/data/user/0/com.mcpocket.poc/files/workspaces",
+  "uptimeSeconds": 44,
+  "nodeStartedAt": "2026-10-11T09:43:09.583131Z",
+  "processStartedAt": "2026-10-11T09:43:09.067586Z",
+  "connectionDiagnostics": {
+    "interactive": true,
+    "deviceIdle": false,
+    "powerSaveMode": false,
+    "ignoringBatteryOptimizations": false,
+    "keyguardLocked": false,
+    "restrictBackgroundStatus": 1,
+    "networkPresent": true,
+    "internetValidated": true,
+    "causeConfidence": "observations_only",
+    "processAlive": true,
+    "lastDisconnect": {
+      "interactive": true,
+      "deviceIdle": false,
+      "powerSaveMode": false,
+      "ignoringBatteryOptimizations": false,
+      "keyguardLocked": false,
+      "restrictBackgroundStatus": 1,
+      "networkPresent": true,
+      "internetValidated": false,
+      "at": "2026-10-11T09:14:04.379165Z",
+      "reasonCode": "network_changed",
+      "detail": "active network changed to wifi",
+      "processStartedAt": "2026-10-11T05:18:31.711698Z"
+    },
+    "historicalExits": [
+      {
+        "timestamp": 1791711787912,
+        "reasonCode": 16,
+        "processName": "com.mcpocket.poc",
+        "importance": 100
+      },
+      {
+        "timestamp": 1791695910811,
+        "reasonCode": 16,
+        "processName": "com.mcpocket.poc",
+        "importance": 125
+      },
+      {
+        "timestamp": 1791689031626,
+        "reasonCode": 2,
+        "processName": "com.mcpocket.poc:node",
+        "importance": 300
+      }
+    ],
+    "note": "Exit records are historical; do not attribute a current disconnection to an old exit. Samsung sleep-list membership is not inferred."
+  },
+  "processUptimeSeconds": 45,
+  "picoAdb": {
+    "state": "paired",
+    "paired": true,
+    "connected": false,
+    "connection": {
+      "state": "unknown",
+      "connected": false,
+      "checking": false,
+      "checkedAt": null,
+      "error": "",
+      "serial": "192.168.0.15:40157"
+    },
+    "lastPairAt": "2026-10-08T04:34:14.676352Z",
+    "lastConnectAt": "2026-10-11T09:42:23.264462Z",
+    "lastSerial": "192.168.0.15:40157",
+    "discoveryDeadlineElapsedMs": null,
+    "engine": {
+      "enginePath": "/data/app/~~afeK_yXdUOgvgEpjnXlkEg==/com.mcpocket.poc-r8fcH8qrMXCn3oJX32lkjQ==/lib/arm64/libadb.so",
+      "enginePresent": true,
+      "engineExecutable": true,
+      "home": "/data/user/0/com.mcpocket.poc/files/picoadb",
+      "identityCreated": true,
+      "pairedIdentityPersistent": true
+    },
+    "discovery": {
+      "discoveryStarted": false,
+      "pairingServiceType": "_adb-tls-pairing._tcp.",
+      "connectServiceType": "_adb-tls-connect._tcp.",
+      "pairingEndpoints": [],
+      "connectEndpoints": [],
+      "lastError": ""
+    },
+    "lastAction": "",
+    "lastError": "",
+    "lastOutput": ""
+  },
+  "screenAwake": {
+    "activeTasks": 0,
+    "activeOperations": 0,
+    "requested": false,
+    "watchdogMs": 360000,
+    "remainingWatchdogMs": 0,
+    "overlayHeld": false,
+    "wakeLockHeld": false,
+    "restoration": "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"
+  },
+  "toolCallCount": 3,
+  "relay": {
+    "connectionId": "ad37d9a7-f18b-4c40-b7e4-b5200cca00e9",
+    "relayConnectedAt": "2026-10-11T09:43:10.046619Z",
+    "lastRelayHeartbeatAt": "2026-10-11T09:43:50.015175Z",
+    "lastRelayPongAt": "2026-10-11T09:43:50.084434Z",
+    "lastRelayDisconnectAt": "",
+    "lastRelayDisconnectReason": "",
+    "lastLoopbackProxyErrorAt": "",
+    "lastLoopbackProxyErrorType": "",
+    "lastLoopbackProxyErrorMessage": "",
+    "lastLoopbackProxyRequestId": "",
+    "loopbackHealthy": true,
+    "reconnectAttemptCount": 0,
+    "disconnectCount": 0,
+    "heartbeatSentCount": 5,
+    "heartbeatPongCount": 5,
+    "reconnectBackoffAttempt": 0,
+    "currentNetworkType": "wifi",
+    "socketPresent": true
+  },
+  "isError": false
+}

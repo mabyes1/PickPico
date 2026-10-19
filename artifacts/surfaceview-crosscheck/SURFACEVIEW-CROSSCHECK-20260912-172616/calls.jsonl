@@ -1,0 +1,18 @@
+{"phase":"preflight","tool":"server_info","status":"completed","device":"samsung SM-S9110","androidRelease":"16","pickpicoVersion":"0.16.76","relayStatus":"connected","remoteEndpoint":"stored locally only"}
+{"phase":"preflight","tool":"task_create","status":"completed","taskId":"task-e1e673f7-05b3-4771-ba43-3fe09866958f"}
+{"phase":"preflight","tool":"workspace.write","status":"completed","path":"benchmarks/SURFACEVIEW-CROSSCHECK-20260912-172616/index.html","bytesWritten":5466}
+{"phase":"preflight","tool":"workspace.write","status":"completed","path":"benchmarks/SURFACEVIEW-CROSSCHECK-20260912-172616/server.js","bytesWritten":2672}
+{"phase":"preflight","tool":"node.start","status":"completed","entry":"benchmarks/SURFACEVIEW-CROSSCHECK-20260912-172616/launcher.js","url":"http://127.0.0.1:34153"}
+{"case":"Samsung","tool":"ui.inspect","status":"completed","compact":false,"includeInvisible":false,"maxDepth":30,"maxNodes":1000,"count":98,"surfaceViewCount":1,"testPageTextHits":0}
+{"case":"Samsung","tool":"ui.inspect","status":"completed","compact":false,"includeInvisible":true,"maxDepth":30,"maxNodes":1000,"count":109,"surfaceViewCount":2,"testPageTextHits":0}
+{"case":"Samsung","tool":"screen.capture","status":"completed","path":"captures/screen-1789205403465.jpg","captureMode":"accessibility"}
+{"case":"Chrome","tool":"app.launch","status":"completed","packageName":"com.android.chrome"}
+{"case":"Chrome","tool":"url.open","status":"completed","url":"http://127.0.0.1:34153/","note":"default browser routed to Samsung Internet"}
+{"case":"Chrome","tool":"ui.action","status":"blocked","error":"STALE_OBSERVATION","attempts":2,"note":"no action performed"}
+{"case":"Chrome","tool":"ui.type","status":"blocked","error":"STALE_OBSERVATION","attempts":1,"note":"no action performed"}
+{"case":"TalkBack","tool":"process.exec","status":"blocked","error":"SecurityException getCurrentUser requires INTERACT_ACROSS_USERS"}
+{"case":"TalkBack","tool":"app.list","status":"completed","query":"TalkBack","count":0}
+{"case":"TalkBack","tool":"human.help","status":"waiting_human","requestId":"hh-0688a806-95db-497c-b510-44feadea47f5","purpose":"one device unlock step only"}
+{"phase":"cleanup","tool":"node.stop","status":"completed","wasRunning":true}
+{"phase":"cleanup","tool":"process.exec","status":"completed","action":"removed phone test folder benchmarks/SURFACEVIEW-CROSSCHECK-20260912-172616","exitCode":0}
+{"phase":"cleanup","tool":"process.exec","status":"completed","verification":"phone test folder absent","stdout":"removed"}

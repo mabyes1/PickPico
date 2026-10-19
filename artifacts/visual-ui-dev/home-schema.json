@@ -1,0 +1,39 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207480797,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"phone.home\",\"description\":\"Wake, request system unlock, then go Home\",\"category\":\"phone\",\"risk\":\"ui_action\",\"sideEffect\":true,\"tool\":\"phone_home\",\"group\":\"hyper\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false},\"schemaVersion\":\"0.16.77\",\"call\":{\"tool\":\"phone_home\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "phone.home",
+      "description": "Wake, request system unlock, then go Home",
+      "category": "phone",
+      "risk": "ui_action",
+      "sideEffect": true,
+      "tool": "phone_home",
+      "group": "hyper",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.77",
+      "call": {
+        "tool": "phone_home",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {},
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

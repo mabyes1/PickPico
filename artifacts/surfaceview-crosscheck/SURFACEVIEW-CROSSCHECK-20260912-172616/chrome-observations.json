@@ -1,0 +1,57 @@
+{
+  "runId": "SURFACEVIEW-CROSSCHECK-20260912-172616",
+  "attempts": [
+    {
+      "label": "chrome-before-navigation",
+      "packageName": "com.android.systemui",
+      "windowTitle": "",
+      "observationId": "ui-3624ddeb-3960-4d1b-9b98-0085930949e8",
+      "count": 94,
+      "nodeCount": 94,
+      "truncated": false,
+      "surfaceViews": [],
+      "termHits": [],
+      "searchNodes": [],
+      "windows": [
+        {
+          "id": 9,
+          "title": "",
+          "type": 3,
+          "layer": 0,
+          "active": true,
+          "focused": true,
+          "packageName": "com.android.systemui"
+        }
+      ]
+    },
+    {
+      "label": "chrome-screen",
+      "capture": {
+        "captured": true,
+        "width": 1080,
+        "height": 2340,
+        "mimeType": "image/jpeg",
+        "path": "captures/screen-1789205634807.jpg",
+        "sizeBytes": 80488,
+        "freshFrame": true,
+        "frameAgeMs": 0,
+        "captureMode": "accessibility",
+        "timestamp": "2026-09-12T09:33:54.813635Z",
+        "toolCallCount": 265,
+        "agent": "unknown (model not exposed)",
+        "isError": false
+      }
+    }
+  ],
+  "navigation": {
+    "appLaunch": "com.android.chrome launched",
+    "urlOpenAttempts": [
+      "http://127.0.0.1:34153/ via default url.open routed to Samsung Internet",
+      "googlechrome://navigate remained Chrome new tab",
+      "intent URI blocked as unsafe"
+    ],
+    "uiActionAttempts": [
+      "click/type on Chrome search box returned STALE_OBSERVATION twice; no action performed"
+    ]
+  }
+}

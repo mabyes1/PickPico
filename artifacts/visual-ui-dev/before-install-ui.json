@@ -1,0 +1,145 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207194851,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"available\":true,\"packageName\":\"com.android.systemui\",\"windowTitle\":\"\",\"observationId\":\"ui-1512b684-99cf-4802-8687-ffd85d5e7c08\",\"nodes\":[{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\",\"actions\":[\"long_click\"]},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\",\"contentDescription\":\"17:59\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_time_area\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\",\"text\":\"1\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_hour10th\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/1\",\"text\":\"7\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_hour1st\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/2\",\"text\":\":\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_colon\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/3\",\"text\":\"5\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_minute10th\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/0\\/4\",\"text\":\"9\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_minute1st\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/0\\/0\\/0\\/0\\/0\\/1\\/0\\/0\",\"text\":\"9月12日, 週六\",\"contentDescription\":\"9月12日, 星期六\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/common_date\"},{\"path\":\"w9\\/0\\/5\\/3\\/1\\/0\\/2\\/0\\/0\\/0\\/0\",\"actions\":[\"click\"]},{\"path\":\"w9\\/0\\/5\\/3\\/2\\/0\\/0\\/0\\/0\\/0\",\"contentDescription\":\"3 個通知\",\"viewId\":\"com.samsung.android.app.aodservice:id\\/keyguard_icononly_container_view\",\"actions\":[\"click\"]},{\"path\":\"w9\\/0\\/5\\/4\\/2\\/0\\/0\\/0\\/0\\/0\",\"text\":\"台灣大哥大\",\"viewId\":\"com.android.systemui:id\\/keyguard_carrier_text\"},{\"path\":\"w9\\/0\\/5\\/4\\/2\\/0\\/1\\/0\\/0\\/0\\/0\",\"contentDescription\":\"鈴聲震動。\"},{\"path\":\"w9\\/0\\/5\\/4\\/2\\/0\\/1\\/0\\/0\\/0\\/3\\/0\\/1\\/0\",\"contentDescription\":\"Wi-Fi 訊號強度滿格。\",\"viewId\":\"com.android.systemui:id\\/wifi_signal\"},{\"path\":\"w9\\/0\\/5\\/4\\/2\\/0\\/1\\/0\\/0\\/0\\/4\",\"contentDescription\":\"台灣大哥大，訊號強度一格。\",\"viewId\":\"com.android.systemui:id\\/mobile_combo\"},{\"path\":\"w9\\/0\\/5\\/4\\/2\\/0\\/1\\/0\\/0\\/1\",\"contentDescription\":\"充電中，已完成 95%。\",\"viewId\":\"com.android.systemui:id\\/battery\"},{\"path\":\"w9\\/0\\/5\\/6\\/2\\/0\\/0\",\"contentDescription\":\"手電筒\",\"viewId\":\"com.android.systemui:id\\/start_button\"},{\"path\":\"w9\\/0\\/5\\/6\\/3\\/0\\/0\",\"contentDescription\":\"相機\",\"viewId\":\"com.android.systemui:id\\/end_button\"},{\"path\":\"w9\\/0\\/5\\/7\",\"contentDescription\":\"延長解鎖\",\"viewId\":\"com.android.systemui:id\\/sec_lock_icon_view\",\"actions\":[\"long_click\"]},{\"path\":\"w9\\/0\\/5\\/7\\/0\",\"viewId\":\"com.android.systemui:id\\/sec_lock_icon\",\"actions\":[\"click\",\"long_click\"]},{\"path\":\"w19\\/0\\/0\\/0\\/0\\/2\",\"contentDescription\":\"側螢幕面板\",\"viewId\":\"com.sec.android.app.launcher:id\\/trigger_container\",\"actions\":[\"click\"]},{\"path\":\"w19\\/0\\/0\\/0\\/0\\/2\\/0\",\"contentDescription\":\"側螢幕面板\",\"viewId\":\"com.sec.android.app.launcher:id\\/trigger_view\"}],\"count\":21,\"matchedCount\":21,\"truncated\":false,\"agent\":\"GPT-6\",\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "available": true,
+      "packageName": "com.android.systemui",
+      "windowTitle": "",
+      "observationId": "ui-1512b684-99cf-4802-8687-ffd85d5e7c08",
+      "nodes": [
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0",
+          "actions": [
+            "long_click"
+          ]
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/0/0",
+          "contentDescription": "17:59",
+          "viewId": "com.samsung.android.app.aodservice:id/common_time_area"
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/0/0/0",
+          "text": "1",
+          "viewId": "com.samsung.android.app.aodservice:id/common_hour10th"
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/0/0/1",
+          "text": "7",
+          "viewId": "com.samsung.android.app.aodservice:id/common_hour1st"
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/0/0/2",
+          "text": ":",
+          "viewId": "com.samsung.android.app.aodservice:id/common_colon"
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/0/0/3",
+          "text": "5",
+          "viewId": "com.samsung.android.app.aodservice:id/common_minute10th"
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/0/0/4",
+          "text": "9",
+          "viewId": "com.samsung.android.app.aodservice:id/common_minute1st"
+        },
+        {
+          "path": "w9/0/5/3/1/0/0/0/0/0/0/1/0/0",
+          "text": "9月12日, 週六",
+          "contentDescription": "9月12日, 星期六",
+          "viewId": "com.samsung.android.app.aodservice:id/common_date"
+        },
+        {
+          "path": "w9/0/5/3/1/0/2/0/0/0/0",
+          "actions": [
+            "click"
+          ]
+        },
+        {
+          "path": "w9/0/5/3/2/0/0/0/0/0",
+          "contentDescription": "3 個通知",
+          "viewId": "com.samsung.android.app.aodservice:id/keyguard_icononly_container_view",
+          "actions": [
+            "click"
+          ]
+        },
+        {
+          "path": "w9/0/5/4/2/0/0/0/0/0",
+          "text": "台灣大哥大",
+          "viewId": "com.android.systemui:id/keyguard_carrier_text"
+        },
+        {
+          "path": "w9/0/5/4/2/0/1/0/0/0/0",
+          "contentDescription": "鈴聲震動。"
+        },
+        {
+          "path": "w9/0/5/4/2/0/1/0/0/0/3/0/1/0",
+          "contentDescription": "Wi-Fi 訊號強度滿格。",
+          "viewId": "com.android.systemui:id/wifi_signal"
+        },
+        {
+          "path": "w9/0/5/4/2/0/1/0/0/0/4",
+          "contentDescription": "台灣大哥大，訊號強度一格。",
+          "viewId": "com.android.systemui:id/mobile_combo"
+        },
+        {
+          "path": "w9/0/5/4/2/0/1/0/0/1",
+          "contentDescription": "充電中，已完成 95%。",
+          "viewId": "com.android.systemui:id/battery"
+        },
+        {
+          "path": "w9/0/5/6/2/0/0",
+          "contentDescription": "手電筒",
+          "viewId": "com.android.systemui:id/start_button"
+        },
+        {
+          "path": "w9/0/5/6/3/0/0",
+          "contentDescription": "相機",
+          "viewId": "com.android.systemui:id/end_button"
+        },
+        {
+          "path": "w9/0/5/7",
+          "contentDescription": "延長解鎖",
+          "viewId": "com.android.systemui:id/sec_lock_icon_view",
+          "actions": [
+            "long_click"
+          ]
+        },
+        {
+          "path": "w9/0/5/7/0",
+          "viewId": "com.android.systemui:id/sec_lock_icon",
+          "actions": [
+            "click",
+            "long_click"
+          ]
+        },
+        {
+          "path": "w19/0/0/0/0/2",
+          "contentDescription": "側螢幕面板",
+          "viewId": "com.sec.android.app.launcher:id/trigger_container",
+          "actions": [
+            "click"
+          ]
+        },
+        {
+          "path": "w19/0/0/0/0/2/0",
+          "contentDescription": "側螢幕面板",
+          "viewId": "com.sec.android.app.launcher:id/trigger_view"
+        }
+      ],
+      "count": 21,
+      "matchedCount": 21,
+      "truncated": false,
+      "agent": "GPT-6",
+      "isError": false
+    },
+    "isError": false
+  }
+}

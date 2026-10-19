@@ -1,0 +1,45 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207276783,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"requestId\":\"hh-0b5cfdd4-38eb-4aee-9adb-7994ffffce73\",\"requestType\":\"help\",\"agent\":\"GPT-6\",\"status\":\"waiting_human\",\"title\":\"安裝 PICO 畫面操作測試版\",\"instruction\":\"測試版 0.16.77 已下載且簽章\\/雜湊驗證通過。請解鎖手機，點「PickPico 更新」通知並完成 Android 的安裝確認，裝好後開啟 PICO。這一步是 Android 要求的本機操作，完成後我會接續實機測試。\",\"actions\":[\"已安裝完成\"],\"allowTextReply\":true,\"allowImages\":false,\"maxImages\":3,\"attachments\":[],\"createdAt\":\"2026-09-12T10:01:16.269286Z\",\"createdAtEpochMs\":1789207276269,\"idleTimeoutSeconds\":360,\"expiresAtEpochMs\":1789207636269,\"openGraceUsed\":false,\"toolCallCount\":287,\"next\":{\"tool\":\"human_help_status\",\"arguments\":{\"requestId\":\"hh-0b5cfdd4-38eb-4aee-9adb-7994ffffce73\",\"waitMs\":25000},\"requiredCallerArguments\":[\"agent\"]},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "requestId": "hh-0b5cfdd4-38eb-4aee-9adb-7994ffffce73",
+      "requestType": "help",
+      "agent": "GPT-6",
+      "status": "waiting_human",
+      "title": "安裝 PICO 畫面操作測試版",
+      "instruction": "測試版 0.16.77 已下載且簽章/雜湊驗證通過。請解鎖手機，點「PickPico 更新」通知並完成 Android 的安裝確認，裝好後開啟 PICO。這一步是 Android 要求的本機操作，完成後我會接續實機測試。",
+      "actions": [
+        "已安裝完成"
+      ],
+      "allowTextReply": true,
+      "allowImages": false,
+      "maxImages": 3,
+      "attachments": [],
+      "createdAt": "2026-09-12T10:01:16.269286Z",
+      "createdAtEpochMs": 1789207276269,
+      "idleTimeoutSeconds": 360,
+      "expiresAtEpochMs": 1789207636269,
+      "openGraceUsed": false,
+      "toolCallCount": 287,
+      "next": {
+        "tool": "human_help_status",
+        "arguments": {
+          "requestId": "hh-0b5cfdd4-38eb-4aee-9adb-7994ffffce73",
+          "waitMs": 25000
+        },
+        "requiredCallerArguments": [
+          "agent"
+        ]
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

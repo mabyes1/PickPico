@@ -1,0 +1,39 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207182500,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"phone.wake\",\"description\":\"Wake display; does not unlock or navigate\",\"category\":\"phone\",\"risk\":\"physical_action\",\"sideEffect\":true,\"tool\":\"phone_wake\",\"group\":\"core\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false},\"schemaVersion\":\"0.16.76\",\"call\":{\"tool\":\"phone_wake\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "phone.wake",
+      "description": "Wake display; does not unlock or navigate",
+      "category": "phone",
+      "risk": "physical_action",
+      "sideEffect": true,
+      "tool": "phone_wake",
+      "group": "core",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.76",
+      "call": {
+        "tool": "phone_wake",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {},
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

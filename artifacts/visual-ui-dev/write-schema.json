@@ -1,0 +1,64 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207290844,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"workspace.write\",\"description\":\"Write or append workspace text\",\"category\":\"workspace\",\"risk\":\"filesystem_write\",\"sideEffect\":true,\"tool\":\"command_run\",\"group\":\"core\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":1024},\"content\":{\"type\":\"string\",\"maxLength\":1048576},\"append\":{\"type\":\"boolean\",\"default\":false},\"createParents\":{\"type\":\"boolean\",\"default\":true}},\"required\":[\"path\",\"content\"],\"additionalProperties\":false},\"schemaVersion\":\"0.16.76\",\"call\":{\"tool\":\"command_run\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{\"commandId\":\"workspace.write\",\"arguments\":{}},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "workspace.write",
+      "description": "Write or append workspace text",
+      "category": "workspace",
+      "risk": "filesystem_write",
+      "sideEffect": true,
+      "tool": "command_run",
+      "group": "core",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 1048576
+          },
+          "append": {
+            "type": "boolean",
+            "default": false
+          },
+          "createParents": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.76",
+      "call": {
+        "tool": "command_run",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {
+          "commandId": "workspace.write",
+          "arguments": {}
+        },
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","params":{"arguments":{"agent":"GPT-5","commandId":"app.update_check","arguments":{}},"name":"command_run"},"method":"tools/call","id":1789208168447}

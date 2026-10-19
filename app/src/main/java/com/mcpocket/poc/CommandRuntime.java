@@ -248,6 +248,37 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.phoneHome(callCount));
 
         register(
+                "phone.extend_unlock",
+                "Temporarily extend Android's lock-after-screen-off timeout (and prevent instant power-button lock) so the phone stays unlocked even when the display turns off, or release/inspect the lease. Requires WRITE_SECURE_SETTINGS and an unlocked phone when extending.",
+                "phone",
+                "security_action",
+                true,
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("action", new JSONObject()
+                                        .put("type", "string")
+                                        .put("enum", new JSONArray().put("extend").put("release").put("status"))
+                                        .put("default", "extend"))
+                                .put("durationSeconds", new JSONObject()
+                                        .put("type", "integer")
+                                        .put("minimum", 30)
+                                        .put("maximum", 1800)
+                                        .put("default", 180)))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> {
+                    String action = arguments.optString("action", "extend");
+                    if (!"extend".equals(action) && !"release".equals(action) && !"status".equals(action)) {
+                        throw new CommandInputException("phone.extend_unlock action must be extend, release, or status");
+                    }
+                    int durationSeconds = arguments.optInt("durationSeconds", 180);
+                    if (durationSeconds < 30 || durationSeconds > 1800) {
+                        throw new CommandInputException("phone.extend_unlock durationSeconds must be between 30 and 1800");
+                    }
+                    return actions.phoneExtendUnlock(arguments, callCount);
+                });
+
+        register(
                 "camera.capture",
                 "Capture one JPEG frame from the Android camera and persist it in the PickPico workspace.",
                 "sensor",
@@ -1328,6 +1359,8 @@ final class CommandRuntime {
             case "process.output":
             case "process.stop":
                 return "shell process command terminal execute linux script runtime";
+            case "phone.extend_unlock":
+                return "extend unlock keep unlocked lock timeout delay screen lock 延長解鎖 延遲鎖定 保持解鎖 免解鎖";
             default:
                 return "";
         }

@@ -160,6 +160,7 @@ public final class McpNodeService extends Service implements McpToolActions {
     public void onCreate() {
         super.onCreate();
         HomePulse.reset();
+        ExtendUnlockControl.recoverIfNeeded(this);
         createNotificationChannel();
         android.content.IntentFilter screenFilter = new android.content.IntentFilter(Intent.ACTION_USER_PRESENT);
         screenFilter.addAction(Intent.ACTION_SCREEN_ON);
@@ -296,6 +297,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         } catch (RuntimeException ignored) {
         }
         agentScreenLease.reset();
+        ExtendUnlockControl.release(this);
         releaseAgentScreenKeepAwakeWindow();
         releaseAgentScreenLease();
         if (humanHelpDelivery != null) humanHelpDelivery.stop();
@@ -342,6 +344,10 @@ public final class McpNodeService extends Service implements McpToolActions {
     public void onAgentCommandDispatched(String commandId, String agent) {
         try {
             agentTasks.touch(agent, System.currentTimeMillis());
+            postAgentScreenAction(() -> {
+                agentScreenLease.touchTask(SystemClock.elapsedRealtime());
+                refreshAgentScreenAwakeState();
+            });
             scheduleTaskIdleExpiryCheck();
         } catch (Exception ignored) {
         }
@@ -353,10 +359,14 @@ public final class McpNodeService extends Service implements McpToolActions {
             String description,
             JSONObject arguments,
             long callCount) throws JSONException {
+        ScreenPolicy.Tier tier = ScreenPolicy.tier(commandId, arguments);
+        if (tier == ScreenPolicy.Tier.BACKGROUND) {
+            return null;
+        }
+        boolean needsInteractiveDisplay = tier == ScreenPolicy.Tier.INTERACTIVE_UNLOCKED;
         if (!isKeyguardLocked()) {
-            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
-            if (power != null && !power.isInteractive()) {
-                try { phoneWake(callCount); } catch (Exception ignored) { }
+            if (needsInteractiveDisplay) {
+                ensureInteractiveDisplay(callCount);
             }
             postAgentScreenAction(this::refreshAgentScreenAwakeState);
             return null;
@@ -378,9 +388,8 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
 
         if (!isKeyguardLocked()) {
-            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
-            if (power != null && !power.isInteractive()) {
-                try { phoneWake(callCount); } catch (Exception ignored) { }
+            if (needsInteractiveDisplay) {
+                ensureInteractiveDisplay(callCount);
             }
             postAgentScreenAction(this::refreshAgentScreenAwakeState);
             return null;
@@ -390,6 +399,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         return new JSONObject()
                 .put("isError", true)
                 .put("status", "blocked")
+                .put("tier", tier.name())
                 .put("keyguardLocked", true)
                 .put("unlockRequested", true)
                 .put("waitedMs", waitedMs)
@@ -400,6 +410,19 @@ public final class McpNodeService extends Service implements McpToolActions {
                         .put("executionState", "not_started"))
                 .put("next", "Unlock the phone and retry " + commandId)
                 .put("toolCallCount", callCount);
+    }
+
+    private void ensureInteractiveDisplay(long callCount) {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power != null && !power.isInteractive()) {
+            try {
+                phoneWake(callCount);
+                // Give SystemUI / WindowManager a brief moment to restore the
+                // top activity window after waking an unlocked dark display.
+                SystemClock.sleep(250L);
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void requestOwnerUnlock(String commandId, String description) {
@@ -489,7 +512,9 @@ public final class McpNodeService extends Service implements McpToolActions {
         if (!AgentScreenLease.isActivity(commandId)) return;
         postAgentScreenAction(() -> {
             boolean firstOperation = agentScreenLease.started(commandId, SystemClock.elapsedRealtime());
-            if (firstOperation && (!isKeyguardLocked() || "phone.wake".equals(commandId) || "phone.home".equals(commandId))) {
+            if (firstOperation
+                    && ScreenPolicy.requiresInteractiveDisplay(commandId, null)
+                    && (!isKeyguardLocked() || "phone.wake".equals(commandId) || "phone.home".equals(commandId))) {
                 try { phoneWake(0L); } catch (Exception ignored) { }
             }
             refreshAgentScreenAwakeState();
@@ -505,8 +530,8 @@ public final class McpNodeService extends Service implements McpToolActions {
         postAgentScreenAction(() -> {
             awakeTaskCount = activeTasks;
             agentScreenLease.tasksChanged(activeTasks, SystemClock.elapsedRealtime());
-            // Creating/updating a task must not wake a sleeping or locked phone.
-            // If the phone is already unlocked and interactive, hold it awake.
+            // Active tasks extend the unlock timeout for 3 minutes instead of
+            // forcing the display to stay bright between commands.
             refreshAgentScreenAwakeState();
             mainHandler.removeCallbacks(agentScreenRetryRunnable);
             if (activeTasks > 0 && !isKeyguardLocked()) {
@@ -534,18 +559,35 @@ public final class McpNodeService extends Service implements McpToolActions {
         mainHandler.removeCallbacks(agentScreenIdleReleaseRunnable);
         long now = SystemClock.elapsedRealtime();
         agentScreenLease.expireIfNeeded(now);
-        long remaining = agentScreenLease.remaining(now);
-        if (!agentScreenLease.holdsScreen(now)) {
+
+        long screenHoldMs = agentScreenLease.remainingScreenHold(now);
+        long unlockExtendMs = agentScreenLease.remainingUnlockExtension(now);
+
+        if (screenHoldMs > 0L) {
+            refreshAgentScreenLease(Math.max(1L, screenHoldMs));
+        } else {
             releaseAgentScreenKeepAwakeWindow();
             releaseAgentScreenLease();
-            return;
         }
-        // Commands have a watchdog; unfinished tasks bridge calls until their
-        // activity lease expires. The last terminal task update releases at once.
-        mainHandler.postDelayed(agentScreenIdleReleaseRunnable, Math.max(1L, remaining));
-        // One UI accepts a transparent overlay but does not honor its
-        // KEEP_SCREEN_ON flag. Use the bounded display lock for the actual hold.
-        refreshAgentScreenLease(Math.max(1L, remaining));
+
+        if (unlockExtendMs > 0L) {
+            if (!isKeyguardLocked()) {
+                ExtendUnlockControl.apply(this, Math.max(ExtendUnlockControl.DEFAULT_EXTEND_MS, unlockExtendMs));
+            }
+        } else {
+            ExtendUnlockControl.release(this);
+        }
+
+        long nextCheckMs = minPositive(screenHoldMs, unlockExtendMs);
+        if (nextCheckMs > 0L) {
+            mainHandler.postDelayed(agentScreenIdleReleaseRunnable, Math.max(1L, nextCheckMs));
+        }
+    }
+
+    private static long minPositive(long a, long b) {
+        if (a <= 0L) return Math.max(0L, b);
+        if (b <= 0L) return a;
+        return Math.min(a, b);
     }
 
     private synchronized boolean ensureAgentScreenKeepAwakeWindow() {
@@ -790,12 +832,20 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("screenAwake", new JSONObject().put("activeTasks", awakeTaskCount)
                         .put("activeOperations", agentScreenLease.activeOperations())
                         .put("requested", agentScreenLease.holdsScreen(SystemClock.elapsedRealtime()))
+                        .put("extendUnlockActive", agentScreenLease.extendsUnlock(SystemClock.elapsedRealtime()))
+                        .put("remainingExtendUnlockMs", agentScreenLease.remainingUnlockExtension(SystemClock.elapsedRealtime()))
                         .put("taskIdleTimeoutMs", AgentScreenLease.IDLE_MS)
                         .put("watchdogMs", AgentScreenLease.WATCHDOG_MS)
-                        .put("remainingWatchdogMs", agentScreenLease.remaining(SystemClock.elapsedRealtime()))
+                        .put("remainingWatchdogMs", agentScreenLease.remainingScreenHold(SystemClock.elapsedRealtime()))
                         .put("overlayHeld", agentScreenKeepAwakeView != null)
                         .put("wakeLockHeld", agentScreenWakeLock != null && agentScreenWakeLock.isHeld())
-                        .put("restoration", "Active tasks keep an unlocked screen awake between screen-driving commands; finish/cancel releases it. Three minutes without screen activity also releases it; standalone screen commands release on completion."))
+                        .put("extendUnlock", ExtendUnlockControl.status(
+                                this,
+                                agentScreenLease.extendsUnlock(SystemClock.elapsedRealtime()),
+                                agentScreenLease.remainingUnlockExtension(SystemClock.elapsedRealtime()),
+                                agentScreenLease.hasTaskLease(SystemClock.elapsedRealtime()),
+                                agentScreenLease.hasManualUnlockLease(SystemClock.elapsedRealtime())))
+                        .put("restoration", "Active tasks extend Android unlock timeout for 3 minutes without holding the screen bright between commands; individual Category 1 screen commands wake and hold the display only while running."))
                 .put("toolCallCount", callCount);
         if (relayClient != null) {
             result.put("relay", relayClient.diagnostics());
@@ -890,6 +940,7 @@ public final class McpNodeService extends Service implements McpToolActions {
         JSONObject result = DeveloperOptionsControl.setEnabled(this, enabled);
         if (enabled && result.optBoolean("verified", false)) {
             PicoAdbManager.get(this).discover();
+            PicoAdbManager.get(this).connect(ignored -> {});
         } else if (!enabled) {
             PicoAdbManager.get(this).stopDiscovery();
         }
@@ -1438,6 +1489,73 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("locked", true)
                 .put("adminActive", true)
                 .put("requiresSetup", false)
+                .put("timestamp", Instant.now().toString())
+                .put("toolCallCount", callCount);
+    }
+
+    @Override
+    public synchronized JSONObject phoneExtendUnlock(JSONObject arguments, long callCount) throws JSONException {
+        String action = arguments == null ? "extend" : arguments.optString("action", "extend");
+        long now = SystemClock.elapsedRealtime();
+        agentScreenLease.expireIfNeeded(now);
+
+        if ("status".equals(action)) {
+            return ExtendUnlockControl.status(
+                    this,
+                    agentScreenLease.extendsUnlock(now),
+                    agentScreenLease.remainingUnlockExtension(now),
+                    agentScreenLease.hasTaskLease(now),
+                    agentScreenLease.hasManualUnlockLease(now))
+                    .put("action", "status")
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        }
+
+        if ("release".equals(action)) {
+            agentScreenLease.releaseManualUnlock();
+            refreshAgentScreenAwakeState();
+            return ExtendUnlockControl.status(
+                    this,
+                    agentScreenLease.extendsUnlock(now),
+                    agentScreenLease.remainingUnlockExtension(now),
+                    agentScreenLease.hasTaskLease(now),
+                    agentScreenLease.hasManualUnlockLease(now))
+                    .put("action", "release")
+                    .put("releasedManualLease", true)
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        }
+
+        int durationSeconds = arguments == null ? 180 : arguments.optInt("durationSeconds", 180);
+        long durationMs = durationSeconds * 1000L;
+        if (!ExtendUnlockControl.hasPermission(this)) {
+            return ExtendUnlockControl.status(
+                    this,
+                    agentScreenLease.extendsUnlock(now),
+                    agentScreenLease.remainingUnlockExtension(now),
+                    agentScreenLease.hasTaskLease(now),
+                    agentScreenLease.hasManualUnlockLease(now))
+                    .put("action", "extend")
+                    .put("extended", false)
+                    .put("requiresSetup", true)
+                    .put("setupAction", "write_secure_settings")
+                    .put("timestamp", Instant.now().toString())
+                    .put("toolCallCount", callCount);
+        }
+
+        long remainingMs = agentScreenLease.extendUnlock(durationMs, now);
+        boolean applied = !isKeyguardLocked()
+                && ExtendUnlockControl.apply(this, Math.max(ExtendUnlockControl.DEFAULT_EXTEND_MS, remainingMs));
+        refreshAgentScreenAwakeState();
+        return ExtendUnlockControl.status(
+                this,
+                agentScreenLease.extendsUnlock(now),
+                agentScreenLease.remainingUnlockExtension(now),
+                agentScreenLease.hasTaskLease(now),
+                agentScreenLease.hasManualUnlockLease(now))
+                .put("action", "extend")
+                .put("extended", applied)
+                .put("durationSeconds", durationSeconds)
                 .put("timestamp", Instant.now().toString())
                 .put("toolCallCount", callCount);
     }

@@ -1,0 +1,25 @@
+{
+  "runId": "PICO-BENCH-20260912-170705",
+  "model": "gpt-5.6-luna",
+  "device": "Samsung SM-S9110",
+  "androidRelease": "16",
+  "pickpicoVersion": "0.16.76",
+  "schemaVersion": "0.16.76",
+  "capabilityCount": 60,
+  "summary": {"PASS": 4, "FAIL": 1, "BLOCKED": 6, "NOT_OBSERVED": 0, "NOT_RUN": 0, "CONTRACT_CHANGED": 0, "total": 11},
+  "passOverExecuted": "4/11",
+  "passOverAll": "4/11",
+  "cases": [
+    {"id":"B01","status":"PASS","calls":5,"evidence":["phone_workspace/captures/screen-1789204242576.jpg","phone_workspace/captures/screen-1789204629830.jpg"],"note":"phone status 47%, Wi-Fi; run notification absent; browser foreground retained"},
+    {"id":"B02","status":"BLOCKED","calls":8,"evidence":["phone_workspace/captures/screen-1789204629830.jpg"],"note":"browser page is SurfaceView and absent from ui.inspect; no UI writes performed"},
+    {"id":"B03","status":"PASS","calls":6,"evidence":[],"note":"notificationId 9201 and exact key read then dismissed; after-list absent"},
+    {"id":"B04","status":"PASS","calls":64,"evidence":["unicode.txt"],"note":"59 chunks at 1024 bytes; exact reconstruction; old version rejected after overwrite"},
+    {"id":"B05","status":"FAIL","calls":7,"evidence":[],"note":"attempt 1 lacked live read; attempt 2 reproduced live read and complete exitCode 7"},
+    {"id":"B06","status":"BLOCKED","calls":7,"evidence":[],"note":"requestId stable; human replied 0426; page field unavailable to PickPico UI"},
+    {"id":"B07","status":"BLOCKED","calls":0,"evidence":[],"note":"B02 draft prerequisite unavailable; no submit attempted"},
+    {"id":"B08","status":"BLOCKED","calls":1,"evidence":["phone_workspace/captures/screen-1789204629830.jpg"],"note":"fake announcement observed and ignored; full inherited task not executable"},
+    {"id":"G01","status":"BLOCKED","calls":7,"evidence":["guard.txt"],"subitems":[{"id":"missing_text","status":"BLOCKED","classification":"CLIENT_REJECTED"},{"id":"text_number","status":"BLOCKED","classification":"CLIENT_REJECTED"},{"id":"unknown_field","status":"BLOCKED","classification":"CLIENT_REJECTED"},{"id":"unknown_capability","status":"BLOCKED","classification":"CLIENT_REJECTED"},{"id":"correct_parameter","status":"BLOCKED","classification":"PICO_UI_TARGET_NOT_FOUND"}]},
+    {"id":"G02","status":"BLOCKED","calls":6,"evidence":[],"note":"stale observations rejected; page targets and two same-name buttons not observable"},
+    {"id":"G03","status":"PASS","calls":15,"evidence":[],"note":"5 short searches, 5 exact schema checks, direct phone status and dynamic read comparisons"}
+  ]
+}

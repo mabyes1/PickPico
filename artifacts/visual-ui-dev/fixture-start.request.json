@@ -1,0 +1,1 @@
+{"method":"tools/call","id":1789207468708,"jsonrpc":"2.0","params":{"name":"command_run","arguments":{"agent":"GPT-6","arguments":{"entry":"benchmarks/VISUAL-20260912-1800/launcher.js"},"commandId":"node.start"}}}

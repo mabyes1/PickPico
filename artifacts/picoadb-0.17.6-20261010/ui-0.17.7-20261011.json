@@ -1,0 +1,50 @@
+{
+  "verifiedAt": "2026-10-11T03:24:02Z",
+  "pairing": {
+    "available": true,
+    "packageName": "com.mcpocket.poc",
+    "windowTitle": "PickPico",
+    "observationId": "ui-abe55160-b68c-4bf1-b27f-2b3ea4c02fa0",
+    "nodes": [
+      {
+        "path": "w2725/0/0/0/0/1/1/0/0/1/1",
+        "text": "PAIRING · SAVED"
+      },
+      {
+        "path": "w2725/0/0/0/0/1/1/0/0/2/1",
+        "text": "Open Wireless Debugging, enable it, then choose “Pair device with pairing code”. Keep that six-digit dialog open. Split screen is the most reliable setup on Samsung."
+      },
+      {
+        "path": "w2725/0/0/0/0/1/1/0/0/3/2",
+        "text": "6-digit pairing code",
+        "actions": [
+          "click",
+          "long_click",
+          "type"
+        ]
+      }
+    ],
+    "count": 3,
+    "matchedCount": 3,
+    "truncated": false,
+    "agent": "GPT-6",
+    "isError": false
+  },
+  "connection": {
+    "available": true,
+    "packageName": "com.mcpocket.poc",
+    "windowTitle": "PickPico",
+    "observationId": "ui-07684952-a5df-464e-899f-8aa26e816a9e",
+    "nodes": [
+      {
+        "path": "w2725/0/0/0/0/1/1/0/0/1/2",
+        "text": "CONNECTION · CONNECTED"
+      }
+    ],
+    "count": 1,
+    "matchedCount": 1,
+    "truncated": false,
+    "agent": "GPT-6",
+    "isError": false
+  }
+}

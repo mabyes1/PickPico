@@ -152,6 +152,13 @@ interface McpToolActions {
                 .put("toolCallCount", callCount);
     }
 
+    default JSONObject phoneExtendUnlock(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "phone.extend_unlock")
+                .put("toolCallCount", callCount);
+    }
+
     default JSONObject cameraCapture(JSONObject arguments, long callCount) throws JSONException {
         return new JSONObject()
                 .put("supported", false)

@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207309698,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"executionId\":\"cmd-e5c80fed-1a48-4be2-ad32-544c2799760b\",\"commandId\":\"workspace.write\",\"status\":\"completed\",\"isError\":false,\"startedAt\":\"2026-09-12T10:01:49.150027Z\",\"completedAt\":\"2026-09-12T10:01:49.157873Z\",\"result\":{\"path\":\"benchmarks\\/VISUAL-20260912-1800\\/launcher.js\",\"bytesWritten\":288,\"sizeBytes\":288,\"append\":false,\"toolCallCount\":293,\"agent\":\"GPT-6\",\"isError\":false}}"
+      }
+    ],
+    "structuredContent": {
+      "executionId": "cmd-e5c80fed-1a48-4be2-ad32-544c2799760b",
+      "commandId": "workspace.write",
+      "status": "completed",
+      "isError": false,
+      "startedAt": "2026-09-12T10:01:49.150027Z",
+      "completedAt": "2026-09-12T10:01:49.157873Z",
+      "result": {
+        "path": "benchmarks/VISUAL-20260912-1800/launcher.js",
+        "bytesWritten": 288,
+        "sizeBytes": 288,
+        "append": false,
+        "toolCallCount": 293,
+        "agent": "GPT-6",
+        "isError": false
+      }
+    },
+    "isError": false
+  }
+}

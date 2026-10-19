@@ -1,0 +1,19 @@
+{
+  "installedVersion": "0.17.9",
+  "previousVersion": "0.17.7",
+  "pairingPreserved": true,
+  "originalPairingAt": "2026-10-08T04:34:14.676352Z",
+  "renderedLanguage": "Traditional Chinese (follow system)",
+  "manualRoundTrip": "Deferred: another task operating phone",
+  "ownTaskStatus": "cancelled after read-only acceptance",
+  "screenAwake": {
+    "activeTasks": 1,
+    "activeOperations": 0,
+    "requested": false,
+    "watchdogMs": 360000,
+    "remainingWatchdogMs": 0,
+    "overlayHeld": false,
+    "wakeLockHeld": false,
+    "restoration": "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"
+  }
+}

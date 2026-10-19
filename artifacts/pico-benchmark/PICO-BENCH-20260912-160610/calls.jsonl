@@ -1,0 +1,41 @@
+{"seq":1,"phase":"preflight","tool":"pickpico.server_info","arguments":{},"callerAgent":"not-forwarded","outcome":"ERROR","error":"MCP internal error"}
+{"seq":2,"phase":"preflight","tool":"pickpico.policy_status","arguments":{},"callerAgent":"not-forwarded","outcome":"ERROR","error":"MCP internal error"}
+{"seq":3,"phase":"preflight","tool":"pickpico.capability_search","arguments":{"query":"","availableOnly":false,"includeSchema":true,"limit":100},"outcome":"CLIENT_REJECTED","error":"connector limit maximum is 20"}
+{"seq":4,"phase":"preflight-retry","tool":"pickpico.server_info","arguments":{},"outcome":"ERROR","error":"MCP internal error"}
+{"seq":5,"phase":"preflight","tool":"pickpico.policy_status","arguments":{},"outcome":"ERROR","error":"MCP internal error"}
+{"seq":6,"phase":"preflight","tool":"pickpico.capability_search","arguments":{"query":"","availableOnly":false,"includeSchema":true,"limit":20},"outcome":"ERROR","error":"MCP internal error"}
+{"seq":7,"phase":"preflight","tool":"pickpico.command_status","arguments":{},"outcome":"PASS","result":"recent=0,count=0"}
+{"seq":8,"phase":"preflight","tool":"pickpico.task_runtime_info","arguments":{},"outcome":"PASS","result":"taskLifecycle=true,activeTasks=0"}
+{"seq":9,"phase":"preflight","tool":"pickpico.capability_list","arguments":{},"outcome":"PASS","result":"count=58,schemaVersion=0.16.75"}
+{"seq":10,"phase":"preflight","tool":"pickpico.task_status","arguments":{},"outcome":"PASS","result":"tasks=0"}
+{"seq":11,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"node.info"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":12,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"phone.status"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":13,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"policy.status"},"outcome":"PASS","result":"schema available"}
+{"seq":14,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"ui.inspect"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":15,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"app.list"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":16,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"workspace.info"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":17,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"node.start"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":18,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"workspace.write"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":19,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"process.exec"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":20,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"human.help"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":21,"phase":"preflight","tool":"pickpico.capability_status","arguments":{"id":"notification.list"},"outcome":"PASS","result":"schema available, requiredCallerArguments=[agent]"}
+{"seq":22,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":23,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"phone.status","arguments":{}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":24,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"policy.status","arguments":{}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":25,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"workspace.info","arguments":{}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":26,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"app.list","arguments":{"query":"PickPico","limit":50}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":27,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"ui.inspect","arguments":{"compact":false,"maxNodes":400}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":28,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"notification.list","arguments":{"limit":50,"includeOwn":false}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":29,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{"agent":"unknown (model not exposed)"}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required; nested capability argument did not satisfy caller argument"}
+{"seq":30,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"agent":"unknown (model not exposed)"},"outcome":"PICO_NOT_EXECUTED","error":"agent is required; exposed schema did not forward top-level extra field"}
+{"seq":31,"phase":"preflight","tool":"pickpico.task_create","arguments":{"agent":"unknown (model not exposed)","objective":"PICO benchmark run PICO-BENCH-20260912-160610"},"outcome":"PASS","result":"task created task-70977958-ddd8-4985-9c1f-265db7a4948e"}
+{"seq":32,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":33,"phase":"preflight","tool":"pickpico.server_info","arguments":{},"callerAgent":"unknown (model not exposed)","outcome":"PASS","result":"SM-S9110,Android16,version=0.16.75,relay=connected"}
+{"seq":34,"phase":"preflight","tool":"pickpico.policy_status","arguments":{},"callerAgent":"unknown (model not exposed)","outcome":"PASS","result":"hyperMode=true,approvalMode=yolo"}
+{"seq":35,"phase":"preflight","tool":"pickpico.capability_search","arguments":{"query":"手機電量","availableOnly":false,"includeSchema":true,"limit":20},"callerAgent":"unknown (model not exposed)","outcome":"PASS","result":"phone.status, schemaVersion=0.16.75"}
+{"seq":36,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"caller":{"agent":"unknown (model not exposed)"}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":37,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"callerArguments":{"agent":"unknown (model not exposed)"}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":38,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"context":{"agent":"unknown (model not exposed)"}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":39,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"metadata":{"agent":"unknown (model not exposed)"}},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}
+{"seq":40,"phase":"preflight","tool":"pickpico.task_update","arguments":{"taskId":"task-70977958-ddd8-4985-9c1f-265db7a4948e","status":"running"},"outcome":"PASS"}
+{"seq":41,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"ui.inspect","arguments":{"compact":false,"maxNodes":120},"agent":"unknown (model not exposed)"},"outcome":"PICO_NOT_EXECUTED","error":"agent is required"}

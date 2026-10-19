@@ -1,0 +1,41 @@
+{
+  "query": "wireless debugging",
+  "matches": [
+    {
+      "id": "picoadb.status",
+      "description": "Wireless Debugging and privileged access state; disconnected: guide.get(picoadb.connect) uses PICO UI to enable Wi-Fi ADB",
+      "category": "system",
+      "risk": "read_only",
+      "sideEffect": false,
+      "tool": "picoadb_status",
+      "group": "core",
+      "state": "available",
+      "available": true
+    }
+  ],
+  "count": 1,
+  "totalCandidates": 1,
+  "fallbackRecommended": false,
+  "schemaVersion": "0.17.10",
+  "guides": [
+    {
+      "id": "picoadb.connect",
+      "revision": 3,
+      "title": "透過 PICO 開啟 Wi-Fi ADB 並連線",
+      "summary": "用 PICO 畫面工具進入開發人員選項、開啟無線偵錯，再沿用已儲存的配對重連。",
+      "readWith": {
+        "tool": "command_run",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {
+          "commandId": "guide.get",
+          "arguments": {
+            "guideId": "picoadb.connect"
+          }
+        }
+      }
+    }
+  ],
+  "discoveryHint": "Prefer direct tools. capability_status(id) returns the exact schema; reuse until schemaVersion changes."
+}

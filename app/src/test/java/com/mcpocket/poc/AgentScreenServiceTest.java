@@ -52,30 +52,60 @@ public class AgentScreenServiceTest {
         assertNull(ReflectionHelpers.getField(service, "agentScreenWakeLock"));
     }
 
-    @Test public void taskKeepsDisplayAcrossCommandsAndCompletionReleases() {
+    @Test public void taskExtendsUnlockWithoutHoldingDisplayBetweenCommandsAndRestoresOnCompletion() throws Exception {
         McpNodeService service = Robolectric.buildService(McpNodeService.class).get();
+        shadowOf(service).grantPermissions(ExtendUnlockControl.PERMISSION);
+        android.provider.Settings.Secure.putLong(
+                service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, 5_000L);
+        android.provider.Settings.Secure.putInt(
+                service.getContentResolver(), ExtendUnlockControl.KEY_POWER_BUTTON_INSTANTLY_LOCKS, 1);
 
         service.onAgentTasksChanged(1);
         shadowOf(Looper.getMainLooper()).idle();
 
         AgentScreenLease lease = ReflectionHelpers.getField(service, "agentScreenLease");
         assertEquals(0, lease.activeOperations());
-        assertNull(ReflectionHelpers.getField(service, "agentScreenKeepAwakeView"));
-        assertTrue(lease.holdsScreen(android.os.SystemClock.elapsedRealtime()));
-        PowerManager.WakeLock held = ReflectionHelpers.getField(service, "agentScreenWakeLock");
-        assertNotNull(held);
-        assertTrue(held.isHeld());
+        assertFalse("Task alone must not hold screen bright", lease.holdsScreen(android.os.SystemClock.elapsedRealtime()));
+        assertTrue("Task must extend unlock for 3 minutes", lease.extendsUnlock(android.os.SystemClock.elapsedRealtime()));
+        PowerManager.WakeLock idleLock = ReflectionHelpers.getField(service, "agentScreenWakeLock");
+        assertTrue(idleLock == null || !idleLock.isHeld());
+
+        // Lock-after-timeout is extended to 180_000ms and instant power-button lock disabled
+        assertEquals(
+                180_000L,
+                android.provider.Settings.Secure.getLong(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, -1L));
+        assertEquals(
+                0,
+                android.provider.Settings.Secure.getInt(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_POWER_BUTTON_INSTANTLY_LOCKS, -1));
+
+        // While a Tier 1 command runs, the display wake lock is held; when it finishes, wake lock releases
+        // while extend-unlock remains active.
         service.onAgentCommandStarted("ui.inspect");
         shadowOf(Looper.getMainLooper()).idle();
+        PowerManager.WakeLock activeLock = ReflectionHelpers.getField(service, "agentScreenWakeLock");
+        assertNotNull(activeLock);
+        assertTrue(activeLock.isHeld());
+
         service.onAgentCommandFinished("ui.inspect");
         shadowOf(Looper.getMainLooper()).idle();
-        assertTrue(lease.holdsScreen(android.os.SystemClock.elapsedRealtime()));
+        PowerManager.WakeLock afterCommandLock = ReflectionHelpers.getField(service, "agentScreenWakeLock");
+        assertTrue(afterCommandLock == null || !afterCommandLock.isHeld());
+        assertTrue(lease.extendsUnlock(android.os.SystemClock.elapsedRealtime()));
+
+        // Completing the task restores the owner's exact original lock settings
         service.onAgentTasksChanged(0);
         shadowOf(Looper.getMainLooper()).idle();
-        assertFalse(lease.holdsScreen(android.os.SystemClock.elapsedRealtime()));
-        assertNull(ReflectionHelpers.getField(service, "agentScreenKeepAwakeView"));
-        PowerManager.WakeLock released = ReflectionHelpers.getField(service, "agentScreenWakeLock");
-        assertTrue(released == null || !released.isHeld());
+        assertFalse(lease.extendsUnlock(android.os.SystemClock.elapsedRealtime()));
+        assertEquals(
+                5_000L,
+                android.provider.Settings.Secure.getLong(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, -1L));
+        assertEquals(
+                1,
+                android.provider.Settings.Secure.getInt(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_POWER_BUTTON_INSTANTLY_LOCKS, -1));
     }
 
     @Test public void hungOperationIsReleasedByWatchdog() {
@@ -95,65 +125,93 @@ public class AgentScreenServiceTest {
         assertNull(ReflectionHelpers.getField(service, "agentScreenKeepAwakeView"));
     }
 
-    @Test public void abandonedTaskReleasesDisplayWithoutChangingSystemTimeout() {
+    @Test public void abandonedTaskRestoresExtendUnlockSettingsAfterThreeMinutes() {
         McpNodeService service = Robolectric.buildService(McpNodeService.class).get();
-        android.provider.Settings.System.putInt(service.getContentResolver(), "screen_off_timeout", 15000);
+        shadowOf(service).grantPermissions(ExtendUnlockControl.PERMISSION);
+        android.provider.Settings.Secure.putLong(
+                service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, 10_000L);
+        android.provider.Settings.Secure.putInt(
+                service.getContentResolver(), ExtendUnlockControl.KEY_POWER_BUTTON_INSTANTLY_LOCKS, 1);
+
         service.onAgentTasksChanged(1);
         shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(
+                180_000L,
+                android.provider.Settings.Secure.getLong(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, -1L));
+
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(AgentScreenLease.IDLE_MS));
         AgentScreenLease lease = ReflectionHelpers.getField(service, "agentScreenLease");
-        assertFalse(lease.holdsScreen(android.os.SystemClock.elapsedRealtime()));
-        assertNull(ReflectionHelpers.getField(service, "agentScreenKeepAwakeView"));
-        assertEquals(15000, android.provider.Settings.System.getInt(service.getContentResolver(), "screen_off_timeout", 0));
+        assertFalse(lease.extendsUnlock(android.os.SystemClock.elapsedRealtime()));
+        assertEquals(
+                10_000L,
+                android.provider.Settings.Secure.getLong(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, -1L));
+        assertEquals(
+                1,
+                android.provider.Settings.Secure.getInt(
+                        service.getContentResolver(), ExtendUnlockControl.KEY_POWER_BUTTON_INSTANTLY_LOCKS, -1));
     }
 
-    @Test public void taskActivityRenewsTheSameLockWithoutASleepGap() {
+    @Test public void phoneExtendUnlockDynamicToolExtendsQueriesAndReleases() throws Exception {
         McpNodeService service = Robolectric.buildService(McpNodeService.class).get();
-        service.onAgentTasksChanged(1);
+        shadowOf(service).grantPermissions(ExtendUnlockControl.PERMISSION);
+        android.provider.Settings.Secure.putLong(
+                service.getContentResolver(), ExtendUnlockControl.KEY_LOCK_AFTER_TIMEOUT, 5_000L);
+        android.provider.Settings.Secure.putInt(
+                service.getContentResolver(), ExtendUnlockControl.KEY_POWER_BUTTON_INSTANTLY_LOCKS, 1);
+
+        org.json.JSONObject extended = service.phoneExtendUnlock(
+                new org.json.JSONObject().put("action", "extend").put("durationSeconds", 180), 1L);
         shadowOf(Looper.getMainLooper()).idle();
-        PowerManager.WakeLock lock = ReflectionHelpers.getField(service, "agentScreenWakeLock");
-        assertNotNull(lock);
-        assertTrue(lock.isHeld());
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(170));
-        service.onAgentCommandStarted("ui.inspect");
-        service.onAgentCommandFinished("ui.inspect");
+        assertTrue(extended.getBoolean("extended"));
+        assertTrue(extended.getBoolean("active"));
+        assertTrue(extended.getBoolean("manualLeaseActive"));
+        assertEquals(180_000L, extended.getLong("lockAfterTimeoutMs"));
+
+        org.json.JSONObject status = service.phoneExtendUnlock(
+                new org.json.JSONObject().put("action", "status"), 2L);
+        assertTrue(status.getBoolean("active"));
+
+        org.json.JSONObject released = service.phoneExtendUnlock(
+                new org.json.JSONObject().put("action", "release"), 3L);
         shadowOf(Looper.getMainLooper()).idle();
-        assertSame(lock, ReflectionHelpers.getField(service, "agentScreenWakeLock"));
-        assertTrue(lock.isHeld());
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(20));
-        assertTrue("Renewal must outlive the original lease", lock.isHeld());
-        service.onAgentTasksChanged(0);
-        shadowOf(Looper.getMainLooper()).idle();
-        assertFalse(lock.isHeld());
+        assertFalse(released.getBoolean("active"));
+        assertEquals(5_000L, released.getLong("lockAfterTimeoutMs"));
+        assertTrue(released.getBoolean("powerButtonInstantlyLocks"));
     }
 
-    @Test public void lockedScreenDoesNotHoldWakeLockUntilUserUnlocks() throws Exception {
+    @Test public void tierOneWakesUnlockedDarkScreenWhileTierTwoStaysDarkAndBothPendWhenLocked() throws Exception {
         McpNodeService service = Robolectric.buildService(McpNodeService.class).create().get();
         android.app.KeyguardManager keyguard =
                 (android.app.KeyguardManager) service.getSystemService(android.content.Context.KEYGUARD_SERVICE);
+        PowerManager power =
+                (PowerManager) service.getSystemService(android.content.Context.POWER_SERVICE);
         shadowOf(keyguard).setKeyguardLocked(true);
 
-        service.onAgentTasksChanged(1);
-        shadowOf(Looper.getMainLooper()).idle();
-        PowerManager.WakeLock lockedHold = ReflectionHelpers.getField(service, "agentScreenWakeLock");
-        assertTrue(lockedHold == null || !lockedHold.isHeld());
-
-        // If the phone remains locked past the wait timeout, awaitUnlockIfRequired returns UNLOCK_REQUIRED.
-        service.unlockWaitTimeoutMs = 400L;
-        org.json.JSONObject blocked = service.awaitUnlockIfRequired(
+        // When locked, both Tier 1 (ui.inspect) and Tier 2 (picoadb.set_enabled(true)) pend and return UNLOCK_REQUIRED on timeout.
+        service.unlockWaitTimeoutMs = 300L;
+        org.json.JSONObject blockedTier1 = service.awaitUnlockIfRequired(
                 "ui.inspect", "Read UI", new org.json.JSONObject(), 1L);
-        assertNotNull(blocked);
-        assertEquals("blocked", blocked.getString("status"));
-        assertEquals("UNLOCK_REQUIRED", blocked.getJSONObject("error").getString("code"));
+        assertNotNull(blockedTier1);
+        assertEquals("INTERACTIVE_UNLOCKED", blockedTier1.getString("tier"));
+        assertEquals("UNLOCK_REQUIRED", blockedTier1.getJSONObject("error").getString("code"));
 
-        // Once the owner unlocks, awaitUnlockIfRequired returns null and the wake lock is acquired.
+        org.json.JSONObject blockedTier2 = service.awaitUnlockIfRequired(
+                "picoadb.set_enabled", "Enable wireless debugging", new org.json.JSONObject().put("enabled", true), 2L);
+        assertNotNull(blockedTier2);
+        assertEquals("UNLOCKED_ONLY", blockedTier2.getString("tier"));
+        assertEquals("UNLOCK_REQUIRED", blockedTier2.getJSONObject("error").getString("code"));
+
+        // When unlocked with the screen dark (interactive == false):
         shadowOf(keyguard).setKeyguardLocked(false);
-        org.json.JSONObject allowed = service.awaitUnlockIfRequired(
-                "ui.inspect", "Read UI", new org.json.JSONObject(), 2L);
+        shadowOf(power).setIsInteractive(false);
+
+        // Tier 2 (picoadb.set_enabled(true)) succeeds immediately WITHOUT waking the display.
+        org.json.JSONObject allowedTier2 = service.awaitUnlockIfRequired(
+                "picoadb.set_enabled", "Enable wireless debugging", new org.json.JSONObject().put("enabled", true), 3L);
         shadowOf(Looper.getMainLooper()).idle();
-        assertNull(allowed);
-        PowerManager.WakeLock unlockedHold = ReflectionHelpers.getField(service, "agentScreenWakeLock");
-        assertNotNull(unlockedHold);
-        assertTrue(unlockedHold.isHeld());
+        assertNull(allowedTier2);
+        assertFalse("Tier 2 must not wake a dark unlocked screen", power.isInteractive());
     }
 }

@@ -1,0 +1,11 @@
+{
+  "permissionGranted": true,
+  "developerOptionsEnabled": true,
+  "wirelessDebuggingEnabled": true,
+  "usbDebuggingEnabled": false,
+  "grantCommand": "adb shell pm grant com.mcpocket.poc android.permission.WRITE_SECURE_SETTINGS",
+  "success": true,
+  "toolCallCount": 28,
+  "agent": "GPT-6",
+  "isError": false
+}
