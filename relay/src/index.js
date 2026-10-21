@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
+import { deliveryAckTimeoutMs, pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
 import { offlineResult } from "./offline-result.js";
 import { oauthFetch } from "./oauth.js";
 import { GRANT_HEADER, grantActive, handleNodeOAuth, cleanupOAuth } from "./oauth-node.js";
@@ -8,8 +8,13 @@ import { GRANT_HEADER, grantActive, handleNodeOAuth, cleanupOAuth } from "./oaut
 // can legitimately exceed one 360-second lease. This is only a transport
 // safety net; the product-level timeout is enforced by PickPico itself.
 const REQUEST_TIMEOUT_MS = 30 * 60_000;
-const HEARTBEAT_STALE_MS = 35_000;
+// Past FRESH the phone is merely late (Doze can freeze its heartbeat timer for ~1 min while the
+// socket still receives). Only past STALE do we treat the node as offline. Delivery ACK is the
+// end-to-end proof, so a late node gets a longer ACK window instead of an immediate refusal.
+const HEARTBEAT_FRESH_MS = 35_000;
+const HEARTBEAT_STALE_MS = 120_000;
 const DELIVERY_ACK_TIMEOUT_MS = 5_000;
+const LATE_NODE_DELIVERY_ACK_TIMEOUT_MS = 20_000;
 const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
 const relay = {
@@ -262,6 +267,12 @@ export class NodeRelay extends DurableObject {
       return json(offlineResult(rpc, sockets.length, sockets.map(s => this.socketHeartbeatAgeMs(s))), 200, corsHeaders());
     }
 
+    const ackTimeoutMs = deliveryAckTimeoutMs(
+      this.socketHeartbeatAgeMs(socket),
+      HEARTBEAT_FRESH_MS,
+      DELIVERY_ACK_TIMEOUT_MS,
+      LATE_NODE_DELIVERY_ACK_TIMEOUT_MS,
+    );
     const body = await request.text();
     const requestId = crypto.randomUUID();
     const headers = {};
@@ -303,7 +314,7 @@ export class NodeRelay extends DurableObject {
           socket.close(1012, "PickPico request delivery ACK timed out");
         } catch (_) {
         }
-      }, DELIVERY_ACK_TIMEOUT_MS);
+      }, ackTimeoutMs);
       this.pending.set(requestId, { resolve, timeout, ackTimer, acked: false, socket });
     });
 
