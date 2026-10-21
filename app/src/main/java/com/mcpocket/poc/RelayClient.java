@@ -90,6 +90,7 @@ final class RelayClient {
     private long disconnectCount;
     private long heartbeatSentCount;
     private long heartbeatPongCount;
+    private final HeartbeatGapTracker heartbeatGaps = new HeartbeatGapTracker();
     private volatile String pendingHeartbeatNonce;
     private volatile ScheduledFuture<?> heartbeatFuture;
     private volatile ScheduledFuture<?> heartbeatTimeoutFuture;
@@ -187,6 +188,7 @@ final class RelayClient {
                 .put("disconnectCount", disconnectCount)
                 .put("heartbeatSentCount", heartbeatSentCount)
                 .put("heartbeatPongCount", heartbeatPongCount)
+                .put("heartbeatGaps", heartbeatGaps.toJson())
                 .put("reconnectBackoffAttempt", reconnectAttempt)
                 .put("currentNetworkType", observedNetworkType)
                 .put("socketPresent", webSocket != null);
@@ -265,6 +267,7 @@ final class RelayClient {
     }
 
     private synchronized void sendHeartbeat(WebSocket socket) {
+        heartbeatGaps.tick(SystemClock.elapsedRealtime());
         if (closed || socket != webSocket || pendingHeartbeatNonce != null) {
             return;
         }
@@ -301,6 +304,7 @@ final class RelayClient {
 
     private void startHeartbeatLoop(WebSocket socket) {
         clearHeartbeatState();
+        heartbeatGaps.resetBaseline();
         sendHeartbeat(socket);
         heartbeatFuture = heartbeatExecutor.scheduleWithFixedDelay(
                 () -> sendHeartbeat(socket),

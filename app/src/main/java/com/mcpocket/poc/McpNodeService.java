@@ -430,12 +430,15 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
                         | Intent.FLAG_ACTIVITY_NO_HISTORY);
-        postUnlockNotification(commandId, description, unlock);
+        // A trusted device (Smart Lock) only has the lock screen cover left; dismissing it
+        // needs no owner input, so skip the notification and the attention alert.
+        boolean trusted = KeyguardTrust.current(this) == KeyguardTrust.State.TRUSTED_DISMISSIBLE;
+        if (!trusted) postUnlockNotification(commandId, description, unlock);
         try {
             startActivity(unlock);
         } catch (RuntimeException ignored) {
         }
-        AgentAttention.alert(this);
+        if (!trusted) AgentAttention.alert(this);
     }
 
     private void postUnlockNotification(String commandId, String description, Intent unlockIntent) {
@@ -1614,6 +1617,10 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .put("observationMs", observationMs)
                 .put("keyguardLocked", keyguardLocked)
                 .put("unlocked", !keyguardLocked)
+                // Lock screen still covering a trusted device: any screen command dismisses it, no owner input needed.
+                .put("deviceLocked", keyguard != null && keyguard.isDeviceLocked())
+                .put("trustedDismissible", keyguard != null && KeyguardTrust.classify(keyguardLocked, keyguard.isDeviceLocked())
+                        == KeyguardTrust.State.TRUSTED_DISMISSIBLE)
                 .put("keepsScreenAwake", false)
                 .put("backgroundKeepAlive", false)
                 .put("timestamp", Instant.now().toString())

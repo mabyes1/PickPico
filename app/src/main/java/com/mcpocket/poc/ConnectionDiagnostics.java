@@ -34,7 +34,7 @@ final class ConnectionDiagnostics {
                     .put("powerSaveMode", p.isPowerSaveMode())
                     .put("ignoringBatteryOptimizations", p.isIgnoringBatteryOptimizations(context.getPackageName()));
             KeyguardManager k = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
-            if (k != null) out.put("keyguardLocked", k.isKeyguardLocked());
+            if (k != null) out.put("keyguardLocked", k.isKeyguardLocked()).put("deviceLocked", k.isDeviceLocked());
             ConnectivityManager c = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             if (c != null) {
                 out.put("restrictBackgroundStatus", c.getRestrictBackgroundStatus());
