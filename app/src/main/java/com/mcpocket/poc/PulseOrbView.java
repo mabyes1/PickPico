@@ -192,100 +192,165 @@ final class PulseOrbView extends View {
         if (animate) postInvalidateDelayed(mode.equals(PicoOrbState.RUNNING) || mode.equals(PicoOrbState.HUMAN_HELP) ? 33L : 50L);
     }
 
-    // Lantern: a warm paper lantern with a candle inside and a small face that reacts to the
+    // Lantern: a paper lantern lit from inside, with a small printed face that reacts to the
     // agent state. Pure Canvas, so it runs on every SDK. It keeps its own warm palette and
     // only leans toward the semantic colour when something needs attention.
-    private static final int LANTERN_CLAY = Color.rgb(214, 122, 88);
-    private static final int LANTERN_CREAM = Color.rgb(252, 238, 222);
-    private static final int LANTERN_DEEP = Color.rgb(150, 74, 54);
-    private static final int LANTERN_INK = Color.rgb(74, 38, 30);
-    private static final int LANTERN_GLOW = Color.rgb(255, 210, 140);
-    private static final int LANTERN_BLUSH = Color.rgb(240, 140, 130);
+    private static final int LANTERN_CORE = Color.rgb(255, 238, 196);
+    private static final int LANTERN_AMBER = Color.rgb(255, 178, 88);
+    private static final int LANTERN_ORANGE = Color.rgb(240, 112, 54);
+    private static final int LANTERN_RIM = Color.rgb(168, 56, 36);
+    private static final int LANTERN_RIB = Color.rgb(124, 46, 28);
+    private static final int LANTERN_LACQUER = Color.rgb(58, 34, 30);
+    private static final int LANTERN_GOLD = Color.rgb(236, 184, 96);
+    private static final int LANTERN_TASSEL = Color.rgb(200, 66, 46);
+    private static final int LANTERN_INK = Color.rgb(74, 35, 24);
+    private static final int LANTERN_BLUSH = Color.rgb(255, 130, 112);
 
     private void drawLantern(Canvas canvas, float t, int accent) {
         float density = getResources().getDisplayMetrics().density;
         float cx = getWidth() / 2f, cy = getHeight() / 2f;
         boolean running = mode.equals(PicoOrbState.RUNNING);
-        boolean alerting = mode.equals(PicoOrbState.BLOCKED) || mode.equals(PicoOrbState.CONNECTION_ATTENTION)
-                || mode.equals(PicoOrbState.HUMAN_HELP);
+        // Only trouble tints the paper; help and progress are told by the face and the rings.
+        boolean troubled = mode.equals(PicoOrbState.BLOCKED) || mode.equals(PicoOrbState.CONNECTION_ATTENTION);
         float breath = (float) Math.sin(t * (running ? 2.4f : .9f));
-        float r = Math.min(getWidth() * .32f, getHeight() * .35f) * (1 + .015f * breath);
-        int clay = alerting ? blend(LANTERN_CLAY, accent, .45f) : LANTERN_CLAY;
-        int deep = blend(LANTERN_DEEP, clay, .25f);
+        float r = Math.min(getWidth(), getHeight()) * .3f * (1 + .012f * breath);
+        float rx = r * 1.04f, ry = r * .94f;
+        float tint = troubled ? .25f : 0f;
+        int amber = blend(LANTERN_AMBER, accent, tint);
+        int orange = blend(LANTERN_ORANGE, accent, tint);
+        int rim = blend(LANTERN_RIM, accent, tint * .6f);
+        float flame = .5f + .5f * (float) Math.sin(t * (running ? 3.1f : 1.2f));
 
+        // Light spilling onto the page.
         paint.setStyle(Paint.Style.FILL);
-        paint.setShader(new RadialGradient(cx, cy, r * 1.55f,
-                new int[]{alpha(LANTERN_GLOW, running ? 72 : 46), alpha(clay, 18), Color.TRANSPARENT},
-                new float[]{0f, .62f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, r * 1.55f, paint);
-
-        // Caps sit behind the paper so the body overlaps them like a real lantern.
+        paint.setShader(new RadialGradient(cx, cy + ry * .08f, r * 1.85f,
+                new int[]{alpha(amber, Math.round(96 + 50 * flame)), alpha(orange, 40), Color.TRANSPARENT},
+                new float[]{0f, .55f, 1f}, Shader.TileMode.CLAMP));
+        canvas.drawCircle(cx, cy, r * 1.85f, paint);
         paint.setShader(null);
-        paint.setColor(deep);
-        float capW = r * .2f, capH = r * .1f;
-        arc.set(cx - capW, cy - r - capH, cx + capW, cy - r + capH * 1.2f);
-        canvas.drawRoundRect(arc, capH * .5f, capH * .5f, paint);
-        arc.set(cx - capW * .8f, cy + r - capH * 1.2f, cx + capW * .8f, cy + r + capH);
-        canvas.drawRoundRect(arc, capH * .5f, capH * .5f, paint);
 
-        // Paper body, lit from the upper left and deepening toward the rim.
-        paint.setShader(new RadialGradient(cx - r * .32f, cy - r * .38f, r * 1.55f,
-                new int[]{LANTERN_CREAM, blend(clay, LANTERN_CREAM, .35f), clay, deep},
-                new float[]{0f, .28f, .66f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, r, paint);
+        // Hanging cord.
+        float capTop = cy - ry - ry * .11f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, density * 1.1f));
+        paint.setColor(alpha(LANTERN_LACQUER, 230));
+        canvas.drawLine(cx, capTop - r * .34f, cx, capTop, paint);
+
+        // Tassel, swaying gently below the lantern.
+        float tasselTop = cy + ry + ry * .09f;
+        int swing = canvas.save();
+        canvas.rotate((float) Math.sin(t * 1.3f) * (running ? 9f : 5f), cx, tasselTop);
+        canvas.drawLine(cx, tasselTop, cx, tasselTop + r * .1f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(LANTERN_GOLD);
+        canvas.drawCircle(cx, tasselTop + r * .12f, r * .035f, paint);
+        float tw = r * .07f, tTop = tasselTop + r * .14f, tBottom = tasselTop + r * .4f;
+        wave.reset();
+        wave.moveTo(cx - tw * .45f, tTop);
+        wave.lineTo(cx + tw * .45f, tTop);
+        wave.quadTo(cx + tw * 1.1f, tBottom - r * .06f, cx + tw, tBottom);
+        wave.lineTo(cx - tw, tBottom);
+        wave.quadTo(cx - tw * 1.1f, tBottom - r * .06f, cx - tw * .45f, tTop);
+        wave.close();
+        paint.setColor(LANTERN_TASSEL);
+        canvas.drawPath(wave, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, density * .6f));
+        paint.setColor(alpha(LANTERN_RIB, 150));
+        for (int i = -1; i <= 1; i++) {
+            canvas.drawLine(cx + i * tw * .45f, tTop + r * .04f, cx + i * tw * .6f, tBottom - r * .01f, paint);
+        }
+        canvas.restoreToCount(swing);
+
+        // Paper body: brightest at the candle, deepening toward the rim.
+        arc.set(cx - rx, cy - ry, cx + rx, cy + ry);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(new RadialGradient(cx, cy + ry * .12f, rx * 1.02f,
+                new int[]{blend(LANTERN_CORE, amber, .2f * (1f - flame)), amber, orange, rim},
+                new float[]{0f, .34f, .76f, 1f}, Shader.TileMode.CLAMP));
+        canvas.drawOval(arc, paint);
 
         int saved = canvas.save();
         wave.reset();
-        wave.addCircle(cx, cy, r, Path.Direction.CW);
+        wave.addOval(arc, Path.Direction.CW);
         canvas.clipPath(wave);
-        float core = .5f + .5f * (float) Math.sin(t * (running ? 3.1f : 1.2f));
-        paint.setShader(new RadialGradient(cx, cy + r * .2f, r * .85f,
-                new int[]{alpha(LANTERN_GLOW, Math.round(60 + 80 * core)), alpha(LANTERN_GLOW, 0)},
-                new float[]{0f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, r, paint);
-
-        // Ribs turn slowly; only the near half of each meridian is drawn.
+        // Back ribs show faintly through the lit paper; front ribs sit on top.
         paint.setShader(null);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(1f, density * .9f));
-        float spin = t * (running ? .9f : .18f);
-        for (int i = 0; i < 6; i++) {
-            double phase = spin + i * Math.PI / 3.0;
-            float facing = (float) Math.cos(phase);
-            if (facing <= 0f) continue;
-            float side = (float) Math.sin(phase);
-            float half = r * Math.abs(side);
-            arc.set(cx - half, cy - r, cx + half, cy + r);
-            paint.setColor(alpha(deep, Math.round(70 * facing)));
-            canvas.drawArc(arc, side >= 0f ? -90f : 90f, 180f, false, paint);
+        float spin = t * (running ? .8f : .16f);
+        for (int pass = 0; pass < 2; pass++) {
+            for (int i = 0; i < 8; i++) {
+                double phase = spin + i * Math.PI / 4.0;
+                float facing = (float) Math.cos(phase);
+                boolean front = facing > 0f;
+                if (front != (pass == 1)) continue;
+                float side = (float) Math.sin(phase);
+                float half = rx * Math.abs(side);
+                arc.set(cx - half, cy - ry, cx + half, cy + ry);
+                paint.setStrokeWidth(Math.max(1f, density * (front ? 1.4f : .9f)));
+                paint.setColor(alpha(LANTERN_RIB, front ? Math.round(60 + 90 * facing) : 40));
+                canvas.drawArc(arc, side >= 0f ? -90f : 90f, 180f, false, paint);
+            }
         }
-        paint.setColor(alpha(deep, 60));
-        for (float latitude : new float[]{-.72f, .72f}) {
-            float half = r * (float) Math.sqrt(1 - latitude * latitude);
-            float y = cy + r * latitude;
-            arc.set(cx - half, y - half * .16f, cx + half, y + half * .16f);
+        arc.set(cx - rx, cy - ry, cx + rx, cy + ry);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(new RadialGradient(cx, cy, rx,
+                new int[]{Color.TRANSPARENT, Color.TRANSPARENT, alpha(rim, 120)},
+                new float[]{0f, .68f, 1f}, Shader.TileMode.CLAMP));
+        canvas.drawOval(arc, paint);
+        paint.setShader(new RadialGradient(cx - rx * .38f, cy - ry * .45f, rx * .5f,
+                new int[]{alpha(Color.WHITE, 64), Color.TRANSPARENT},
+                new float[]{0f, 1f}, Shader.TileMode.CLAMP));
+        canvas.drawOval(arc, paint);
+        canvas.restoreToCount(saved);
+        paint.setShader(null);
+
+        // Bamboo rings near the poles.
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.2f, density * 1.6f));
+        paint.setColor(alpha(LANTERN_RIB, 150));
+        for (float latitude : new float[]{-.84f, .84f}) {
+            float half = rx * (float) Math.sqrt(1 - latitude * latitude);
+            float y = cy + ry * latitude;
+            arc.set(cx - half, y - half * .14f, cx + half, y + half * .14f);
             canvas.drawArc(arc, 0f, 180f, false, paint);
         }
-        canvas.restoreToCount(saved);
 
-        paint.setColor(alpha(LANTERN_CREAM, 110));
-        paint.setStrokeWidth(Math.max(1f, density * .7f));
-        canvas.drawCircle(cx, cy, r, paint);
+        drawLanternCap(canvas, cx, cy - ry, rx * .3f, ry * .17f, true, density);
+        drawLanternCap(canvas, cx, cy + ry, rx * .24f, ry * .14f, false, density);
 
         drawLanternFace(canvas, cx, cy, r, t);
 
-        // A single ember drifting above the cap.
-        float flicker = .55f + .45f * (float) (Math.sin(t * 5.3f) * Math.sin(t * 2.1f + 1f));
-        float emberY = cy - r * 1.3f + (float) Math.sin(t * 1.7f) * r * .04f;
-        float emberX = cx + (float) Math.sin(t * 1.1f) * r * .05f;
+        // Three small sparks drifting up from the top.
         paint.setStyle(Paint.Style.FILL);
-        paint.setShader(new RadialGradient(emberX, emberY, r * .14f,
-                new int[]{alpha(LANTERN_GLOW, Math.round(200 * flicker)), Color.TRANSPARENT},
-                new float[]{0f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawCircle(emberX, emberY, r * .14f, paint);
+        for (int i = 0; i < 3; i++) {
+            float p = (t * (running ? .5f : .22f) + i / 3f) % 1f;
+            float sy = capTop - p * r * .55f;
+            float sx = cx + (float) Math.sin(p * 6f + i * 2f) * r * .2f;
+            paint.setColor(alpha(LANTERN_AMBER, Math.round((float) Math.sin(p * Math.PI) * 190)));
+            canvas.drawCircle(sx, sy, Math.max(1f, density * 1.4f), paint);
+        }
+    }
+
+    /** Lacquered cap with a gold rim; {@code poleY} is where the paper meets the cap. */
+    private void drawLanternCap(Canvas canvas, float cx, float poleY, float halfW, float h,
+            boolean top, float density) {
+        float inner = top ? poleY + h * .35f : poleY - h * .35f;
+        float outer = top ? poleY - h * .65f : poleY + h * .65f;
+        wave.reset();
+        wave.moveTo(cx - halfW, inner);
+        wave.lineTo(cx + halfW, inner);
+        wave.lineTo(cx + halfW * .72f, outer);
+        wave.lineTo(cx - halfW * .72f, outer);
+        wave.close();
         paint.setShader(null);
-        paint.setColor(alpha(Color.WHITE, Math.round(220 * flicker)));
-        canvas.drawCircle(emberX, emberY, Math.max(1f, r * .025f), paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(LANTERN_LACQUER);
+        canvas.drawPath(wave, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, density));
+        paint.setColor(alpha(LANTERN_GOLD, 210));
+        canvas.drawLine(cx - halfW, inner, cx + halfW, inner, paint);
     }
 
     private void drawLanternFace(Canvas canvas, float cx, float cy, float r, float t) {
@@ -295,62 +360,63 @@ final class PulseOrbView extends View {
         boolean happy = mode.equals(PicoOrbState.COMPLETED);
         boolean searching = mode.equals(PicoOrbState.CONNECTING);
 
-        float scale = help ? 1.25f : 1f;
-        float eyeW = r * .075f * scale, eyeH = r * .105f * scale;
+        float scale = help ? 1.2f : 1f;
+        float eyeW = r * .085f * scale, eyeH = r * .115f * scale;
         float lookX = running ? (float) Math.sin(t * 1.6f) * r * .06f
                 : searching ? (float) Math.sin(t * .8f) * r * .08f : 0f;
         float lookY = help ? -r * .05f : 0f;
-        float eyeY = cy + r * .06f + lookY;
-        float gap = r * .22f;
+        float eyeY = cy + r * .1f + lookY;
+        float gap = r * .27f;
         float cycle = running ? 3.2f : 4.6f;
         float blinkPhase = t % cycle;
         float open = blinkPhase < .14f ? Math.abs(blinkPhase - .07f) / .07f : 1f;
+        int ink = alpha(LANTERN_INK, 235);
 
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(alpha(LANTERN_BLUSH, 80));
+        paint.setColor(alpha(LANTERN_BLUSH, 110));
         for (int side = -1; side <= 1; side += 2) {
-            float bx = cx + side * gap * 1.45f;
-            arc.set(bx - r * .1f, eyeY + r * .1f, bx + r * .1f, eyeY + r * .2f);
+            float bx = cx + side * gap * 1.5f;
+            arc.set(bx - r * .12f, eyeY + r * .13f, bx + r * .12f, eyeY + r * .26f);
             canvas.drawOval(arc, paint);
         }
 
         paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeWidth(Math.max(1.2f, r * .035f));
+        paint.setStrokeWidth(Math.max(1.2f, r * .04f));
         for (int side = -1; side <= 1; side += 2) {
             float ex = cx + side * gap + lookX;
             if (happy) {
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setColor(LANTERN_INK);
+                paint.setColor(ink);
                 wave.reset();
                 wave.moveTo(ex - eyeW * 1.2f, eyeY + eyeH * .3f);
                 wave.quadTo(ex, eyeY - eyeH * 1.1f, ex + eyeW * 1.2f, eyeY + eyeH * .3f);
                 canvas.drawPath(wave, paint);
             } else if (tired) {
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setColor(LANTERN_INK);
+                paint.setColor(ink);
                 canvas.drawLine(ex - eyeW * 1.1f, eyeY, ex + eyeW * 1.1f, eyeY, paint);
             } else {
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(LANTERN_INK);
+                paint.setColor(ink);
                 float h = Math.max(eyeH * .12f, eyeH * open);
                 arc.set(ex - eyeW, eyeY - h, ex + eyeW, eyeY + h);
                 canvas.drawOval(arc, paint);
                 if (open > .6f) {
-                    paint.setColor(alpha(Color.WHITE, 230));
-                    canvas.drawCircle(ex - eyeW * .35f, eyeY - h * .4f, eyeW * .32f, paint);
+                    paint.setColor(alpha(Color.WHITE, 235));
+                    canvas.drawCircle(ex - eyeW * .32f, eyeY - h * .38f, eyeW * .34f, paint);
                 }
             }
         }
 
-        float mouthY = eyeY + r * .19f;
+        float mouthY = eyeY + r * .2f;
         paint.setStyle(Paint.Style.STROKE);
-        paint.setColor(LANTERN_INK);
+        paint.setColor(ink);
         if (help) {
-            paint.setStrokeWidth(Math.max(1f, r * .028f));
-            canvas.drawCircle(cx + lookX * .5f, mouthY, r * .04f, paint);
+            paint.setStrokeWidth(Math.max(1f, r * .03f));
+            canvas.drawCircle(cx + lookX * .5f, mouthY, r * .045f, paint);
         } else if (tired) {
-            canvas.drawLine(cx - r * .05f, mouthY, cx + r * .05f, mouthY, paint);
+            canvas.drawLine(cx - r * .055f, mouthY, cx + r * .055f, mouthY, paint);
         } else {
             float w = happy ? r * .1f : r * .07f;
             arc.set(cx - w + lookX * .5f, mouthY - w * .8f, cx + w + lookX * .5f, mouthY + w * .8f);
