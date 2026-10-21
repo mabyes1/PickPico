@@ -60,4 +60,6 @@ AI 引導客戶端開始 OAuth，讓手機持有人核對六位數並允許，�
 
 所有頁面的 `form-action` 收斂為 `'self'`，不再加入客戶端 origin。這樣表單在 Relay 完成，不讓後續 callback 的跨來源轉址鏈留在表單提交的 CSP 檢查中；不必放寬 Origin、移除 cookie 綁定，或把完成授權改成 GET。`frame-ancestors 'none'` 及 X-Frame-Options DENY 保留。
 
-隔離的 Chromium 瀏覽器實驗重現：舊版同源 POST 已送達、第一個 callback 收到 GET，但第二個 origin 的 callback 被阻擋；改用實際 callbackPage 完成頁後，同一轉址鏈抵達最後頁面。這是可重現的瀏覽器回歸驗證，未使用真實手機或真實 token。正式 Relay 也驗證 consent 拒絕會回應 200 完成頁而非外部 302，無新增手機提示。特定 Muse 客戶端的實際完整流程仍需重新發起驗收；不能僅憑 CSP 字串推斷文件被客戶端嵌入，或斷言 POST 從未送達。
+隔離的 Chromium 瀏覽器實驗重現：舊版同源 POST 已送達、第一個 callback 收到 GET，但第二個 origin 的 callback 被阻擋；改用實際 callbackPage 完成頁後，同一轉址鏈抵達最後頁面。這是可重現的瀏覽器回歸驗證，未使用真實手機或真實 token。正式 Relay 也驗證 consent 拒絕會回應 200 完成頁而非外部 302，無新增手機提示。不能僅憑 CSP 字串推斷文件被客戶端嵌入，或斷言 POST 從未送達。
+
+2026-10-21，使用者在修正上線後重新發起 Muse OAuth，回報已完成手機確認並成功返回 Muse（回答「DONE!」）。Muse 的首次授權回傳因此通過使用者實機驗收；本次回報未包含 Muse 端手機工具呼叫或 access token 到期後續期的結果，這兩項仍分開驗收。
