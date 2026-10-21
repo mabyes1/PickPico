@@ -358,9 +358,32 @@ final class PulseOrbView extends View {
                 float half = rx * Math.abs(side);
                 arc.set(cx - half, cy - ry, cx + half, cy + ry);
                 paint.setStrokeWidth(Math.max(1f, density * (front ? 1.4f : .9f)));
-                paint.setColor(alpha(LANTERN_RIB, front ? Math.round(60 + 90 * facing) : 40));
+                paint.setColor(alpha(LANTERN_RIB, front ? Math.round(26 + 40 * facing) : 18));
                 canvas.drawArc(arc, side >= 0f ? -90f : 90f, 180f, false, paint);
             }
+        }
+        // Accordion pleats: rings of folds, packed closer toward the poles like real folded paper.
+        // Each fold is a soft shadow under the crease, a lit lip above it and a fine dark line.
+        final int pleatCount = 11;
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE);
+        for (int k = 1; k < pleatCount; k++) {
+            double theta = Math.PI * k / pleatCount;
+            float yRing = cy - ry * (float) Math.cos(theta);
+            float half = rx * (float) Math.sin(theta);
+            float bulge = half * .15f;
+            arc.set(cx - half, yRing - bulge, cx + half, yRing + bulge);
+            paint.setStrokeWidth(density * 3.4f);
+            paint.setColor(alpha(LANTERN_RIB, 30));
+            canvas.drawArc(arc, 0f, 180f, false, paint);
+            arc.set(cx - half, yRing - bulge - density * 1.7f, cx + half, yRing + bulge - density * 1.7f);
+            paint.setStrokeWidth(density * 2.2f);
+            paint.setColor(alpha(LANTERN_CORE, 40));
+            canvas.drawArc(arc, 0f, 180f, false, paint);
+            arc.set(cx - half, yRing - bulge, cx + half, yRing + bulge);
+            paint.setStrokeWidth(Math.max(1f, density * 1.1f));
+            paint.setColor(alpha(LANTERN_RIB, 118));
+            canvas.drawArc(arc, 0f, 180f, false, paint);
         }
         arc.set(cx - rx, cy - ry, cx + rx, cy + ry);
         paint.setStyle(Paint.Style.FILL);
