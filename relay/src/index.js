@@ -256,10 +256,12 @@ export class NodeRelay extends DurableObject {
     // Never route through a socket that has already stopped heartbeating. Among
     // healthy sockets, prefer the freshest connection and let delivery ACK be
     // the final end-to-end proof that the phone received this MCP request.
+    // A suspended phone cannot send heartbeats (its timers stop with the CPU), yet an inbound
+    // frame wakes it. So heartbeat age only ranks sockets here; it never rejects one.
     const socket = selectHealthiestSocket(
       sockets,
       (candidate) => this.socketHeartbeatAgeMs(candidate),
-      HEARTBEAT_STALE_MS,
+      Number.MAX_SAFE_INTEGER,
     );
     if (!socket) {
       let rpc;
