@@ -46,10 +46,18 @@ AI 引導客戶端開始 OAuth，讓手機持有人核對六位數並允許，�
 
 ### 2026-10-21 驗收狀態
 
-- workerd／Miniflare 自動驗證 9/9 通過，手機為模擬對端。涵蓋 v1～v4 未授權入口、HTML／JSON 引導、metadata、PKCE、瀏覽器與手機確認、等待頁重新整理不重發提示、續期輪換與滑動期限、跨 resource／手機隔離及撤銷。
+- workerd／Miniflare 自動驗證 10/10 通過，手機為模擬對端。涵蓋 v1～v4 未授權入口、HTML／JSON 引導、metadata、PKCE、瀏覽器與手機確認、等待頁重新整理不重發提示、續期輪換與滑動期限、跨 resource／手機隔離、撤銷，以及成功／拒絕授權後的本地完成頁。
 - 真實 Chrome 與實體手機已完成首次確認，成功返回 ChatGPT，並透過 v4 OAuth 連線讀取 server_info、phone_status 與 dev(info)。手機沿用 0.17.18，未重裝 APK，配對保留。手機離線後恢復連線也能沿用既有授權。
 - 正式站已檢查未帶 token 的 v3／v4 呼叫仍為 401，附 OAuth challenge 及引導；提供無效 token 時優先引導自動續期。公開說明不會啟動手機確認。
-- Chrome 表單需要 same-origin Referrer Policy，以保留 Origin 檢查。等待頁 CSP 僅允許 provider 驗證過的 callback origin；POST/303/GET 避免重新整理重送 consent。
+- Chrome 表單需要 same-origin Referrer Policy，以保留 Origin 檢查。等待頁使用 POST/303/GET 避免重新整理重送 consent。
 - 尚待個別使用者實際 AI 客戶端的首次連線體驗，以及正式 ChatGPT access token 到期後的自動續期驗收。自動測試通過不等同所有客戶端已實測。
 
 每次部署的 Worker version、回復版本、客戶端識別碼及裝置診斷應另存私有部署紀錄，不放入公開儲存庫。
+
+### 表單與跨來源 callback 的 CSP 相容性
+
+`/finish` 繼續要求同源 POST、原瀏覽器的 HttpOnly cookie 及已核准的手機交易；GET 回應 405。授權成功或拒絕後，POST 回應 Relay 本身的 200 完成頁，由 nonce 腳本使用 `location.replace` 導覽至 provider 驗證過的 callback，並提供一般連結供手動返回。拒絕瀏覽器 consent 的流程也使用相同完成頁。完成頁不傳送 Referrer，callback URI 不寫入紀錄。
+
+所有頁面的 `form-action` 收斂為 `'self'`，不再加入客戶端 origin。這樣表單在 Relay 完成，不讓後續 callback 的跨來源轉址鏈留在表單提交的 CSP 檢查中；不必放寬 Origin、移除 cookie 綁定，或把完成授權改成 GET。`frame-ancestors 'none'` 及 X-Frame-Options DENY 保留。
+
+隔離的 Chromium 瀏覽器實驗重現：舊版同源 POST 已送達、第一個 callback 收到 GET，但第二個 origin 的 callback 被阻擋；改用實際 callbackPage 完成頁後，同一轉址鏈抵達最後頁面。這是可重現的瀏覽器回歸驗證，未使用真實手機或真實 token。正式 Relay 也驗證 consent 拒絕會回應 200 完成頁而非外部 302，無新增手機提示。特定 Muse 客戶端的實際完整流程仍需重新發起驗收；不能僅憑 CSP 字串推斷文件被客戶端嵌入，或斷言 POST 從未送達。

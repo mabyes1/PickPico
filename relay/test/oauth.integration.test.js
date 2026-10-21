@@ -14,6 +14,18 @@ const challenge = createHash("sha256").update(verifier).digest("base64url");
 const bundle = await build({ entryPoints: [new URL("../src/index.js", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")],
   bundle: true, write: false, format: "esm", platform: "neutral", mainFields: ["module", "main"], external: ["cloudflare:workers"] });
 
+async function callbackTarget(response) {
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Location"), null, "a form POST must finish on Relay, not redirect across origins");
+  assert.match(response.headers.get("Content-Security-Policy"), /form-action 'self';/);
+  assert.equal(response.headers.get("Referrer-Policy"), "no-referrer");
+  const html = await response.text();
+  assert.match(html, /location\.replace/);
+  const href = /id="oauth-return" href="([^"]+)"/.exec(html)?.[1];
+  assert.ok(href, html);
+  return new URL(href.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))));
+}
+
 async function setup(t) {
   const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text,
     compatibilityDate: "2026-09-01", compatibilityFlags: ["global_fetch_strictly_public"],
@@ -92,8 +104,7 @@ async function setup(t) {
     const r = await fetch(`${issuer}/check/${tx}`, { method: "POST" });
     assert.equal((await r.json()).status, "approved");
     const finish = await fetch(`${issuer}/finish/${tx}`, { method: "POST" });
-    assert.equal(finish.status, 302, await finish.clone().text());
-    const location = new URL(finish.headers.get("Location"));
+    const location = await callbackTarget(finish);
     assert.equal(location.searchParams.get("state"), "state-123");
     assert.equal(location.searchParams.get("iss"), issuer);
     return location.searchParams.get("code");
@@ -153,6 +164,8 @@ test("real Worker: discovery, physical-owner gate, refresh, node isolation, revo
   assert.match(await earlyFinish.text(), /等待手機確認/);
   const stolen = await env.mf.dispatchFetch(`${issuer}/check/${tx}`, { method: "POST", headers: { Origin: origin } });
   assert.equal(stolen.status, 403, "transaction URL alone must not grant browser ownership");
+  assert.equal((await env.fetch(`${issuer}/finish/${tx}`)).status, 405, "GET must never consume phone approval or issue an authorization code");
+  assert.equal((await env.mf.dispatchFetch(`${issuer}/finish/${tx}`, { method: "POST", headers: { Origin: origin } })).status, 403, "finish must retain browser cookie binding");
   const csrf = await env.mf.dispatchFetch(`${issuer}/finish/${tx}`, { method: "POST", headers: { Origin: "https://evil.example", Cookie: [...env.jar].map(([k,v])=>`${k}=${v}`).join("; ") } });
   assert.equal(csrf.status, 403);
   const code = await env.approve(tx);
@@ -233,6 +246,19 @@ test("phone denial and invalid PKCE cannot issue access", { timeout: 30000 }, as
   await delay(1600);
   assert.equal((await (await env.fetch(`${issuer}/check/${tx}`, { method: "POST" })).json()).status, "denied");
   const finish = await env.fetch(`${issuer}/finish/${tx}`, { method: "POST" });
-  assert.equal(finish.status, 302);
-  assert.equal(new URL(finish.headers.get("Location")).searchParams.get("error"), "access_denied");
+  assert.equal((await callbackTarget(finish)).searchParams.get("error"), "access_denied");
+});
+
+test("browser consent refusal also ends POST locally before navigating to client", async (t) => {
+  const env = await setup(t);
+  const query = new URLSearchParams({ response_type: "code", client_id: env.client.client_id,
+    redirect_uri: "http://127.0.0.1:31000/callback", scope: "phone offline_access", state: "denial-state",
+    code_challenge: challenge, code_challenge_method: "S256", resource });
+  const html = await (await env.fetch(`${issuer}/authorize?${query}`)).text();
+  const handle = /name="handle" value="([^"]+)"/.exec(html)[1];
+  const response = await env.fetch(`${issuer}/authorize`, { method: "POST", body: new URLSearchParams({ handle, decision: "deny" }) });
+  const callback = await callbackTarget(response);
+  assert.equal(callback.searchParams.get("error"), "access_denied");
+  assert.equal(callback.searchParams.get("state"), "denial-state");
+  assert.equal(env.calls.length, 0);
 });

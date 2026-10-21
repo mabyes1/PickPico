@@ -1,6 +1,6 @@
 import { OAuthAuthorizationServer, OAuthResourceServer, OAuthError, AuthorizationError, CimdFetchError } from "@cloudflare/workers-oauth-provider";
 import { GRANT_HEADER, hash, randomSecret } from "./oauth-node.js";
-import { consentPage, escapeHtml, managementPage, page, waitingPage } from "./oauth-pages.js";
+import { callbackPage, consentPage, escapeHtml, managementPage, page, waitingPage } from "./oauth-pages.js";
 import { connectionGuide, connectionGuidePage, oauthOnboardingResponse } from "./oauth-onboarding.js";
 
 const NODE = "([A-Za-z0-9_-]{16,128})";
@@ -155,7 +155,7 @@ export async function oauthFetch(request, env, ctx, forward) {
       const handle = String(form.get("handle") || "");
       if (form.get("decision") !== "approve") {
         const denied = await oauth.denyConsent(request, handle);
-        return new Response(null, { status: 302, headers: denied.headers });
+        return callbackPage(new Headers(denied.headers).get("Location"), denied.headers);
       }
       const approved = await oauth.approveConsent(request, handle, { scope: ["phone", "offline_access"] });
       const details = await oauth.describeConsent(approved.request);
@@ -185,8 +185,7 @@ export async function oauthFetch(request, env, ctx, forward) {
       if (operation === "wait") {
         const { response, data } = await internal(env, nodeId, "check", body);
         if (!response.ok) return json(data, response.status);
-        // Only the provider-validated callback origin is allowed through CSP.
-        return waitingPage(`/oauth/${nodeId}`, id, data.code, new Headers(), data.redirectOrigin);
+        return waitingPage(`/oauth/${nodeId}`, id, data.code, new Headers());
       }
       if (operation === "check") {
         const { response, data } = await internal(env, nodeId, "check", body);
@@ -209,17 +208,17 @@ export async function oauthFetch(request, env, ctx, forward) {
         return managementPage(`/oauth/${nodeId}`, id, data.grants);
       }
       if (state.data.status === "pending") {
-        return waitingPage(`/oauth/${nodeId}`, id, state.data.code, new Headers(), state.data.redirectOrigin);
+        return waitingPage(`/oauth/${nodeId}`, id, state.data.code, new Headers());
       }
       const claimed = await internal(env, nodeId, "claim", body);
       if (!claimed.response.ok) return json(claimed.data, claimed.response.status);
-      if (claimed.data.redirectTo) return Response.redirect(claimed.data.redirectTo, 302);
+      if (claimed.data.redirectTo) return callbackPage(claimed.data.redirectTo);
       if (claimed.data.denied) {
         const target = new URL(claimed.data.request.redirectUri);
         target.searchParams.set("error", "access_denied");
         target.searchParams.set("state", claimed.data.request.state);
         target.searchParams.set("iss", claimed.data.request.issuer);
-        return Response.redirect(target.toString(), 302);
+        return callbackPage(target.toString());
       }
       const result = await oauth.completeAuthorization({
         request: claimed.data.request, userId: nodeId, metadata: { clientName: claimed.data.details.clientName },
@@ -228,7 +227,7 @@ export async function oauthFetch(request, env, ctx, forward) {
       });
       const committed = await internal(env, nodeId, "commit", { ...body, grantKey: claimed.data.grantKey, redirectTo: result.redirectTo });
       if (!committed.response.ok) return json({ error: "authorization_commit_failed" }, 503);
-      return new Response(null, { status: 302, headers: { Location: result.redirectTo, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
+      return callbackPage(result.redirectTo);
     }
     return as.fetch(request, env, ctx);
   } catch (error) {
