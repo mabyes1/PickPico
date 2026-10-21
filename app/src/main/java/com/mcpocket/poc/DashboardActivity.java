@@ -230,6 +230,7 @@ public final class DashboardActivity extends LocalizedActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        PicoOrbOverlayController.setDashboardForeground(true);
         PickPicoTheme.State savedTheme = PickPicoTheme.load(this);
         if (savedTheme.colorA != theme.colorA || savedTheme.colorB != theme.colorB
                 || savedTheme.gradient != theme.gradient || !savedTheme.orbStyle.equals(theme.orbStyle)) {
@@ -247,6 +248,7 @@ public final class DashboardActivity extends LocalizedActivity {
 
     @Override
     protected void onPause() {
+        PicoOrbOverlayController.setDashboardForeground(false);
         if (pulseOrb != null) pulseOrb.setResumed(false);
         if (appearanceOrbPreview != null) appearanceOrbPreview.setResumed(false);
         if (topBrandLogo != null) topBrandLogo.setResumed(false);

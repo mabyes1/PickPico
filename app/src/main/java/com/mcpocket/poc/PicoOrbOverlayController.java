@@ -26,6 +26,13 @@ final class PicoOrbOverlayController {
     private static final int PANEL_WIDTH_DP = 224;
     private static final int PANEL_ESTIMATED_HEIGHT_DP = 232;
 
+    // The dashboard already shows the same state, so the floating ball steps aside while it is on screen.
+    private static volatile boolean dashboardForeground;
+
+    static void setDashboardForeground(boolean foreground) {
+        dashboardForeground = foreground;
+    }
+
     private final Context context;
     private final StateSource source;
     private final WindowManager windowManager;
@@ -95,6 +102,7 @@ final class PicoOrbOverlayController {
             hiddenWakeKey = "";
         }
         boolean allowed = snapshot != null
+                && !dashboardForeground
                 && !PicoOrbState.HIDDEN.equals(snapshot.orbMode)
                 && McpocketPolicySettings.isPicoOrbEnabled(context)
                 && Settings.canDrawOverlays(context);
