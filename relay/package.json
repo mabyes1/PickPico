@@ -9,6 +9,11 @@
     "test": "node --test"
   },
   "devDependencies": {
+    "esbuild": "0.28.1",
+    "miniflare": "5.20260831.0-alpha",
     "wrangler": "^4.33.1"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.3"
   }
 }

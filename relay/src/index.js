@@ -1,6 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import { pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
 import { offlineResult } from "./offline-result.js";
+import { oauthFetch } from "./oauth.js";
+import { GRANT_HEADER, grantActive, handleNodeOAuth, cleanupOAuth } from "./oauth-node.js";
 
 // HUMAN_HELP uses a renewable human-idle lease, so its total wall-clock wait
 // can legitimately exceed one 360-second lease. This is only a transport
@@ -10,7 +12,7 @@ const HEARTBEAT_STALE_MS = 35_000;
 const DELIVERY_ACK_TIMEOUT_MS = 5_000;
 const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
-export default {
+const relay = {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") {
@@ -130,6 +132,13 @@ export default {
   },
 };
 
+export default {
+  async fetch(request, env, ctx) {
+    const authenticated = await oauthFetch(request, env, ctx, (verified, bindings) => relay.fetch(verified, bindings));
+    return authenticated || relay.fetch(request, env);
+  },
+};
+
 export class NodeRelay extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -140,8 +149,15 @@ export class NodeRelay extends DurableObject {
 
   async fetch(request) {
     const url = new URL(request.url);
+    const ownerAuth = await handleNodeOAuth(this, request);
+    if (ownerAuth) return ownerAuth;
     if (url.pathname.endsWith("/connect")) {
       return this.connectNode(request);
+    }
+    if ((url.pathname.endsWith("/status") || url.pathname.endsWith("/mcp"))
+        && request.method !== "OPTIONS"
+        && !await grantActive(this, request.headers.get(GRANT_HEADER))) {
+      return json({ error: "oauth_required" }, 401, { "Cache-Control": "no-store" });
     }
     if (url.pathname.endsWith("/status")) {
       const sockets = this.nodeSockets();
@@ -250,7 +266,6 @@ export class NodeRelay extends DurableObject {
     const requestId = crypto.randomUUID();
     const headers = {};
     for (const name of [
-      "authorization",
       "content-type",
       "accept",
       "mcp-protocol-version",
@@ -376,6 +391,10 @@ export class NodeRelay extends DurableObject {
       headers: payload.headers || {},
       body: payload.body || "",
     });
+  }
+
+  async alarm() {
+    await cleanupOAuth(this);
   }
 
   async webSocketClose(ws, code, reason) {
