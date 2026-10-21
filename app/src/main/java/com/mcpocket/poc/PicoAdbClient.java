@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
  */
 final class PicoAdbClient {
     private static final Object DAEMON_POLICY_LOCK = new Object();
+    private static boolean legacyDaemonAttempted; // guarded by DAEMON_POLICY_LOCK
     private static final long PAIR_TIMEOUT_MS = 30_000L;
     private static final long CONNECT_TIMEOUT_MS = 20_000L;
     // Interactive command output is bounded in memory. Diagnostics stream to disk.
@@ -166,24 +167,35 @@ final class PicoAdbClient {
             // Java owns reconnection policy; native mDNS must not bypass the UI switch.
             builder.environment().put("ADB_MDNS_AUTO_CONNECT", "0");
 
-            synchronized (DAEMON_POLICY_LOCK) {
-                android.content.SharedPreferences policy = context.getSharedPreferences("picoadb_state", 0);
-                if (!policy.getBoolean("native_autoconnect_disabled_v1", false)) {
-                    // An old orphan daemon keeps its original environment across APK updates.
-                    // Replace it once so the user's switch also governs upgraded installs.
-                    ProcessBuilder stop = new ProcessBuilder(adbBinary.getAbsolutePath(), "kill-server")
-                            .directory(cwd).redirectErrorStream(true);
-                    stop.environment().putAll(builder.environment());
-                    Result stopped = execute(stop, 5000L, null);
-                    if (!stopped.success()) return stopped;
-                    policy.edit().putBoolean("native_autoconnect_disabled_v1", true).apply();
-                }
-            }
+            android.content.SharedPreferences policy = context.getSharedPreferences("picoadb_state", 0);
+            replaceLegacyDaemon(policy.getBoolean("native_autoconnect_disabled_v1", false), () -> {
+                ProcessBuilder stop = new ProcessBuilder(adbBinary.getAbsolutePath(), "kill-server")
+                        .directory(cwd).redirectErrorStream(true);
+                stop.environment().putAll(builder.environment());
+                return execute(stop, 5000L, null);
+            }, () -> policy.edit().putBoolean("native_autoconnect_disabled_v1", true).apply());
 
             return execute(builder, timeoutMs, outputFile);
         } catch (Exception error) {
             return Result.failure(-1, false,
                     error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage()));
+        }
+    }
+
+    // An old orphan daemon keeps its original environment across APK updates.
+    // Replace it once so the user's switch also governs upgraded installs. This is
+    // best effort: a failed stop must never block ADB commands, and it is retried
+    // at most once per process so a hanging kill-server cannot slow every call.
+    static void replaceLegacyDaemon(boolean alreadyReplaced, java.util.concurrent.Callable<Result> stop,
+                                    Runnable markReplaced) {
+        synchronized (DAEMON_POLICY_LOCK) {
+            if (alreadyReplaced || legacyDaemonAttempted) return;
+            legacyDaemonAttempted = true;
+            try {
+                if (stop.call().success()) markReplaced.run();
+            } catch (Exception ignored) {
+                // Fall through to the requested command with the existing daemon.
+            }
         }
     }
 

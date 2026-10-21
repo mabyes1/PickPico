@@ -36,6 +36,43 @@ public class PicoAdbClientTest {
         assertSame(failed, PicoAdbClient.diagnoseConnect(failed, new File(log, "missing"), 0, "192.168.0.15:41059"));
     }
 
+    @Test public void failedLegacyDaemonStopNeverBlocksAndRunsOncePerProcess() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger stops = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean marked = new java.util.concurrent.atomic.AtomicBoolean();
+        java.lang.reflect.Field attempted = PicoAdbClient.class.getDeclaredField("legacyDaemonAttempted");
+        attempted.setAccessible(true);
+        attempted.setBoolean(null, false);
+        try {
+            PicoAdbClient.replaceLegacyDaemon(false, () -> {
+                stops.incrementAndGet();
+                return PicoAdbClient.Result.failure(1, false, "cannot connect to daemon");
+            }, () -> marked.set(true));
+            PicoAdbClient.replaceLegacyDaemon(false, () -> {
+                stops.incrementAndGet();
+                throw new java.io.IOException("hung");
+            }, () -> marked.set(true));
+            assertEquals(1, stops.get());
+            assertFalse(marked.get());
+
+            attempted.setBoolean(null, false); // Next app process retries and persists success.
+            PicoAdbClient.replaceLegacyDaemon(false, () -> {
+                stops.incrementAndGet();
+                return new PicoAdbClient.Result(0, false, false, "");
+            }, () -> marked.set(true));
+            assertEquals(2, stops.get());
+            assertTrue(marked.get());
+
+            attempted.setBoolean(null, false);
+            PicoAdbClient.replaceLegacyDaemon(true, () -> {
+                stops.incrementAndGet();
+                return new PicoAdbClient.Result(0, false, false, "");
+            }, () -> { });
+            assertEquals(2, stops.get());
+        } finally {
+            attempted.setBoolean(null, false);
+        }
+    }
+
     @Test public void diagnosticFileRetainsOutputBeyondFourMiB() throws Exception {
         File target = temporary.newFile("diagnostic.txt");
         PicoAdbClient.Result result = PicoAdbClient.execute(child("large"), 15_000L, target);
