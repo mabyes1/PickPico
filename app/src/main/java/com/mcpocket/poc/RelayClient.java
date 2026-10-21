@@ -1,10 +1,14 @@
 package com.mcpocket.poc;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -59,6 +63,9 @@ final class RelayClient {
     private static final long[] RECONNECT_DELAYS_MS = {1000L, 2000L, 4000L, 8000L, 16000L, 30000L};
     private static final long HEARTBEAT_INTERVAL_MS = 10_000L;
     private static final long HEARTBEAT_TIMEOUT_MS = 15_000L;
+    // After the screen comes on, a connection that died while the phone slept should be
+    // noticed in seconds, not after a full heartbeat cycle.
+    private static final long WAKE_PROBE_TIMEOUT_MS = 6_000L;
 
     private final Context context;
     private final String relayBaseUrl;
@@ -91,6 +98,9 @@ final class RelayClient {
     private long heartbeatSentCount;
     private long heartbeatPongCount;
     private final HeartbeatGapTracker heartbeatGaps = new HeartbeatGapTracker();
+    private BroadcastReceiver wakeReceiver;
+    private long wakeProbeCount;
+    private String lastWakeProbeAt = "";
     private volatile String pendingHeartbeatNonce;
     private volatile ScheduledFuture<?> heartbeatFuture;
     private volatile ScheduledFuture<?> heartbeatTimeoutFuture;
@@ -151,6 +161,7 @@ final class RelayClient {
         closed = false;
         reconnectAttempt = 0;
         registerNetworkCallback();
+        registerWakeReceiver();
         connect();
     }
 
@@ -159,6 +170,7 @@ final class RelayClient {
         mainHandler.removeCallbacksAndMessages(null);
         clearHeartbeatState();
         unregisterNetworkCallback();
+        unregisterWakeReceiver();
         WebSocket socket = webSocket;
         webSocket = null;
         cancelPendingProxies(null);
@@ -189,6 +201,8 @@ final class RelayClient {
                 .put("heartbeatSentCount", heartbeatSentCount)
                 .put("heartbeatPongCount", heartbeatPongCount)
                 .put("heartbeatGaps", heartbeatGaps.toJson())
+                .put("wakeProbeCount", wakeProbeCount)
+                .put("lastWakeProbeAt", lastWakeProbeAt)
                 .put("reconnectBackoffAttempt", reconnectAttempt)
                 .put("currentNetworkType", observedNetworkType)
                 .put("socketPresent", webSocket != null);
@@ -266,8 +280,12 @@ final class RelayClient {
         mainHandler.postDelayed(this::connect, delay);
     }
 
-    private synchronized void sendHeartbeat(WebSocket socket) {
-        heartbeatGaps.tick(SystemClock.elapsedRealtime());
+    private void sendHeartbeat(WebSocket socket) {
+        sendHeartbeat(socket, HEARTBEAT_TIMEOUT_MS, true);
+    }
+
+    private synchronized void sendHeartbeat(WebSocket socket, long timeoutMs, boolean periodic) {
+        if (periodic) heartbeatGaps.tick(SystemClock.elapsedRealtime());
         if (closed || socket != webSocket || pendingHeartbeatNonce != null) {
             return;
         }
@@ -298,7 +316,7 @@ final class RelayClient {
         }
         heartbeatTimeoutFuture = heartbeatExecutor.schedule(
                 () -> handleHeartbeatTimeout(socket, nonce),
-                HEARTBEAT_TIMEOUT_MS,
+                timeoutMs,
                 TimeUnit.MILLISECONDS);
     }
 
@@ -357,6 +375,65 @@ final class RelayClient {
         lastRelayPongAt = Instant.now().toString();
         heartbeatPongCount++;
         listener.onRelayState("connected", remoteEndpoint, "relay heartbeat healthy");
+    }
+
+    private synchronized void registerWakeReceiver() {
+        if (wakeReceiver != null) return;
+        wakeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context receiverContext, Intent intent) {
+                probeAfterWake();
+            }
+        };
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(wakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                context.registerReceiver(wakeReceiver, filter);
+            }
+        } catch (RuntimeException ignored) {
+            wakeReceiver = null;
+        }
+    }
+
+    private synchronized void unregisterWakeReceiver() {
+        if (wakeReceiver == null) return;
+        try {
+            context.unregisterReceiver(wakeReceiver);
+        } catch (RuntimeException ignored) {
+        }
+        wakeReceiver = null;
+    }
+
+    /**
+     * The screen just came on. Anything that died while the phone slept is found out now:
+     * no socket means reconnect immediately (skipping the backoff, which does not tick during
+     * sleep); an existing socket gets a short-fuse ping so a zombie is replaced within seconds.
+     */
+    private void probeAfterWake() {
+        synchronized (this) {
+            if (closed) return;
+            wakeProbeCount++;
+            lastWakeProbeAt = Instant.now().toString();
+            if (webSocket == null) {
+                reconnectAttempt = 0;
+                mainHandler.post(this::connect);
+                return;
+            }
+        }
+        try {
+            heartbeatExecutor.execute(() -> {
+                synchronized (RelayClient.this) {
+                    WebSocket socket = webSocket;
+                    if (closed || socket == null) return;
+                    pendingHeartbeatNonce = null;
+                    sendHeartbeat(socket, WAKE_PROBE_TIMEOUT_MS, false);
+                }
+            });
+        } catch (RejectedExecutionException ignored) {
+        }
     }
 
     private synchronized void registerNetworkCallback() {
