@@ -26,6 +26,8 @@ final class PulseOrbView extends View {
     private PickPicoTheme.State theme;
     private RuntimeShader fluid;
     private RuntimeShader flame;
+    private RuntimeShader mist;
+    private boolean mistLoadAttempted;
     private boolean flameLoadAttempted;
     private long lastFrame;
     private long modeStartedAt = SystemClock.uptimeMillis();
@@ -192,6 +194,71 @@ final class PulseOrbView extends View {
         if (animate) postInvalidateDelayed(mode.equals(PicoOrbState.RUNNING) || mode.equals(PicoOrbState.HUMAN_HELP) ? 33L : 50L);
     }
 
+    private RuntimeShader lanternMist() {
+        if (Build.VERSION.SDK_INT < 33) return null;
+        if (!mistLoadAttempted) {
+            mistLoadAttempted = true;
+            try (InputStream input = getContext().getAssets().open("lantern-mist.agsl")) {
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                byte[] buffer = new byte[4096]; int count;
+                while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                mist = new RuntimeShader(bytes.toString(StandardCharsets.UTF_8.name()));
+            } catch (Exception error) {
+                android.util.Log.e("PickPicoOrb", "Lantern mist shader unavailable; using puffs", error);
+            }
+        }
+        return mist;
+    }
+
+    /** layer 0 is drawn behind the lantern, layer 1 is a thin veil across its base. */
+    private void drawLanternMist(Canvas canvas, float t, int warm, float layer, boolean running) {
+        float energy = running ? 1.25f : 1f;
+        RuntimeShader shader = canvas.isHardwareAccelerated() ? lanternMist() : null;
+        if (shader != null) {
+            shader.setFloatUniform("resolution", (float) getWidth(), (float) getHeight());
+            shader.setFloatUniform("time", t);
+            shader.setFloatUniform("energy", energy);
+            shader.setFloatUniform("layer", layer);
+            shader.setColorUniform("warm", warm);
+            shader.setColorUniform("cool", blend(theme.colorA, Color.WHITE, .86f));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setAlpha(255);
+            paint.setShader(shader);
+            canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
+            paint.setShader(null);
+            return;
+        }
+        // Fallback: soft puffs rising and drifting, same palette and rhythm as the shader.
+        float cx = getWidth() / 2f, cy = getHeight() / 2f;
+        float r = Math.min(getWidth(), getHeight()) * .3f;
+        int cool = blend(theme.colorA, Color.WHITE, .86f);
+        int count = layer < .5f ? 7 : 3;
+        paint.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < count; i++) {
+            float phase = (t * .05f + i / (float) count + layer * .37f) % 1f;
+            float side = (i % 2 == 0 ? -1f : 1f) * (.55f + .55f * (float) Math.abs(Math.sin(i * 2.3f + layer)));
+            float sway = (float) Math.sin(phase * 5.2f + i * 1.7f) * r * .14f;
+            float px = cx + side * r * (layer < .5f ? .8f : .6f) + sway;
+            float py = layer < .5f
+                    ? cy + r * .95f - phase * r * 2.1f
+                    : cy + r * (.7f + .35f * (float) Math.sin(i * 1.9f)) ;
+            float radius = r * (.5f + .4f * (float) Math.abs(Math.sin(i * 1.3f + 2f))) * (.8f + phase * .5f);
+            float fade = (float) Math.sin(phase * Math.PI);
+            int base = blend(cool, warm, Math.max(0f, 1f - (float) Math.hypot(px - cx, py - cy) / (r * 1.6f)) * .75f);
+            int a = Math.round((layer < .5f ? 54f : 40f) * fade * energy);
+            paint.setShader(new RadialGradient(px, py, radius,
+                    new int[]{alpha(base, a), alpha(base, a / 3), Color.TRANSPARENT},
+                    new float[]{0f, .55f, 1f}, Shader.TileMode.CLAMP));
+            canvas.drawCircle(px, py, radius, paint);
+        }
+        paint.setShader(null);
+    }
+
+    /** Largest ring radius that still fits inside this view, so rings fade instead of being cut. */
+    private float ringLimit() {
+        return Math.min(getWidth(), getHeight()) / 2f - getResources().getDisplayMetrics().density * 2f;
+    }
+
     // Lantern: a paper lantern lit from inside, with a small printed face that reacts to the
     // agent state. Pure Canvas, so it runs on every SDK. It keeps its own warm palette and
     // only leans toward the semantic colour when something needs attention.
@@ -220,6 +287,9 @@ final class PulseOrbView extends View {
         int orange = blend(LANTERN_ORANGE, accent, tint);
         int rim = blend(LANTERN_RIM, accent, tint * .6f);
         float flame = .5f + .5f * (float) Math.sin(t * (running ? 3.1f : 1.2f));
+
+        // Smoke first, so the lantern floats in it.
+        drawLanternMist(canvas, t, amber, 0f, running);
 
         // Light spilling onto the page.
         paint.setStyle(Paint.Style.FILL);
@@ -330,6 +400,9 @@ final class PulseOrbView extends View {
             paint.setColor(alpha(LANTERN_AMBER, Math.round((float) Math.sin(p * Math.PI) * 190)));
             canvas.drawCircle(sx, sy, Math.max(1f, density * 1.4f), paint);
         }
+
+        // A thin veil drifting across the base, in front of the tassel.
+        drawLanternMist(canvas, t, amber, 1f, running);
     }
 
     /** Lacquered cap with a gold rim; {@code poleY} is where the paper meets the cap. */
@@ -475,13 +548,14 @@ final class PulseOrbView extends View {
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(getResources().getDisplayMetrics().density * (1.15f + wave * .9f));
         paint.setColor(alpha(accent, (int) (82f + wave * 145f)));
+        float limit = ringLimit();
         canvas.drawCircle(getWidth() * .5f, getHeight() * .5f,
-                base * (1.12f + wave * .09f), paint);
+                Math.min(base * (1.12f + wave * .09f), limit - getResources().getDisplayMetrics().density * 3f), paint);
 
         paint.setStrokeWidth(getResources().getDisplayMetrics().density * .8f);
         paint.setColor(alpha(blend(accent, Color.WHITE, .28f), (int) (38f + inverse * 88f)));
         canvas.drawCircle(getWidth() * .5f, getHeight() * .5f,
-                base * (1.34f + inverse * .045f), paint);
+                Math.min(base * (1.34f + inverse * .045f), limit), paint);
     }
 
     private void drawCompletedRipple(Canvas canvas, long now) {
@@ -491,7 +565,7 @@ final class PulseOrbView extends View {
         float progress = elapsed / .9f;
         float eased = 1f - (1f - progress) * (1f - progress);
         float base = Math.min(getWidth() * .335f, getHeight() * .397f);
-        float radius = base * (1.02f + eased * .78f);
+        float radius = Math.min(base * (1.02f + eased * .78f), ringLimit());
         int alpha = (int) (185f * (1f - progress));
         paint.setShader(null);
         paint.setStyle(Paint.Style.STROKE);
