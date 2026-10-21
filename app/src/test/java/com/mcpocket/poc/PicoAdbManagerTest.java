@@ -16,6 +16,8 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -49,9 +51,19 @@ public final class PicoAdbManagerTest {
         manager = new PicoAdbManager(context, client, discovery);
     }
 
-    @After public void cleanup() {
+    @After public void cleanup() throws Exception {
         if (manager != null) {
-            ExecutorService worker = ReflectionHelpers.getField(manager, "worker");
+            stopWorker(manager);
+        }
+    }
+
+    private static void stopWorker(PicoAdbManager target) throws InterruptedException {
+        ExecutorService worker = ReflectionHelpers.getField(target, "worker");
+        worker.shutdown();
+        try {
+            assertTrue("PicoADB worker did not finish within 5 seconds",
+                    worker.awaitTermination(5, TimeUnit.SECONDS));
+        } finally {
             worker.shutdownNow();
         }
     }
@@ -144,26 +156,35 @@ public final class PicoAdbManagerTest {
     }
 
     @Test public void expiredAuthorizationIsExposedWithoutErasingIdentityAndClearedOnRecovery() throws Exception {
-        devices("offline");
+        // Configure mocks once; the connection callback changes state, not Mockito stubbing.
+        AtomicReference<String> transport = new AtomicReference<>("offline");
+        when(client.devices()).thenAnswer(call -> new PicoAdbClient.Result(0, false, false,
+                "List of devices attached\n" + serial + "\t" + transport.get() + " product:test\n"));
+        when(client.probeDevices()).thenAnswer(call -> new PicoAdbClient.Result(0, false, false,
+                "List of devices attached\n" + serial + "\t" + transport.get() + " product:test\n"));
         when(discovery.connectEndpoint()).thenReturn(new PicoAdbDiscovery.Endpoint("phone", "127.0.0.1", 39991));
         when(client.connect(anyString(), anyInt())).thenReturn(PicoAdbClient.Result.failure(1, false,
                 "ADB_AUTHORIZATION_REQUIRED: Android rejected the saved ADB identity"));
         JSONObject result = manager.execute(new JSONObject().put("command", "id"), true, 1);
-        assertTrue(result.getJSONObject("error").getString("message").contains("ADB_AUTHORIZATION_REQUIRED"));
+        assertTrue(result.toString(), result.getJSONObject("error").getString("message").contains("ADB_AUTHORIZATION_REQUIRED"));
         assertTrue(manager.status().getBoolean("authorizationRequired"));
         assertTrue(manager.status().getBoolean("paired"));
         assertEquals("original-pair", manager.status().getString("lastPairAt"));
+        // An app restart cannot leave the old instance probing the shared client/preferences.
+        stopWorker(manager);
         // A fresh manager must retain the recovery requirement after an app restart.
         PicoAdbManager restored = new PicoAdbManager(context, client, discovery);
         try {
             assertTrue(restored.status().getBoolean("authorizationRequired"));
             when(client.connect(anyString(), anyInt())).thenAnswer(call -> {
-                devices("device");
+                transport.set("device");
                 return new PicoAdbClient.Result(0, false, false, "connected to " + serial);
             });
-            assertTrue(restored.execute(new JSONObject().put("command", "id"), true, 1).getBoolean("success"));
-            assertFalse(restored.status().getBoolean("authorizationRequired"));
-        } finally { ((ExecutorService) ReflectionHelpers.getField(restored, "worker")).shutdownNow(); }
+            JSONObject recovered = restored.execute(new JSONObject().put("command", "id"), true, 1);
+            assertTrue(recovered.toString(), recovered.optBoolean("success", false));
+            JSONObject recoveredStatus = restored.status();
+            assertFalse(recoveredStatus.toString(), recoveredStatus.getBoolean("authorizationRequired"));
+        } finally { stopWorker(restored); }
     }
 
     @Test public void missingNativeInstallPushesApkUsesPackageManagerAndCleansOnlyItsStaging() throws Exception {
