@@ -466,7 +466,7 @@ public final class DashboardActivity extends LocalizedActivity {
 
     private void setNavActive(TextView view, boolean active) {
         view.setTag(R.id.theme_text_role, null);
-        int color = active ? PickPicoTheme.accentA(theme) : PickPicoTheme.dim(theme);
+        int color = active ? PickPicoTheme.text(theme) : PickPicoTheme.dim(theme);
         view.setTextColor(color);
         Object kind = view.getTag(R.id.theme_hint_role);
         PulseGlyph glyph = new PulseGlyph(kind instanceof String ? (String)kind : "home", color);

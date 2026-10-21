@@ -28,8 +28,8 @@ final class PickPicoTheme {
     // instead of letting individual Activities grow their own parallel theme.
     static final int BASE_BG = Color.rgb(18, 21, 24);
     static final int TEXT = Color.rgb(244, 247, 249);
-    static final int MUTED = Color.rgb(184, 195, 203);
-    static final int DIM = Color.rgb(125, 136, 153);
+    static final int MUTED = Color.rgb(200, 208, 216);
+    static final int DIM = Color.rgb(160, 171, 186);
     static final int GREEN = Color.rgb(116, 199, 165);
     static final int AMBER = Color.rgb(230, 182, 106);
     static final int RED = Color.rgb(240, 113, 120);
@@ -158,6 +158,21 @@ final class PickPicoTheme {
         }
     }
 
+    /** Brightest relative luminance a dark theme background may reach (about 4.5:1 against DIM text). */
+    static final float MAX_BACKGROUND_LUMINANCE = 0.045f;
+
+    /** Darkens {@code color} toward black, keeping its hue, until its luminance is at most {@code max}. */
+    static int capLuminance(int color, float max) {
+        if (Color.luminance(color) <= max) return color;
+        float low = 0f;
+        float high = 1f;
+        for (int i = 0; i < 12; i++) {
+            float mid = (low + high) / 2f;
+            if (Color.luminance(mix(Color.BLACK, color, mid)) <= max) low = mid; else high = mid;
+        }
+        return mix(Color.BLACK, color, low);
+    }
+
     static int accentA(State state) {
         return mix(state.colorA, isLightBackground(state) ? Color.BLACK : Color.WHITE, 0.36f);
     }
@@ -238,7 +253,9 @@ final class PickPicoTheme {
             if (w <= 0f || h <= 0f) return;
 
             if (!state.gradient) {
-                canvas.drawColor(state.colorA);
+                canvas.drawColor(isLightBackground(state)
+                        ? state.colorA
+                        : capLuminance(state.colorA, MAX_BACKGROUND_LUMINANCE));
                 return;
             }
 
@@ -247,6 +264,10 @@ final class PickPicoTheme {
             float intensity = state.backgroundIntensity / 100f;
             int top = mix(state.colorA, Color.rgb(30, 39, 46), (1f - intensity) * .28f);
             int bottom = mix(state.colorB, Color.rgb(24, 31, 38), (1f - intensity) * .34f);
+            // Whatever hue the owner picked, keep the page dark enough that secondary text
+            // (DIM/MUTED) stays readable all the way down the screen.
+            top = capLuminance(top, MAX_BACKGROUND_LUMINANCE);
+            bottom = capLuminance(bottom, MAX_BACKGROUND_LUMINANCE);
             paint.setShader(new LinearGradient(
                     0f, 0f, 0f, h,
                     new int[]{top, mix(top, bottom, .46f), bottom},
