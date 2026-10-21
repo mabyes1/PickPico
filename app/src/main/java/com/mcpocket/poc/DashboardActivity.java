@@ -170,6 +170,7 @@ public final class DashboardActivity extends LocalizedActivity {
     private View appearancePreview;
     private PulseOrbView appearanceOrbPreview;
     private TextView originalOrbChoice;
+    private TextView lanternOrbChoice;
     private TextView flameOrbChoice;
     private String appearanceOrbStyle;
 
@@ -478,7 +479,7 @@ public final class DashboardActivity extends LocalizedActivity {
     private void clearPageReferences() {
         if (appearanceOrbPreview != null) appearanceOrbPreview.setResumed(false);
         appearanceOrbPreview = null;
-        originalOrbChoice = flameOrbChoice = null;
+        originalOrbChoice = flameOrbChoice = lanternOrbChoice = null;
         appearanceOrbStyle = null;
         appearanceGradientSwitch = null;
         appearanceColorA = appearanceColorB = null;
@@ -1425,6 +1426,10 @@ public final class DashboardActivity extends LocalizedActivity {
         LinearLayout.LayoutParams flameParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
         flameParams.leftMargin = dp(8);
         choices.addView(flameOrbChoice, flameParams);
+        lanternOrbChoice = orbAppearanceChoice(getString(R.string.ui_orb_lantern), PickPicoTheme.ORB_LANTERN);
+        LinearLayout.LayoutParams lanternParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        lanternParams.leftMargin = dp(8);
+        choices.addView(lanternOrbChoice, lanternParams);
         card.addView(choices);
         if (Build.VERSION.SDK_INT < 33) {
             flameOrbChoice.setEnabled(false);
@@ -1454,14 +1459,17 @@ public final class DashboardActivity extends LocalizedActivity {
     }
 
     private void refreshOrbAppearanceChoices() {
-        if (originalOrbChoice == null || flameOrbChoice == null) return;
-        boolean flame = PickPicoTheme.ORB_FLAME.equals(theme.orbStyle);
-        originalOrbChoice.setSelected(!flame);
-        flameOrbChoice.setSelected(flame);
-        originalOrbChoice.setContentDescription(getString(R.string.ui_extra_63add8f1fc) + (!flame ? getString(R.string.ui_extra_d7a1e57362) : ""));
-        flameOrbChoice.setContentDescription(getString(R.string.ui_extra_383a3221cf) + (flame ? getString(R.string.ui_extra_d7a1e57362) : ""));
-        originalOrbChoice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), !flame));
-        flameOrbChoice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), flame));
+        String style = theme.orbStyle;
+        bindOrbChoice(originalOrbChoice, PickPicoTheme.ORB_ORIGINAL.equals(style), getString(R.string.ui_extra_63add8f1fc));
+        bindOrbChoice(flameOrbChoice, PickPicoTheme.ORB_FLAME.equals(style), getString(R.string.ui_extra_383a3221cf));
+        bindOrbChoice(lanternOrbChoice, PickPicoTheme.ORB_LANTERN.equals(style), getString(R.string.ui_orb_lantern_description));
+    }
+
+    private void bindOrbChoice(TextView choice, boolean selected, String description) {
+        if (choice == null) return;
+        choice.setSelected(selected);
+        choice.setContentDescription(description + (selected ? getString(R.string.ui_extra_d7a1e57362) : ""));
+        choice.setBackground(PickPicoTheme.control(theme, dp(12), PickPicoTheme.accentA(theme), selected));
     }
 
     private View buildAppearanceCard() {

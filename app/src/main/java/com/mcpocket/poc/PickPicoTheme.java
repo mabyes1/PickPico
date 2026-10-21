@@ -23,6 +23,7 @@ final class PickPicoTheme {
     static final String PREFS = "pickpico_appearance";
     static final String ORB_ORIGINAL = "original";
     static final String ORB_FLAME = "flame";
+    static final String ORB_LANTERN = "lantern";
 
     // Shared product UI tokens. Keep product-facing screens on this palette
     // instead of letting individual Activities grow their own parallel theme.
@@ -137,7 +138,9 @@ final class PickPicoTheme {
     }
 
     static String normalizeOrbStyle(String value) {
-        return ORB_FLAME.equals(value) ? ORB_FLAME : ORB_ORIGINAL;
+        if (ORB_FLAME.equals(value)) return ORB_FLAME;
+        if (ORB_LANTERN.equals(value)) return ORB_LANTERN;
+        return ORB_ORIGINAL;
     }
 
     static int parseHex(String value, int fallback) {

@@ -382,6 +382,8 @@
     <string name="ui_extra_63add8f1fc" formatted="false">"原版懸浮球"</string>
     <string name="ui_extra_d7a1e57362" formatted="false">"，已選取"</string>
     <string name="ui_extra_383a3221cf" formatted="false">"火焰懸浮球"</string>
+    <string name="ui_orb_lantern" formatted="false">"小燈籠"</string>
+    <string name="ui_orb_lantern_description" formatted="false">"小燈籠懸浮球"</string>
     <string name="ui_extra_194405e182" formatted="false">"本機存取憑證尚未就緒"</string>
     <string name="ui_extra_cecf3ba368" formatted="false">"已複製連線資訊"</string>
     <string name="ui_extra_ca265dedb7" formatted="false">"允許這項功能後，AI 可透過 PickPico 鎖定手機。"</string>

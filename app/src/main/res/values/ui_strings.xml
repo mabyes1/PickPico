@@ -382,6 +382,8 @@
     <string name="ui_extra_63add8f1fc" formatted="false">"Original orb"</string>
     <string name="ui_extra_d7a1e57362" formatted="false">", selected"</string>
     <string name="ui_extra_383a3221cf" formatted="false">"Flame orb"</string>
+    <string name="ui_orb_lantern" formatted="false">"Lantern"</string>
+    <string name="ui_orb_lantern_description" formatted="false">"Lantern orb"</string>
     <string name="ui_extra_194405e182" formatted="false">"Local bearer is not ready"</string>
     <string name="ui_extra_cecf3ba368" formatted="false">"Connection copied"</string>
     <string name="ui_extra_ca265dedb7" formatted="false">"Allow PickPico agents to lock this phone when you permit the capability."</string>
