@@ -22,6 +22,7 @@ final class DeveloperOptionsControl {
                 .put("developerOptionsEnabled", read(context, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED))
                 .put("wirelessDebuggingEnabled", read(context, WIFI_ADB))
                 .put("usbDebuggingEnabled", read(context, Settings.Global.ADB_ENABLED))
+                .put("usbDebuggingRequiredForWireless", requiresUsbDebugging())
                 .put("grantCommand", "adb shell pm grant " + context.getPackageName() + " " + PERMISSION);
     }
 
@@ -33,6 +34,9 @@ final class DeveloperOptionsControl {
             throw new CommandRuntime.CommandInputException("UNLOCK_REQUIRED: unlock the phone before enabling debugging");
         if (enabled) {
             write(context, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, true);
+            // Samsung Android 16 stops adbd when the lock-screen USB mode resets
+            // to charging if USB debugging is off, even while adb_wifi_enabled=1.
+            if (requiresUsbDebugging()) write(context, Settings.Global.ADB_ENABLED, true);
             write(context, WIFI_ADB, true);
         } else {
             write(context, WIFI_ADB, false);
@@ -42,6 +46,7 @@ final class DeveloperOptionsControl {
         JSONObject state = status(context);
         boolean verified = enabled
                 ? state.getBoolean("developerOptionsEnabled") && state.getBoolean("wirelessDebuggingEnabled")
+                        && (!requiresUsbDebugging() || state.getBoolean("usbDebuggingEnabled"))
                 : !state.getBoolean("developerOptionsEnabled") && !state.getBoolean("wirelessDebuggingEnabled")
                         && !state.getBoolean("usbDebuggingEnabled");
         return state.put("requestedEnabled", enabled).put("verified", verified)
@@ -56,6 +61,14 @@ final class DeveloperOptionsControl {
             if (!result.optBoolean("success")) return result.put("permissionGranted", false);
         }
         return status(context).put("success", hasPermission(context));
+    }
+
+    static boolean requiresUsbDebugging() {
+        return requiresUsbDebugging(android.os.Build.MANUFACTURER, android.os.Build.VERSION.SDK_INT);
+    }
+
+    static boolean requiresUsbDebugging(String manufacturer, int sdk) {
+        return "samsung".equalsIgnoreCase(manufacturer) && sdk == 36;
     }
 
     private static boolean read(Context context, String key) {

@@ -32,6 +32,8 @@ final class PicoAdbManager {
 
     private static final String PREFS = "picoadb_state";
     private static final String KEY_PAIRED = "paired";
+    private static final String KEY_AUTO_RECONNECT = "auto_reconnect";
+    private static final String KEY_AUTHORIZATION_REQUIRED = "authorization_required";
     private static final String KEY_LAST_PAIR_AT = "last_pair_at";
     private static final String KEY_LAST_CONNECT_AT = "last_connect_at";
     private static final String KEY_LAST_SERIAL = "last_serial";
@@ -118,6 +120,8 @@ final class PicoAdbManager {
     private synchronized void recordConnection(PicoAdbClient.Result devices, String serial) {
         connectionState = devices == null ? "disconnected" : devices.success()
                 ? PicoAdbClient.transportState(devices.output, serial) : "error";
+        if ("connected".equals(connectionState))
+            prefs.edit().putBoolean(KEY_AUTHORIZATION_REQUIRED, false).apply();
         connectionError = devices != null && !devices.success()
                 ? devices.output.substring(0, Math.min(500, devices.output.length())) : "";
         connectionCheckedElapsed = SystemClock.elapsedRealtime();
@@ -135,6 +139,14 @@ final class PicoAdbManager {
 
     void stopDiscovery() {
         mainHandler.post(this::stopDiscoveryOnMain);
+    }
+
+    boolean isAutoReconnectEnabled() {
+        return prefs.getBoolean(KEY_AUTO_RECONNECT, true);
+    }
+
+    void setAutoReconnectEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_AUTO_RECONNECT, enabled).apply();
     }
 
     synchronized JSONObject status() throws JSONException {
@@ -160,6 +172,8 @@ final class PicoAdbManager {
         return new JSONObject()
                 .put("state", state)
                 .put("paired", paired)
+                .put("autoReconnectEnabled", isAutoReconnectEnabled())
+                .put("authorizationRequired", prefs.getBoolean(KEY_AUTHORIZATION_REQUIRED, false))
                 .put("systemControl", DeveloperOptionsControl.status(context))
                 .put("connected", connected)
                 .put("connection", new JSONObject().put("state", checkedState)
@@ -207,6 +221,7 @@ final class PicoAdbManager {
                 lastOutput = result.output;
                 if (result.paired()) {
                     prefs.edit()
+                            .putBoolean(KEY_AUTHORIZATION_REQUIRED, false)
                             .putBoolean(KEY_PAIRED, true)
                             .putString(KEY_LAST_PAIR_AT, Instant.now().toString())
                             .apply();
@@ -253,6 +268,7 @@ final class PicoAdbManager {
             }
 
             PicoAdbClient.Result result = client.connect(endpoint.host, endpoint.port);
+            recordAuthorization(result);
             synchronized (PicoAdbManager.this) {
                 connecting = false;
                 lastOutput = result.output;
@@ -376,6 +392,12 @@ final class PicoAdbManager {
     }
 
     private String ensureConnected() {
+        // A stale native transport must never override an explicit user OFF.
+        if (android.provider.Settings.Global.getInt(context.getContentResolver(),
+                DeveloperOptionsControl.WIFI_ADB, 0) == 0) {
+            synchronized (this) { lastError = "ADB_DISABLED: turn on ADB in PickPico"; }
+            return "";
+        }
         String existing = prefs.getString(KEY_LAST_SERIAL, "");
         if (!existing.isEmpty()) {
             PicoAdbClient.Result devices = client.devices();
@@ -384,13 +406,20 @@ final class PicoAdbManager {
                 return existing;
         }
 
+        if (!isAutoReconnectEnabled()) {
+            synchronized (this) { lastError = "ADB_AUTO_RECONNECT_DISABLED: turn on ADB in PickPico to connect manually, or enable automatic reconnection"; }
+            return "";
+        }
+
         PicoAdbDiscovery.Endpoint endpoint = awaitEndpoint(false, ENDPOINT_WAIT_MS);
         if (endpoint == null) {
             recordConnection(null, existing);
             return "";
         }
         PicoAdbClient.Result connect = client.connect(endpoint.host, endpoint.port);
+        recordAuthorization(connect);
         if (!connect.connected()) {
+            synchronized (this) { lastError = connect.output; }
             recordConnection(null, existing);
             return "";
         }
@@ -417,7 +446,9 @@ final class PicoAdbManager {
         try {
             String serial = ensureConnected();
             if (serial.isEmpty()) {
-                synchronized (this) { lastError = "Enable Android Wireless Debugging to connect this phone"; }
+                synchronized (this) {
+                    if (lastError.isEmpty()) lastError = "Enable Android Wireless Debugging to connect this phone";
+                }
                 return error("picoadb_not_connected", lastError).put("toolCallCount", callCount);
             }
             File workspace = new File(context.getFilesDir(), "workspaces");
@@ -462,6 +493,12 @@ final class PicoAdbManager {
             synchronized (this) { executing = false; }
             refreshConnection();
         }
+    }
+
+    private void recordAuthorization(PicoAdbClient.Result result) {
+        if (result.connected()) prefs.edit().putBoolean(KEY_AUTHORIZATION_REQUIRED, false).apply();
+        else if (result.output.contains("ADB_AUTHORIZATION_REQUIRED"))
+            prefs.edit().putBoolean(KEY_AUTHORIZATION_REQUIRED, true).apply();
     }
 
     private PicoAdbDiscovery.Endpoint awaitEndpoint(boolean pairingEndpoint, long timeoutMs) {

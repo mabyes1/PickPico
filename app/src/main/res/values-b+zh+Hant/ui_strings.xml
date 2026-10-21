@@ -463,4 +463,14 @@
     <string name="ui_dev_control_pending">開發者已啟用。請連上 Wi-Fi；若 Android 顯示網路確認，請允許。</string>
     <string name="ui_dev_control_enabled">開發者與無線偵錯已開啟</string>
     <string name="ui_dev_control_disabled">開發者與偵錯已關閉，原配對已保留</string>
+    <string name="ui_adb_authorization_recovery">Android 已不再信任原本的 ADB 身分，可能是閒置 7 天到期或授權被撤銷。請開啟無線偵錯，選「使用配對碼配對裝置」，再使用下方配對區重新授權。原金鑰與 App 設定會保留。</string>
+    <string name="ui_adb_development_settings">開發模式設定</string>
+    <string name="ui_adb_toggle">開關 ADB</string>
+    <string name="ui_adb_toggle_note">開啟或關閉 Android 無線偵錯。</string>
+    <string name="ui_adb_auto_reconnect">自動重新連線</string>
+    <string name="ui_adb_auto_reconnect_note">使用 ADB 時自動恢復連線；手動關閉 ADB 後會保持關閉。</string>
+    <string name="ui_adb_off_status">ADB 已關閉。</string>
+    <string name="ui_adb_waiting_status">ADB 已開啟，使用 ADB 指令時會建立連線。</string>
+    <string name="ui_adb_manual_status">自動重新連線已關閉。需要手動連線時，將 ADB 關閉後再開啟。</string>
+    <string name="ui_adb_samsung_note">同步控制 Wi-Fi 與 USB 偵錯，讓這台 Samsung 鎖屏後仍可使用 ADB。</string>
 </resources>

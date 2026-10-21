@@ -463,4 +463,14 @@
     <string name="ui_dev_control_pending">Developer options are enabled. Connect to Wi-Fi and accept the Android network confirmation if shown.</string>
     <string name="ui_dev_control_enabled">Developer options and Wi-Fi debugging enabled</string>
     <string name="ui_dev_control_disabled">Developer options and debugging disabled; saved pairing retained</string>
+    <string name="ui_adb_authorization_recovery">Android no longer trusts the saved ADB identity. Authorization may expire after 7 days of inactivity or be revoked. Open Wireless Debugging, choose Pair device with pairing code, then use the pairing section below. Your existing key and app settings are retained.</string>
+    <string name="ui_adb_development_settings">Development settings</string>
+    <string name="ui_adb_toggle">ADB</string>
+    <string name="ui_adb_toggle_note">Turn Android wireless debugging on or off.</string>
+    <string name="ui_adb_auto_reconnect">Automatic reconnection</string>
+    <string name="ui_adb_auto_reconnect_note">Reconnect when an ADB command needs it. ADB stays off when you turn it off.</string>
+    <string name="ui_adb_off_status">ADB is off.</string>
+    <string name="ui_adb_waiting_status">ADB is on. It will connect when an ADB command needs it.</string>
+    <string name="ui_adb_manual_status">Automatic reconnection is off. Toggle ADB off and on to connect manually.</string>
+    <string name="ui_adb_samsung_note">Controls Wi-Fi and USB debugging together so ADB stays available after this Samsung phone locks.</string>
 </resources>

@@ -1,0 +1,306 @@
+--------- beginning of main
+I/adbd    ( 8121): jdwp connection from 24187
+I/adbd    ( 8121): jdwp connection from 6200
+I/adbd    ( 8121): jdwp connection from 11903
+I/adbd    ( 8121): jdwp connection from 1471
+I/adbd    ( 8121): jdwp connection from 5277
+I/adbd    ( 8121): jdwp connection from 13995
+I/adbd    ( 8121): jdwp connection from 12612
+I/adbd    ( 8121): adbd_auth: received a new framework connection
+I/adbd    ( 8121): adbd_auth: received new framework fd 26 (current = -1)
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+I/adbd    ( 8121): New TLS connection [fd=11]
+I/adbd    ( 8121): New TLS connection [fd=30]
+I/adbd    ( 8121): [server]: Initializing adbwifi TlsConnection
+I/adbd    ( 8121): [server]: Initializing adbwifi TlsConnection
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+I/adbd    ( 8121): fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+I/adbd    ( 8121): fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+E/adbd    ( 8121): Invalid base64 key 
+I/adbd    ( 8121): fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+E/adbd    ( 8121): Invalid base64 key 
+I/adbd    ( 8121): [server]: Starting adbwifi tls handshake
+I/adbd    ( 8121): [server]: Starting adbwifi tls handshake
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): [server]: Handshake succeeded.
+I/adbd    ( 8121): adbd_wifi_secure_connect: connected host-30
+I/adbd    ( 8121): adbd_auth: marking framework writable
+I/adbd    ( 8121): adbd_auth: sending packet: WE
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): [server]: Handshake succeeded.
+I/adbd    ( 8121): adbd_wifi_secure_connect: connected host-11
+I/adbd    ( 8121): adbd_auth: marking framework writable
+I/adbd    ( 8121): adbd_auth: sending packet: WE
+I/adbd    ( 8121): New TLS connection [fd=32]
+I/adbd    ( 8121): [server]: Initializing adbwifi TlsConnection
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+I/adbd    ( 8121): fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+E/adbd    ( 8121): Invalid base64 key 
+I/adbd    ( 8121): [server]: Starting adbwifi tls handshake
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): [server]: Handshake succeeded.
+I/adbd    ( 8121): adbd_wifi_secure_connect: connected host-32
+I/adbd    ( 8121): adbd_auth: marking framework writable
+I/adbd    ( 8121): adbd_auth: sending packet: WE
+I/adbd    ( 8121): adbd service requested 'shell,v2,TERM=dumb:export ANDROID_LOG_TAGS=''; exec logcat '-v' 'brief' '-T' '100' '-s' 'AdbService' 'UsbDeviceManager' 'init' 'adbd''
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+I/adbd    ( 8121): adbd service requested 'shell,v2,raw:id'
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+E/adbd    ( 8121): [server]: SSL_read failed [bytes_read=0, io_error=SSL_ERROR_SYSCALL: 'Success']
+I/adbd    ( 8121): host-30: connection terminated: read failed
+I/adbd    ( 8121): ADB wifi device disconnected
+I/adbd    ( 8121): adbd_auth: marking framework writable
+I/adbd    ( 8121): adbd_auth: sending packet: WF
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+I/adbd    ( 8121): New TLS connection [fd=30]
+I/adbd    ( 8121): [server]: Initializing adbwifi TlsConnection
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+I/adbd    ( 8121): fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+E/adbd    ( 8121): Invalid base64 key 
+I/adbd    ( 8121): [server]: Starting adbwifi tls handshake
+I/adbd    ( 8121): adbd_auth: loading keys from /data/misc/adb/adb_keys
+I/adbd    ( 8121): [server]: Handshake succeeded.
+I/adbd    ( 8121): adbd_wifi_secure_connect: connected host-30
+I/adbd    ( 8121): adbd_auth: marking framework writable
+I/adbd    ( 8121): adbd_auth: sending packet: WE
+I/adbd    ( 8121): adbd service requested 'shell,v2,raw:id'
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+I/adbd    ( 8121): jdwp connection from 9727
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+--------- beginning of system
+V/UsbDeviceManager( 3303): onKeyguardStateChanged: isShowing:false secure:true user:0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+W/adbd    ( 8121): timed out while waiting for FUNCTIONFS_BIND, trying again
+I/adbd    ( 8121): UsbFfs: connection terminated: monitor thread finished
+I/adbd    ( 8121): opening control endpoint /dev/usb-ffs/adb/ep0
+V/UsbDeviceManager( 3303): onKeyguardStateChanged: isShowing:true secure:true user:0
+D/UsbDeviceManager( 3303): handleMessage -> MSG_UPDATE_SCREEN_LOCK: mScreenLocked=true
+D/UsbDeviceManager( 3303): getPersistProp: return=persist.sys.usb.config
+D/UsbDeviceManager( 3303): setEnabledFunctions functions=262144 ,forceRestart=false ,usbDataUnlocked=false ,operationId=1495
+D/UsbDeviceManager( 3303): updateUsbNotification(false): mConnected=false mHostConnected=false mSourcePower=false mSinkPower=false mUsbCharging=false
+D/UsbDeviceManager( 3303): NOT FLIP or FLIP OPENED
+D/UsbDeviceManager( 3303): trySetEnabledFunctions: usbFunctions=sec_charging forceRestart=true
+D/UsbDeviceManager( 3303): Update mCurrentFunctions=sec_charging mSecCurrentFunctions=sec_charging
+D/UsbDeviceManager( 3303): setUsbConfig(none)

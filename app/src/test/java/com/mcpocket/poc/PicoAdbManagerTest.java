@@ -32,6 +32,7 @@ public final class PicoAdbManagerTest {
 
     @Before public void setup() throws Exception {
         context = RuntimeEnvironment.getApplication();
+        android.provider.Settings.Global.putInt(context.getContentResolver(), DeveloperOptionsControl.WIFI_ADB, 1);
         context.getSharedPreferences("picoadb_state", 0).edit().clear()
                 .putBoolean("paired", true).putString("last_pair_at", "original-pair")
                 .putString("last_connect_at", "historic-connect").putString("last_serial", serial).commit();
@@ -60,6 +61,30 @@ public final class PicoAdbManagerTest {
                 "List of devices attached\n" + serial + "\t" + state + " product:test\n");
         when(client.devices()).thenReturn(result);
         when(client.probeDevices()).thenReturn(result);
+    }
+
+    @Test public void autoReconnectOffAllowsExistingTransportButNeverDiscoversOrConnects() throws Exception {
+        manager.setAutoReconnectEnabled(false);
+        assertFalse(manager.status().getBoolean("autoReconnectEnabled"));
+        clearInvocations(discovery);
+        assertTrue(manager.execute(new JSONObject().put("command", "id"), true, 1).getBoolean("success"));
+        devices("offline");
+        JSONObject result = manager.execute(new JSONObject().put("command", "id"), true, 1);
+        assertTrue(result.getJSONObject("error").getString("message").contains("ADB_AUTO_RECONNECT_DISABLED"));
+        verify(discovery, never()).connectEndpoint();
+        verify(client, never()).connect(anyString(), anyInt());
+        assertFalse(context.getSharedPreferences("picoadb_state", 0).getBoolean("auto_reconnect", true));
+    }
+
+    @Test public void manuallyDisabledAdbNeverReconnectsEvenWhenAutomaticReconnectionIsOn() throws Exception {
+        devices("device"); // Native state can lag behind the user's OFF switch.
+        android.provider.Settings.Global.putInt(context.getContentResolver(), DeveloperOptionsControl.WIFI_ADB, 0);
+        assertTrue(manager.isAutoReconnectEnabled());
+        JSONObject result = manager.execute(new JSONObject().put("command", "id"), true, 1);
+        assertTrue(result.getJSONObject("error").getString("message").contains("ADB_DISABLED"));
+        verify(discovery, never()).connectEndpoint();
+        verify(client, never()).connect(anyString(), anyInt());
+        verify(client, never()).runInWorkspace(anyList(), anyLong(), any(File.class), any(File.class));
     }
 
     @Test public void savedPairingAndHistoricConnectDoNotMeanConnected() throws Exception {
@@ -116,6 +141,29 @@ public final class PicoAdbManagerTest {
         assertEquals("picoadb_not_connected", result.getJSONObject("error").getString("code"));
         verify(client, never()).runInWorkspace(anyList(), anyLong(), any(File.class), any(File.class));
         assertTrue(manager.status().getBoolean("paired"));
+    }
+
+    @Test public void expiredAuthorizationIsExposedWithoutErasingIdentityAndClearedOnRecovery() throws Exception {
+        devices("offline");
+        when(discovery.connectEndpoint()).thenReturn(new PicoAdbDiscovery.Endpoint("phone", "127.0.0.1", 39991));
+        when(client.connect(anyString(), anyInt())).thenReturn(PicoAdbClient.Result.failure(1, false,
+                "ADB_AUTHORIZATION_REQUIRED: Android rejected the saved ADB identity"));
+        JSONObject result = manager.execute(new JSONObject().put("command", "id"), true, 1);
+        assertTrue(result.getJSONObject("error").getString("message").contains("ADB_AUTHORIZATION_REQUIRED"));
+        assertTrue(manager.status().getBoolean("authorizationRequired"));
+        assertTrue(manager.status().getBoolean("paired"));
+        assertEquals("original-pair", manager.status().getString("lastPairAt"));
+        // A fresh manager must retain the recovery requirement after an app restart.
+        PicoAdbManager restored = new PicoAdbManager(context, client, discovery);
+        try {
+            assertTrue(restored.status().getBoolean("authorizationRequired"));
+            when(client.connect(anyString(), anyInt())).thenAnswer(call -> {
+                devices("device");
+                return new PicoAdbClient.Result(0, false, false, "connected to " + serial);
+            });
+            assertTrue(restored.execute(new JSONObject().put("command", "id"), true, 1).getBoolean("success"));
+            assertFalse(restored.status().getBoolean("authorizationRequired"));
+        } finally { ((ExecutorService) ReflectionHelpers.getField(restored, "worker")).shutdownNow(); }
     }
 
     @Test public void missingNativeInstallPushesApkUsesPackageManagerAndCleansOnlyItsStaging() throws Exception {

@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
  * MCP execution uses the same persistent identity and bounded process runner.
  */
 final class PicoAdbClient {
+    private static final Object DAEMON_POLICY_LOCK = new Object();
     private static final long PAIR_TIMEOUT_MS = 30_000L;
     private static final long CONNECT_TIMEOUT_MS = 20_000L;
     // Interactive command output is bounded in memory. Diagnostics stream to disk.
@@ -65,7 +67,30 @@ final class PicoAdbClient {
     Result connect(String host, int port) {
         if (!isValidHost(host)) return Result.validation("Connect host is invalid");
         if (!isValidPort(port)) return Result.validation("Connect port is invalid");
-        return run(list("connect", endpoint(host, port)), CONNECT_TIMEOUT_MS);
+        File log = new File(context.getCacheDir(), "adb." + android.os.Process.myUid() + ".log");
+        long offset = log.length();
+        Result result = run(list("connect", endpoint(host, port)), CONNECT_TIMEOUT_MS);
+        return diagnoseConnect(result, log, offset, endpoint(host, port));
+    }
+
+    // The native client hides TLS rejection behind "failed to connect" (even exit 0).
+    // Inspect only this attempt's bounded log tail, never historical failures.
+    static Result diagnoseConnect(Result result, File log, long offset, String endpoint) {
+        if (result.connected()) return result;
+        try (RandomAccessFile input = new RandomAccessFile(log, "r")) {
+            long start = input.length() < offset ? 0 : offset;
+            input.seek(Math.max(start, input.length() - 16384));
+            byte[] bytes = new byte[(int) Math.min(16384, input.length() - input.getFilePointer())];
+            input.readFully(bytes);
+            String appended = new String(bytes, StandardCharsets.UTF_8);
+            if (appended.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") && appended.contains(endpoint))
+                return Result.failure(1, false, "ADB_AUTHORIZATION_REQUIRED: Android rejected the saved ADB identity. "
+                        + "The authorization may have expired or been revoked; pair again using Android Wireless Debugging. "
+                        + "The existing key is retained.");
+        } catch (java.io.IOException ignored) {
+            // Missing diagnostics must not obscure the original connection failure.
+        }
+        return result;
     }
 
     Result devices() {
@@ -138,6 +163,22 @@ final class PicoAdbClient {
             builder.environment().put("HOME", adbHome.getAbsolutePath());
             builder.environment().put("TMPDIR", context.getCacheDir().getAbsolutePath());
             builder.environment().put("ANDROID_SDK_HOME", adbHome.getAbsolutePath());
+            // Java owns reconnection policy; native mDNS must not bypass the UI switch.
+            builder.environment().put("ADB_MDNS_AUTO_CONNECT", "0");
+
+            synchronized (DAEMON_POLICY_LOCK) {
+                android.content.SharedPreferences policy = context.getSharedPreferences("picoadb_state", 0);
+                if (!policy.getBoolean("native_autoconnect_disabled_v1", false)) {
+                    // An old orphan daemon keeps its original environment across APK updates.
+                    // Replace it once so the user's switch also governs upgraded installs.
+                    ProcessBuilder stop = new ProcessBuilder(adbBinary.getAbsolutePath(), "kill-server")
+                            .directory(cwd).redirectErrorStream(true);
+                    stop.environment().putAll(builder.environment());
+                    Result stopped = execute(stop, 5000L, null);
+                    if (!stopped.success()) return stopped;
+                    policy.edit().putBoolean("native_autoconnect_disabled_v1", true).apply();
+                }
+            }
 
             return execute(builder, timeoutMs, outputFile);
         } catch (Exception error) {

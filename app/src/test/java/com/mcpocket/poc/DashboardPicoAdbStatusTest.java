@@ -34,6 +34,13 @@ public final class DashboardPicoAdbStatusTest {
             assertEquals("PAIRING · SAVED", view(activity, "settingsPicoAdbState").getText().toString());
             assertEquals("CONNECTION · NOT CONNECTED", view(activity, "settingsPicoAdbConnectionState").getText().toString());
             ReflectionHelpers.callInstanceMethod(activity, "showPage", ReflectionHelpers.ClassParameter.from(int.class, 6));
+            android.widget.Switch adbToggle = ReflectionHelpers.getField(activity, "adbEnabledSwitch");
+            android.widget.Switch reconnectToggle = ReflectionHelpers.getField(activity, "adbAutoReconnectSwitch");
+            assertEquals("ADB", adbToggle.getContentDescription());
+            assertEquals("Automatic reconnection", reconnectToggle.getContentDescription());
+            // Three normal controls share one card; refresh must never write settings.
+            assertEquals(adbToggle.getParent().getParent(), reconnectToggle.getParent().getParent());
+            verify(manager, never()).setAutoReconnectEnabled(anyBoolean());
             assertEquals("PAIRING · SAVED", view(activity, "picoAdbPairingState").getText().toString());
             assertEquals("CONNECTION · NOT CONNECTED", view(activity, "picoAdbState").getText().toString());
             status.put("connected", true).getJSONObject("connection").put("state", "connected");
@@ -43,6 +50,12 @@ public final class DashboardPicoAdbStatusTest {
             ReflectionHelpers.callInstanceMethod(activity, "refreshStatus");
             assertEquals("PAIRING · SAVED", view(activity, "picoAdbPairingState").getText().toString());
             assertEquals("CONNECTION · OFFLINE", view(activity, "picoAdbState").getText().toString());
+            status.put("authorizationRequired", true);
+            ReflectionHelpers.callInstanceMethod(activity, "refreshStatus");
+            assertEquals("PAIRING · AUTHORIZATION REQUIRED", view(activity, "picoAdbPairingState").getText().toString());
+            assertEquals(android.view.View.VISIBLE,
+                    ((android.view.View) ReflectionHelpers.getField(activity, "picoAdbPairCard")).getVisibility());
+            org.junit.Assert.assertTrue(view(activity, "picoAdbDetail").getText().toString().contains("7 days"));
         } finally {
             ReflectionHelpers.setStaticField(PicoAdbManager.class, "instance", previous);
         }

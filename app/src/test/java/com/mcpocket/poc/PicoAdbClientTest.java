@@ -20,6 +20,22 @@ public class PicoAdbClientTest {
     }
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
+    @Test public void tlsRejectionUsesOnlyNewLogBytesForTheRequestedEndpoint() throws Exception {
+        File log = temporary.newFile("adb.log");
+        String rejection = "Post-handshake SSL_peek failed [SSLV3_ALERT_CERTIFICATE_UNKNOWN]\n"
+                + "kicking transport 192.168.0.15:41059\n";
+        java.nio.file.Files.write(log.toPath(), rejection.getBytes(StandardCharsets.UTF_8));
+        PicoAdbClient.Result failed = new PicoAdbClient.Result(0, false, false, "failed to connect");
+        assertTrue(PicoAdbClient.diagnoseConnect(failed, log, 0, "192.168.0.15:41059")
+                .output.startsWith("ADB_AUTHORIZATION_REQUIRED"));
+        assertFalse(PicoAdbClient.diagnoseConnect(failed, log, 0, "192.168.0.15:41059").success());
+        assertSame(failed, PicoAdbClient.diagnoseConnect(failed, log, log.length(), "192.168.0.15:41059"));
+        assertSame(failed, PicoAdbClient.diagnoseConnect(failed, log, 0, "192.168.0.15:40000"));
+        PicoAdbClient.Result connected = new PicoAdbClient.Result(0, false, false, "connected to 192.168.0.15:41059");
+        assertSame(connected, PicoAdbClient.diagnoseConnect(connected, log, 0, "192.168.0.15:41059"));
+        assertSame(failed, PicoAdbClient.diagnoseConnect(failed, new File(log, "missing"), 0, "192.168.0.15:41059"));
+    }
+
     @Test public void diagnosticFileRetainsOutputBeyondFourMiB() throws Exception {
         File target = temporary.newFile("diagnostic.txt");
         PicoAdbClient.Result result = PicoAdbClient.execute(child("large"), 15_000L, target);

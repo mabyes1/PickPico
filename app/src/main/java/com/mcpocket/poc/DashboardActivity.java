@@ -184,18 +184,15 @@ public final class DashboardActivity extends LocalizedActivity {
     private TextView picoAdbDetail;
     private TextView picoAdbScanAction;
     private TextView picoAdbPairAction;
-    private TextView picoAdbConnectAction;
-    private TextView picoAdbPairingToggle;
     private View picoAdbSetupCard;
     private View picoAdbPairCard;
-    private View picoAdbConnectCard;
-    private boolean picoAdbPairingExpanded;
     private EditText picoAdbPairCodeInput;
     private boolean picoAdbBusy;
     private TextView developerControlState;
     private TextView developerControlNote;
-    private TextView developerEnableAction;
-    private TextView developerDisableAction;
+    private Switch adbEnabledSwitch;
+    private Switch adbAutoReconnectSwitch;
+    private boolean updatingAdbControls;
     private TextView developerAuthorizeAction;
 
     // Developer / diagnostics
@@ -528,12 +525,11 @@ public final class DashboardActivity extends LocalizedActivity {
         picoAdbDetail = null;
         picoAdbScanAction = null;
         picoAdbPairAction = null;
-        picoAdbConnectAction = null;
-        picoAdbPairingToggle = null;
-        picoAdbSetupCard = picoAdbPairCard = picoAdbConnectCard = null;
+        picoAdbSetupCard = picoAdbPairCard = null;
         picoAdbPairCodeInput = null;
         developerControlState = developerControlNote = null;
-        developerEnableAction = developerDisableAction = developerAuthorizeAction = null;
+        adbEnabledSwitch = adbAutoReconnectSwitch = null;
+        developerAuthorizeAction = null;
 
         devLocalEndpoint = null;
         devRemoteEndpoint = null;
@@ -1151,31 +1147,32 @@ public final class DashboardActivity extends LocalizedActivity {
 
     private View buildPicoAdbPage() {
         LinearLayout root = pageRoot();
-        picoAdbPairingExpanded = false;
-
-        TextView intro = text(
-                getString(R.string.ui_your_agent_chooses_tools_automatically_system_access_adds_android_commands_file_transfers_and_apk_installation_through_adb),
-                13,
-                Typeface.NORMAL,
-                MUTED);
-        intro.setPadding(dp(2), 0, dp(2), dp(14));
-        root.addView(intro);
-
-        LinearLayout statusCard = glassCard(true);
-        statusCard.addView(text(getString(R.string.ui_system_control_a2fc0e), 14, Typeface.BOLD, TEXT));
+        LinearLayout controlCard = glassCard(true);
+        controlCard.addView(text(getString(R.string.ui_adb_development_settings), 16, Typeface.BOLD, TEXT));
+        adbEnabledSwitch = adbSwitchRow(controlCard, getString(R.string.ui_adb_toggle),
+                getString(DeveloperOptionsControl.requiresUsbDebugging()
+                        ? R.string.ui_adb_samsung_note : R.string.ui_adb_toggle_note), enabled -> {
+                    if (!updatingAdbControls) setDeveloperControl(enabled);
+                });
+        adbAutoReconnectSwitch = adbSwitchRow(controlCard, getString(R.string.ui_adb_auto_reconnect),
+                getString(R.string.ui_adb_auto_reconnect_note), enabled -> {
+                    if (updatingAdbControls) return;
+                    PicoAdbManager manager = PicoAdbManager.get(this);
+                    manager.setAutoReconnectEnabled(enabled);
+                    refreshStatus();
+                });
+        TextView manageSettings = actionButton(getString(R.string.ui_android_wireless_debugging), false, false);
+        manageSettings.setOnClickListener(v -> openWirelessDebuggingSettings());
+        controlCard.addView(manageSettings, new LinearLayout.LayoutParams(-1, dp(44)));
         picoAdbPairingState = text(getString(R.string.ui_pairing_checking), 12, Typeface.BOLD, AMBER);
         picoAdbPairingState.setPadding(0, dp(8), 0, 0);
-        statusCard.addView(picoAdbPairingState);
+        controlCard.addView(picoAdbPairingState);
         picoAdbState = text(getString(R.string.ui_connection_checking), 12, Typeface.BOLD, AMBER);
         picoAdbState.setPadding(0, dp(8), 0, 0);
-        statusCard.addView(picoAdbState);
+        controlCard.addView(picoAdbState);
         picoAdbDetail = text(getString(R.string.ui_reading_picoadb_state), 12, Typeface.NORMAL, MUTED);
         picoAdbDetail.setPadding(0, dp(6), 0, 0);
-        statusCard.addView(picoAdbDetail);
-        root.addView(statusCard, cardParams(0));
-
-        LinearLayout controlCard = glassCard(true);
-        controlCard.addView(text(getString(R.string.ui_dev_control_title), 14, Typeface.BOLD, TEXT));
+        controlCard.addView(picoAdbDetail);
         developerControlState = text("", 12, Typeface.BOLD, AMBER);
         developerControlState.setPadding(0, dp(8), 0, 0);
         controlCard.addView(developerControlState);
@@ -1185,46 +1182,8 @@ public final class DashboardActivity extends LocalizedActivity {
         developerAuthorizeAction = actionButton(getString(R.string.ui_dev_control_authorize), false, false);
         developerAuthorizeAction.setOnClickListener(v -> authorizeDeveloperControl());
         controlCard.addView(developerAuthorizeAction, new LinearLayout.LayoutParams(-1, dp(44)));
-        developerEnableAction = actionButton(getString(R.string.ui_dev_control_enable), false, false);
-        developerEnableAction.setOnClickListener(v -> setDeveloperControl(true));
-        LinearLayout.LayoutParams enableParams = new LinearLayout.LayoutParams(-1, dp(44));
-        enableParams.topMargin = dp(8);
-        controlCard.addView(developerEnableAction, enableParams);
-        developerDisableAction = actionButton(getString(R.string.ui_dev_control_disable), false, false);
-        developerDisableAction.setOnClickListener(v -> setDeveloperControl(false));
-        LinearLayout.LayoutParams disableParams = new LinearLayout.LayoutParams(-1, dp(44));
-        disableParams.topMargin = dp(8);
-        controlCard.addView(developerDisableAction, disableParams);
-        root.addView(controlCard, cardParams(10));
-
-        LinearLayout connectCard = glassCard(true);
-        picoAdbConnectCard = connectCard;
-        connectCard.addView(text(getString(R.string.ui_ready_when_needed), 14, Typeface.BOLD, TEXT));
-        TextView connectNote = text(
-                getString(R.string.ui_keep_android_wireless_debugging_on_when_you_want_system_access_your_agent_reconnects_automatically_when_it_needs_adb),
-                12, Typeface.NORMAL, MUTED);
-        connectNote.setPadding(0, dp(6), 0, dp(12));
-        connectCard.addView(connectNote);
-        picoAdbConnectAction = actionButton(getString(R.string.ui_reconnect_now), false, false);
-        picoAdbConnectAction.setOnClickListener(v -> connectPicoAdb());
-        connectCard.addView(picoAdbConnectAction, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
-        TextView manageSettings = actionButton(getString(R.string.ui_android_wireless_debugging), false, false);
-        manageSettings.setOnClickListener(v -> openWirelessDebuggingSettings());
-        LinearLayout.LayoutParams manageParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        manageParams.topMargin = dp(8);
-        connectCard.addView(manageSettings, manageParams);
-        root.addView(connectCard, cardParams(10));
-
-        picoAdbPairingToggle = actionButton(getString(R.string.ui_pairing_settings), false, false);
-        picoAdbPairingToggle.setOnClickListener(v -> {
-            picoAdbPairingExpanded = !picoAdbPairingExpanded;
-            refreshPicoAdbStatus();
-        });
-        root.addView(picoAdbPairingToggle, cardParams(10));
-
-        LinearLayout setupCard = glassCard(true);
+        LinearLayout setupCard = new LinearLayout(this);
+        setupCard.setOrientation(LinearLayout.VERTICAL);
         picoAdbSetupCard = setupCard;
         setupCard.addView(text(getString(R.string.ui_1_android_authorization), 14, Typeface.BOLD, TEXT));
         TextView setupNote = text(
@@ -1234,11 +1193,6 @@ public final class DashboardActivity extends LocalizedActivity {
                 MUTED);
         setupNote.setPadding(0, dp(6), 0, dp(12));
         setupCard.addView(setupNote);
-
-        TextView openSettings = actionButton(getString(R.string.ui_open_wireless_debugging), false, false);
-        openSettings.setOnClickListener(v -> openWirelessDebuggingSettings());
-        setupCard.addView(openSettings, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
 
         picoAdbScanAction = actionButton(getString(R.string.ui_scan_for_endpoints), false, false);
         picoAdbScanAction.setOnClickListener(v -> {
@@ -1250,9 +1204,10 @@ public final class DashboardActivity extends LocalizedActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
         scanParams.topMargin = dp(8);
         setupCard.addView(picoAdbScanAction, scanParams);
-        root.addView(setupCard, cardParams(10));
+        controlCard.addView(setupCard, cardParams(10));
 
-        LinearLayout pairCard = glassCard(true);
+        LinearLayout pairCard = new LinearLayout(this);
+        pairCard.setOrientation(LinearLayout.VERTICAL);
         picoAdbPairCard = pairCard;
         pairCard.addView(text(getString(R.string.ui_2_pair_this_phone), 14, Typeface.BOLD, TEXT));
         TextView pairNote = text(
@@ -1284,18 +1239,32 @@ public final class DashboardActivity extends LocalizedActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
         pairParams.topMargin = dp(8);
         pairCard.addView(picoAdbPairAction, pairParams);
-        root.addView(pairCard, cardParams(10));
-
-        TextView safety = text(
-                getString(R.string.ui_camera_notifications_and_screen_tools_keep_working_without_adb_when_their_permissions_are_enabled_system_commands_follow_your_hyper_mode_and_approval_settings),
-                11,
-                Typeface.NORMAL,
-                DIM);
-        safety.setPadding(dp(2), dp(4), dp(2), 0);
-        root.addView(safety);
+        controlCard.addView(pairCard, cardParams(10));
+        root.addView(controlCard, cardParams(0));
 
         addBottomSpace(root);
         return pageScroll(root);
+    }
+
+    private Switch adbSwitchRow(LinearLayout parent, String title, String detail, SwitchListener listener) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(14), 0, dp(14));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.addView(text(title, 14, Typeface.BOLD, TEXT));
+        TextView note = text(detail, 12, Typeface.NORMAL, MUTED);
+        note.setPadding(0, dp(5), dp(12), 0);
+        copy.addView(note);
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+        Switch toggle = new Switch(this);
+        toggle.setContentDescription(title);
+        toggle.setShowText(false);
+        tintSwitch(toggle);
+        toggle.setOnCheckedChangeListener((view, enabled) -> listener.onChanged(enabled));
+        row.addView(toggle, new LinearLayout.LayoutParams(dp(58), dp(48)));
+        parent.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        return toggle;
     }
 
     private void openWirelessDebuggingSettings() {
@@ -1352,6 +1321,7 @@ public final class DashboardActivity extends LocalizedActivity {
                     : R.string.ui_dev_control_disabled), Toast.LENGTH_LONG).show();
             if (enabled && result.optBoolean("verified"))
                 PicoAdbManager.get(this).connect(ignored -> refreshStatus());
+            else if (!enabled) PicoAdbManager.get(this).stopDiscovery();
             refreshStatus();
         } catch (Exception error) {
             Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
@@ -1371,8 +1341,14 @@ public final class DashboardActivity extends LocalizedActivity {
                     control.getBoolean("wirelessDebuggingEnabled") ? on : off));
             setTextIfChanged(developerControlNote, getString(ready
                     ? R.string.ui_dev_control_ready : R.string.ui_dev_control_setup_needed));
-            developerEnableAction.setEnabled(ready && !picoAdbBusy);
-            developerDisableAction.setEnabled(ready && !picoAdbBusy);
+            updatingAdbControls = true;
+            try {
+                adbEnabledSwitch.setChecked(control.getBoolean("wirelessDebuggingEnabled"));
+                adbAutoReconnectSwitch.setChecked(PicoAdbManager.get(this).isAutoReconnectEnabled());
+            } finally { updatingAdbControls = false; }
+            adbEnabledSwitch.setEnabled(ready && !picoAdbBusy);
+            developerControlState.setVisibility(ready ? View.GONE : View.VISIBLE);
+            developerControlNote.setVisibility(ready ? View.GONE : View.VISIBLE);
             developerAuthorizeAction.setEnabled(!picoAdbBusy);
             developerAuthorizeAction.setVisibility(ready ? View.GONE : View.VISIBLE);
         } catch (JSONException error) {
@@ -1394,29 +1370,12 @@ public final class DashboardActivity extends LocalizedActivity {
             picoAdbBusy = false;
             boolean paired = result.optBoolean("paired", false);
             if (paired) {
-                picoAdbPairingExpanded = false;
                 if (picoAdbPairCodeInput != null) picoAdbPairCodeInput.setText("");
             }
             Toast.makeText(
                     this,
                     paired ? getString(R.string.ui_pairing_saved_your_agent_can_connect_automatically)
                             : picoAdbResultMessage(result, getString(R.string.ui_extra_ff9aa7b7f0)),
-                    Toast.LENGTH_LONG).show();
-            refreshStatus();
-        });
-    }
-
-    private void connectPicoAdb() {
-        if (picoAdbBusy) return;
-        picoAdbBusy = true;
-        refreshStatus();
-        PicoAdbManager.get(this).connect(result -> {
-            picoAdbBusy = false;
-            boolean connected = result.optBoolean("connected", false);
-            Toast.makeText(
-                    this,
-                    connected ? getString(R.string.ui_extra_16bb313e84)
-                            : picoAdbResultMessage(result, getString(R.string.ui_extra_202caaa870)),
                     Toast.LENGTH_LONG).show();
             refreshStatus();
         });
@@ -2426,6 +2385,7 @@ public final class DashboardActivity extends LocalizedActivity {
 
         String state = status.optString("state", "setup_required");
         boolean paired = status.optBoolean("paired", false);
+        boolean authorizationRequired = status.optBoolean("authorizationRequired", false);
         JSONObject discovery = status.optJSONObject("discovery");
         int pairingEndpoints = discovery == null
                 ? 0 : discovery.optJSONArray("pairingEndpoints") == null
@@ -2504,25 +2464,29 @@ public final class DashboardActivity extends LocalizedActivity {
         }
         if ("connecting".equals(state)) { connectionLabel = getString(R.string.ui_connecting_48b998); connectionColor = BLUE; }
         if ("engine_unavailable".equals(state)) { connectionLabel = getString(R.string.ui_engine_missing); connectionColor = RED; }
-        String pairingLabel = getString(R.string.ui_pairing_1f2ce3) + (paired ? getString(R.string.ui_saved) : getString(R.string.ui_not_paired));
-        setState(settingsPicoAdbState, pairingLabel, paired ? GREEN : AMBER);
-        setState(picoAdbPairingState, pairingLabel, paired ? GREEN : AMBER);
+        String pairingLabel = getString(R.string.ui_pairing_1f2ce3) + (authorizationRequired
+                ? getString(R.string.ui_authorization_required) : paired ? getString(R.string.ui_saved) : getString(R.string.ui_not_paired));
+        setState(settingsPicoAdbState, pairingLabel, paired && !authorizationRequired ? GREEN : AMBER);
+        setState(picoAdbPairingState, pairingLabel, paired && !authorizationRequired ? GREEN : AMBER);
         setState(settingsPicoAdbConnectionState, getString(R.string.ui_connection) + connectionLabel, connectionColor);
         setState(picoAdbState, getString(R.string.ui_connection) + connectionLabel, connectionColor);
         boolean busy = picoAdbBusy || "pairing".equals(state) || "connecting".equals(state)
                 || "diagnosing".equals(state) || "executing".equals(state);
         boolean connected = "connected".equals(transport);
-        boolean showPairing = !paired || picoAdbPairingExpanded;
+        boolean showPairing = !paired || authorizationRequired;
         if (picoAdbSetupCard != null) picoAdbSetupCard.setVisibility(showPairing ? View.VISIBLE : View.GONE);
         if (picoAdbPairCard != null) picoAdbPairCard.setVisibility(showPairing ? View.VISIBLE : View.GONE);
-        if (picoAdbConnectCard != null) picoAdbConnectCard.setVisibility(paired ? View.VISIBLE : View.GONE);
-        if (picoAdbPairingToggle != null) {
-            picoAdbPairingToggle.setVisibility(paired ? View.VISIBLE : View.GONE);
-            setTextIfChanged(picoAdbPairingToggle, showPairing ? getString(R.string.ui_hide_pairing_settings) : getString(R.string.ui_pairing_settings));
-        }
         if ("connected".equals(transport) && !busy)
             detail = getString(R.string.ui_adb_shell_access_is_available_your_agent_can_run_commands_transfer_files_and_install_apks);
         String error = status.optString("lastError", "");
+        if (!busy && !connected && !authorizationRequired) {
+            JSONObject control = status.optJSONObject("systemControl");
+            if (control != null && !control.optBoolean("wirelessDebuggingEnabled"))
+                detail = getString(R.string.ui_adb_off_status);
+            else detail = getString(status.optBoolean("autoReconnectEnabled", true)
+                    ? R.string.ui_adb_waiting_status : R.string.ui_adb_manual_status);
+        }
+        if (authorizationRequired && !busy && !connected) detail = getString(R.string.ui_adb_authorization_recovery);
         if (!error.isEmpty() && !busy && !"connected".equals(transport)) detail += "\n" + error;
         setTextIfChanged(picoAdbDetail, detail);
 
@@ -2537,13 +2501,6 @@ public final class DashboardActivity extends LocalizedActivity {
             picoAdbPairAction.setEnabled(enabled);
             picoAdbPairAction.setAlpha(enabled ? 1f : .45f);
             setTextIfChanged(picoAdbPairAction, "pairing".equals(state) ? getString(R.string.ui_pairing_e8690e) : getString(R.string.ui_pair));
-        }
-        if (picoAdbConnectAction != null) {
-            boolean enabled = !busy && paired && !connected;
-            picoAdbConnectAction.setEnabled(enabled);
-            picoAdbConnectAction.setAlpha(enabled ? 1f : .45f);
-            setTextIfChanged(picoAdbConnectAction,
-                    "connecting".equals(state) ? getString(R.string.ui_connecting_f361a7) : connected ? getString(R.string.ui_connected) : getString(R.string.ui_reconnect_now));
         }
     }
 

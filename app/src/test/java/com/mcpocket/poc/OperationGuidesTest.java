@@ -69,11 +69,12 @@ public final class OperationGuidesTest {
 
     @Test public void directDeveloperControlIsDisclosedWithoutAnAdbTransport() throws Exception {
         JSONObject guide = OperationGuides.get("picoadb.connect");
-        assertEquals(4, guide.getInt("revision"));
+        assertEquals(6, guide.getInt("revision"));
         String text = guide.toString();
         assertTrue(text.contains("picoadb.set_enabled"));
         assertTrue(text.contains("picoadb.authorize_control"));
         assertTrue(text.contains("版本號碼"));
+        assertTrue(text.contains("authorizationRequired"));
     }
 
     private boolean has(JSONArray guides, String id) throws Exception {
