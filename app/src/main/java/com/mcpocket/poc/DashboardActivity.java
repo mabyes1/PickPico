@@ -314,8 +314,8 @@ public final class DashboardActivity extends LocalizedActivity {
 
         bottomNav = buildBottomNav();
         LinearLayout.LayoutParams navLayout = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(66));
-        navLayout.setMargins(dp(4), 0, dp(4), dp(4));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(60));
+        navLayout.setMargins(dp(8), 0, dp(8), dp(6));
         shell.addView(bottomNav, navLayout);
         return stage;
     }
@@ -374,7 +374,7 @@ public final class DashboardActivity extends LocalizedActivity {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER_VERTICAL);
-        nav.setPadding(dp(8), dp(7), dp(8), dp(7));
+        nav.setPadding(dp(8), dp(5), dp(8), dp(5));
         nav.setBackground(PickPicoTheme.strongGlass(theme, dp(26)));
         nav.setElevation(dp(8));
 
@@ -544,7 +544,7 @@ public final class DashboardActivity extends LocalizedActivity {
 
     private View buildHomePage() {
         LinearLayout root = pageRoot();
-        root.setPadding(dp(24), dp(3), dp(24), dp(12));
+        root.setPadding(dp(24), dp(3), dp(24), dp(28));
         pulseTitle = text(getString(R.string.ui_no_active_agent_tasks), 20, Typeface.NORMAL, TEXT);
         pulseTitle.setGravity(Gravity.CENTER);
         pulseTitle.setMaxLines(2);
@@ -553,7 +553,7 @@ public final class DashboardActivity extends LocalizedActivity {
 
         pulseOrb = new PulseOrbView(this, theme);
         float height = getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density;
-        int orbHeight = Math.max(210, Math.min(256, (int)(height * .32f)));
+        int orbHeight = Math.max(210, Math.min(288, (int)(height * .35f)));
         LinearLayout.LayoutParams orbParams = new LinearLayout.LayoutParams(-1, dp(orbHeight));
         orbParams.topMargin = -dp(8);
         root.addView(pulseOrb, orbParams);
@@ -725,10 +725,9 @@ public final class DashboardActivity extends LocalizedActivity {
         heading.setGravity(Gravity.CENTER_VERTICAL);
         card.addView(heading);
 
-        TextView badge = text(icon, 19, Typeface.NORMAL, BLUE);
+        TextView badge = text(icon, 21, Typeface.NORMAL, MUTED);
         badge.setGravity(Gravity.CENTER);
-        badge.setBackground(PickPicoTheme.control(theme, dp(14), BLUE, false));
-        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(46), dp(46));
+        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(30), dp(46));
         badgeParams.rightMargin = dp(14);
         heading.addView(badge, badgeParams);
 
@@ -756,7 +755,7 @@ public final class DashboardActivity extends LocalizedActivity {
     private TextView rowState(LinearLayout card, String initial, int color) {
         LinearLayout heading = (LinearLayout) card.getChildAt(0);
         LinearLayout copy = findCopyColumn(heading);
-        TextView state = text(initial, 11, Typeface.BOLD, color);
+        TextView state = text(initial, 11, Typeface.BOLD, calmStateColor(color));
         state.setLetterSpacing(0.035f);
         state.setPadding(0, dp(8), 0, 0);
         copy.addView(state, 1);
@@ -1998,9 +1997,9 @@ public final class DashboardActivity extends LocalizedActivity {
     }
 
     private TextView sectionLabel(String value) {
-        TextView view = text(value, 9, Typeface.NORMAL, DIM);
-        view.setLetterSpacing(0.12f);
-        view.setPadding(dp(2), 0, 0, dp(9));
+        TextView view = text(value, 11, Typeface.BOLD, DIM);
+        view.setLetterSpacing(0.06f);
+        view.setPadding(dp(2), dp(6), 0, dp(10));
         return view;
     }
 
@@ -2506,10 +2505,15 @@ public final class DashboardActivity extends LocalizedActivity {
         }
     }
 
+    // Colour is reserved for states that need attention; healthy or neutral states stay quiet.
+    static int calmStateColor(int color) {
+        return color == GREEN || color == BLUE ? MUTED : color;
+    }
+
     private void setState(TextView view, String value, int color) {
         if (view == null) return;
         setTextIfChanged(view, value);
-        applyTextColor(view, color);
+        applyTextColor(view, calmStateColor(color));
     }
 
     private static void setTextIfChanged(TextView view, CharSequence value) {
