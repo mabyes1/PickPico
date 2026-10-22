@@ -103,7 +103,9 @@ public final class McpNodeService extends Service implements McpToolActions {
     private static final String CHANNEL_ID = "mcpocket_node";
     private static final int UNLOCK_NOTIFICATION_ID = 8769;
     private static final String UNLOCK_CHANNEL_ID = "mcpocket_unlock_requests";
-    static final long DEFAULT_UNLOCK_WAIT_MS = 120_000L;
+    // Agents give up on a tool call after roughly a minute, so answer UNLOCK_REQUIRED before that.
+    static final long DEFAULT_UNLOCK_WAIT_MS = 45_000L;
+    private static final long UNLOCK_NUDGE_INTERVAL_MS = 12_000L;
     private static final int MAX_PROCESS_SESSIONS = 20;
     private static final long AUTO_UPDATE_INITIAL_DELAY_MS = 10_000L;
     private static final long AUTO_UPDATE_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5L);
@@ -374,17 +376,31 @@ public final class McpNodeService extends Service implements McpToolActions {
 
         long waitStarted = SystemClock.elapsedRealtime();
         long deadline = waitStarted + Math.max(0L, unlockWaitTimeoutMs);
-        requestOwnerUnlock(commandId, description);
+        // Samsung's unlock screen times out within seconds, so keep the display lit for the
+        // whole wait and remind the owner periodically instead of ringing once.
+        PowerManager.WakeLock screenHold = holdScreenForUnlock(Math.max(0L, unlockWaitTimeoutMs) + 3000L);
+        requestOwnerUnlock(commandId, description, false);
+        long nextNudge = waitStarted + UNLOCK_NUDGE_INTERVAL_MS;
         try {
             while (isKeyguardLocked() && SystemClock.elapsedRealtime() < deadline) {
                 if (Thread.currentThread().isInterrupted()) break;
                 RelayRequestScope.checkCurrent();
                 long remaining = deadline - SystemClock.elapsedRealtime();
                 if (remaining <= 0L) break;
+                if (SystemClock.elapsedRealtime() >= nextNudge) {
+                    nextNudge += UNLOCK_NUDGE_INTERVAL_MS;
+                    requestOwnerUnlock(commandId, description, true);
+                }
                 SystemClock.sleep(Math.min(200L, Math.max(1L, remaining)));
             }
         } finally {
             cancelUnlockNotification();
+            if (screenHold != null && screenHold.isHeld()) {
+                try {
+                    screenHold.release();
+                } catch (RuntimeException ignored) {
+                }
+            }
         }
 
         if (!isKeyguardLocked()) {
@@ -425,7 +441,25 @@ public final class McpNodeService extends Service implements McpToolActions {
         }
     }
 
-    private void requestOwnerUnlock(String commandId, String description) {
+    @SuppressWarnings("deprecation")
+    private PowerManager.WakeLock holdScreenForUnlock(long durationMs) {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null) return null;
+        try {
+            PowerManager.WakeLock lock = power.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                            | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                            | PowerManager.ON_AFTER_RELEASE,
+                    "PickPico:awaitUnlock");
+            lock.setReferenceCounted(false);
+            lock.acquire(durationMs);
+            return lock;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void requestOwnerUnlock(String commandId, String description, boolean repeat) {
         Intent unlock = new Intent(this, HyperUnlockActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -438,7 +472,10 @@ public final class McpNodeService extends Service implements McpToolActions {
             startActivity(unlock);
         } catch (RuntimeException ignored) {
         }
-        if (!trusted) AgentAttention.alert(this);
+        if (!trusted) {
+            if (repeat) AgentAttention.nudge(this);
+            else AgentAttention.alert(this);
+        }
     }
 
     private void postUnlockNotification(String commandId, String description, Intent unlockIntent) {
@@ -454,6 +491,7 @@ public final class McpNodeService extends Service implements McpToolActions {
                 "PickPico unlock requests",
                 NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("Alerts when an Agent is pending on screen unlock");
+        channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         AgentAttention.configureUrgentChannel(channel);
         manager.createNotificationChannel(channel);
 
@@ -474,6 +512,8 @@ public final class McpNodeService extends Service implements McpToolActions {
                 .setCategory(Notification.CATEGORY_CALL)
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setAutoCancel(true)
+                .setOngoing(true)
+                .setTimeoutAfter(60_000L)
                 .setContentIntent(pending);
         AgentAttention.applyUrgentBehavior(this, builder, UNLOCK_NOTIFICATION_ID, null);
         AgentAttention.applyPublicLockscreen(builder);

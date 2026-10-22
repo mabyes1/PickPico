@@ -33,6 +33,10 @@ final class ConnectionDiagnostics {
             if (p != null) out.put("interactive", p.isInteractive()).put("deviceIdle", p.isDeviceIdleMode())
                     .put("powerSaveMode", p.isPowerSaveMode())
                     .put("ignoringBatteryOptimizations", p.isIgnoringBatteryOptimizations(context.getPackageName()));
+            android.app.NotificationManager nm = (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            // Both must be allowed for an unlock request to light the screen and show the unlock UI.
+            if (Build.VERSION.SDK_INT >= 34 && nm != null) out.put("fullScreenIntentAllowed", nm.canUseFullScreenIntent());
+            out.put("overlayAllowed", android.provider.Settings.canDrawOverlays(context));
             KeyguardManager k = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
             if (k != null) out.put("keyguardLocked", k.isKeyguardLocked()).put("deviceLocked", k.isDeviceLocked());
             ConnectivityManager c = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
