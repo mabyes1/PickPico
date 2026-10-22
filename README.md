@@ -183,7 +183,7 @@ PickPico 提供 18 個常用能力的完整參數，加上 12 個管理／探索
 
 手機會主動連上 Relay，因此不需要公開 IP、路由器 port forwarding 或 VPN。
 
-**本專案不提供公共 Relay。** 遠端使用需自行部署，完整 MCP URL 本身具有存取能力，請勿公開分享。
+**本專案不提供公共 Relay。** 遠端使用需自行部署。新版 Relay 使用 OAuth 2.1：首次在手機確認，之後由客戶端自動續期；只有完整 MCP URL 無法取得操作權限。
 
 更多設計細節：
 
@@ -239,10 +239,10 @@ PickPico 遵守 Android 原生權限與安全機制：
 | Shell | 僅在 PickPico App sandbox 內執行，不具備 root 或 ADB 權限 |
 | HUMAN HELP | 回覆與圖片保存在 App 私有儲存空間 |
 | 本地連線 | 使用 App 顯示的 Bearer token 驗證 |
-| 遠端連線 | 高熵能力網址、Relay secret 與本地 Bearer 分別管理 |
+| 遠端連線 | OAuth 驗證客戶端；Relay secret 驗證手機；Local Bearer 保護手機 HTTP 入口 |
 | App 更新 | 驗證 SHA-256、套件名稱、簽章與版本後交給 Android 安裝 |
 
-遠端能力網址等同憑證，不應公開分享。
+OAuth token 是憑證，應由客戶端保存。未升級的舊 Relay 仍採能力網址，應當作密鑰保管。
 
 `phone.wake` 只負責喚醒顯示，不解鎖手機，也不代表背景保活或永久常亮；`phone.home` 會嘗試把裝置帶到可操作的 Home 狀態，若 Android 要求安全驗證則回報需要使用者操作。
 

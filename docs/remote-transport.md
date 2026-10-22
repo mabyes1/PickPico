@@ -1,6 +1,6 @@
 # PickPico 遠端傳輸與安全設計
 
-本文記錄 2026-09-05 儲存庫內的 Android 0.16.46 與 Relay 實作。程式中存在的機制，不代表所有裝置、網路或客戶端都已完成實測。
+本文包含 2026-10-20 的 Relay OAuth 授權層；Android 指令執行與配對沿用現有版本。驗收邊界與部署注意事項見 [OAuth 設計與驗收](relay-oauth.md)。
 
 一般使用者請先看 [連線指南](remote-access-setup.md)。
 
@@ -10,7 +10,7 @@
 遠端 Agent / MCP 客戶端
     │ HTTPS POST
     ▼
-Cloudflare Worker → 依 Node ID 對應的 Durable Object
+Cloudflare Worker → OAuth token／手機歸屬驗證 → 依 Node ID 對應的 Durable Object
     │ 透過手機已建立的 WebSocket 傳遞請求
     ▼
 Android RelayClient
@@ -31,8 +31,9 @@ Local MCP 另外監聽 `0.0.0.0:8765`，同時供區域網路與 loopback 使用
 | --- | --- |
 | `GET /health` | Relay 本身的健康回應，不代表手機在線。 |
 | `GET /v1/nodes/<node-id>/connect` | 手機的 WebSocket 升級入口，需要 Relay secret。 |
-| `/v1/nodes/<node-id>/status` | 目前連線、心跳與等待請求數。持有 Node ID 即可查詢。 |
-| `POST /v3/nodes/<node-id>/mcp` | 目前 App 產生的遠端 MCP 入口，使用精簡工具清單。 |
+| `/v1/nodes/<node-id>/status` | 目前連線、心跳與等待請求數，需要該手機 v4 MCP audience 的 OAuth token。 |
+| `POST /v4/nodes/<node-id>/mcp` | 目前 App 產生的遠端 MCP 入口，使用精簡工具清單；v4 為 PicoADB 後的 schema cache boundary。 |
+| `POST /v3/nodes/<node-id>/mcp` | 舊版精簡工具清單相容入口。 |
 | `POST /v1/nodes/<node-id>/mcp`、`/v2/.../mcp` | 保留完整工具清單的相容入口。 |
 
 `/mcp` 支援 POST，另接受 OPTIONS；這不是一般可直接在瀏覽器閱讀的網頁，也不是 GET SSE 訂閱端點。
@@ -55,13 +56,15 @@ app_list app_launch url_open location_get
 
 | 資料 | 用途 | 存取邊界 |
 | --- | --- | --- |
-| Remote MCP 完整網址 | 讓 Agent 找到並呼叫這支手機 | 網址含隨機 Node ID；遠端呼叫沒有另外要求登入或 Bearer 驗證。 |
+| Remote MCP 完整網址 | 讓 Agent 找到這支手機 | 網址含隨機 Node ID；另以 OAuth token 驗證操作權限。 |
 | Relay secret | 手機建立 WebSocket 時驗證身分 | 手機送出 secret；Durable Object 儲存 SHA-256 雜湊，比對後才接受後續連線。 |
 | Local Bearer token | 保護手機上的 HTTP MCP 入口 | 區域網路客戶端要提供；RelayClient 在 loopback 請求中從手機設定讀取並加入。 |
 
 Node ID 由 16 個隨機位元組產生；Relay secret 由 32 個隨機位元組產生，保存在手機設定中。Relay 對該 Node ID 首次收到合格 secret 時建立綁定，後續連線須相符。
 
-Remote MCP 網址是持有即可使用的存取方式，**不是 OAuth，也沒有逐一識別 Agent 帳號**。更改 Local Bearer 不會撤銷已外流的 Remote MCP 網址。停用服務會中止可用性，但不等同輪換網址。
+新版 Relay 在所有 v1～v4 MCP 入口驗證 OAuth token，綁定特定手機與確切 MCP resource。首次使用既有 HUMAN HELP 介面核准，之後由客戶端自動續期。OAuth token 不轉送到手機，Android 仍自行加入 Local Bearer。獨立 `OAUTH_KV` 由 Cloudflare 官方 OAuth Provider 函式庫保存加密授權資料；手機 Durable Object 保存核准狀態，以便即時撤銷。
+
+未升級的舊 Relay 仍採持有網址即可使用的方式，更改 Local Bearer 不會撤銷其遠端網址。
 
 ## 加密與資料經過哪裡
 

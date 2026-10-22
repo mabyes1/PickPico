@@ -1,0 +1,54 @@
+[
+  {
+    "name": "picoadb_set_enabled",
+    "description": "Toggle Developer options and Wi-Fi ADB without opening Settings; requires one-time picoadb.authorize_control.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Required: your actual model name/version for the phone UI. Use the model identity exposed by your runtime, not just a client/app name. If the model is not exposed, explicitly use 'unknown (model not exposed)'; never invent a model."
+        }
+      },
+      "required": [
+        "enabled",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "openWorldHint": true,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "picoadb_authorize_control",
+    "description": "Grant direct Developer options control once through paired ADB; permission persists when ADB is off.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Required: your actual model name/version for the phone UI. Use the model identity exposed by your runtime, not just a client/app name. If the model is not exposed, explicitly use 'unknown (model not exposed)'; never invent a model."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "agent"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "openWorldHint": true,
+      "destructiveHint": true
+    }
+  }
+]

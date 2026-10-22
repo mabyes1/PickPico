@@ -35,6 +35,51 @@ final class AndroidCapabilityRegistry {
                     .put("reason", "Hyper Mode is off");
         }
 
+        if (commandId.startsWith("picoadb.")) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                return result
+                        .put("supported", false)
+                        .put("available", false)
+                        .put("state", "unsupported")
+                        .put("reason", "Wireless Debugging requires Android 11 or later");
+            }
+            JSONObject picoAdb = PicoAdbManager.get(context).status();
+            boolean engineReady = picoAdb.optJSONObject("engine") != null
+                    && picoAdb.optJSONObject("engine").optBoolean("enginePresent", false);
+            result.put("picoAdb", picoAdb);
+            if ("picoadb.set_enabled".equals(commandId)) {
+                return setupState(result, DeveloperOptionsControl.hasPermission(context),
+                        "write_secure_settings", "Run picoadb.authorize_control once while ADB is enabled")
+                        .put("systemControl", DeveloperOptionsControl.status(context));
+            }
+            if ("picoadb.authorize_control".equals(commandId)) {
+                return setupState(result, DeveloperOptionsControl.hasPermission(context)
+                        || engineReady && picoAdb.optBoolean("paired"),
+                        "wireless_debugging_pairing", "Enable and pair Wireless Debugging for one-time authorization");
+            }
+            if ("picoadb.status".equals(commandId)) {
+                return result
+                        .put("available", true)
+                        .put("state", "available");
+            }
+            if ("picoadb.discover".equals(commandId)) {
+                return setupState(
+                        result,
+                        engineReady,
+                        "picoadb_engine",
+                        "PicoADB engine is unavailable");
+            }
+            if ("picoadb.battery_diagnostics".equals(commandId)
+                    || "picoadb.shell".equals(commandId) || "picoadb.exec".equals(commandId)) {
+                return setupState(
+                        result,
+                        engineReady && picoAdb.optBoolean("paired", false),
+                        "wireless_debugging_pairing",
+                        "Pair PickPico with Android Wireless Debugging first")
+                        .put("userInteractionRequired", !picoAdb.optBoolean("paired", false));
+            }
+        }
+
         if ("camera.capture".equals(commandId)) {
             return mediaCapabilityState(
                     context,
@@ -130,6 +175,13 @@ final class AndroidCapabilityRegistry {
             boolean granted = manager != null && manager.isAdminActive(receiver);
             return setupState(result, granted, "device_admin", "PickPico is not an active Device Admin");
         }
+        if ("phone.extend_unlock".equals(commandId)) {
+            return setupState(
+                    result,
+                    ExtendUnlockControl.hasPermission(context),
+                    "write_secure_settings",
+                    "Run picoadb.authorize_control once while ADB is enabled");
+        }
 
         return result
                 .put("available", true)
@@ -147,6 +199,7 @@ final class AndroidCapabilityRegistry {
     static boolean isHyperCommand(String commandId) {
         return "phone.lock".equals(commandId)
                 || "phone.home".equals(commandId)
+                || "phone.extend_unlock".equals(commandId)
                 || "notification.list".equals(commandId)
                 || "notification.get".equals(commandId)
                 || "notification.dismiss".equals(commandId)
@@ -157,6 +210,12 @@ final class AndroidCapabilityRegistry {
                 || "ui.action".equals(commandId)
                 || "ui.type".equals(commandId)
                 || "ui.scroll".equals(commandId)
+                || "picoadb.discover".equals(commandId)
+                || "picoadb.battery_diagnostics".equals(commandId)
+                || "picoadb.shell".equals(commandId)
+                || "picoadb.exec".equals(commandId)
+                || "picoadb.set_enabled".equals(commandId)
+                || "picoadb.authorize_control".equals(commandId)
                 || "screen.capture".equals(commandId);
     }
 

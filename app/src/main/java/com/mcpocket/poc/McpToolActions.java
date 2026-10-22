@@ -5,6 +5,17 @@ import org.json.JSONObject;
 
 /** Android-facing actions that can be exposed as MCP tools. */
 interface McpToolActions {
+    default void onAgentCommandDispatched(String commandId, String agent) {
+    }
+
+    default JSONObject awaitUnlockIfRequired(
+            String commandId,
+            String description,
+            JSONObject arguments,
+            long callCount) throws JSONException {
+        return null;
+    }
+
     default void onAgentCommandStarted(String commandId) {
         onAgentCommandActivity(commandId);
     }
@@ -61,6 +72,30 @@ interface McpToolActions {
 
     JSONObject phoneStatus(long callCount) throws JSONException;
 
+    default JSONObject picoAdbStatus(long callCount) throws JSONException {
+        return unsupported("picoadb.status", callCount);
+    }
+
+    default JSONObject picoAdbDiscover(JSONObject arguments, long callCount) throws JSONException {
+        return unsupported("picoadb.discover", callCount);
+    }
+
+    default JSONObject picoAdbBatteryDiagnostics(long callCount) throws JSONException {
+        return unsupported("picoadb.battery_diagnostics", callCount);
+    }
+
+    default JSONObject picoAdbExecute(JSONObject arguments, boolean shell, long callCount) throws JSONException {
+        return unsupported(shell ? "picoadb.shell" : "picoadb.exec", callCount);
+    }
+
+    default JSONObject picoAdbSetEnabled(boolean enabled, long callCount) throws JSONException {
+        return unsupported("picoadb.set_enabled", callCount);
+    }
+
+    default JSONObject picoAdbAuthorizeControl(long callCount) throws JSONException {
+        return unsupported("picoadb.authorize_control", callCount);
+    }
+
     JSONObject phoneExec(String command, long callCount) throws JSONException;
 
     JSONObject execCommand(JSONObject arguments, long callCount) throws JSONException;
@@ -114,6 +149,13 @@ interface McpToolActions {
         return new JSONObject()
                 .put("supported", false)
                 .put("capability", "phone.home")
+                .put("toolCallCount", callCount);
+    }
+
+    default JSONObject phoneExtendUnlock(JSONObject arguments, long callCount) throws JSONException {
+        return new JSONObject()
+                .put("supported", false)
+                .put("capability", "phone.extend_unlock")
                 .put("toolCallCount", callCount);
     }
 

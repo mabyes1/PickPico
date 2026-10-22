@@ -1,0 +1,1 @@
+{"method":"tools/call","id":1789207242163,"jsonrpc":"2.0","params":{"name":"command_run","arguments":{"commandId":"app.update","arguments":{"url":"http://192.168.0.20:41288/pickpico-0.16.77.apk","sha256":"52052e220a42afa8a2febe1e92ad5c125993dfd4295088553a5d89df76b84370"},"agent":"GPT-6"}}}

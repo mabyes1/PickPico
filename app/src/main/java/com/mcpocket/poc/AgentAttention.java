@@ -188,6 +188,12 @@ final class AgentAttention {
                 .setPriority(Notification.PRIORITY_HIGH);
     }
 
+    /** Repeat reminder while an Agent is still waiting: light the screen and buzz, no voice. */
+    static void nudge(Context context) {
+        wakeScreen(context);
+        vibrateCue(context);
+    }
+
     static void alert(Context context) {
         wakeScreen(context);
         vibrateCue(context);

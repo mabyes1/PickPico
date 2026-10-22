@@ -139,6 +139,7 @@ public final class ProcessExecutionTest {
             run = new ProcessExecution(process, input, deadline(200), false, force -> process.destroyForcibly());
             assertTrue(run.await(3, TimeUnit.SECONDS));
             assertTrue(run.timedOut());
+            assertTrue(process.waitFor(2, TimeUnit.SECONDS));
             assertFalse(process.isAlive());
             assertTrue(run.inputFinished());
         } finally { process.destroyForcibly(); if (run != null) run.stop(true); process.waitFor(); }

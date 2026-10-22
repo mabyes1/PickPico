@@ -1,0 +1,42 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207259094,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"executionId\":\"cmd-db82775e-3d25-40f2-a022-7aa8db6d9d82\",\"commandId\":\"app.update_status\",\"status\":\"waiting_user\",\"isError\":false,\"startedAt\":\"2026-09-12T10:00:58.445037Z\",\"completedAt\":\"2026-09-12T10:00:58.448343Z\",\"result\":{\"status\":\"pending_user_action\",\"running\":false,\"packageName\":\"com.mcpocket.poc\",\"currentVersionName\":\"0.16.76\",\"currentVersionCode\":113,\"candidateVersionName\":\"0.16.77\",\"candidateVersionCode\":114,\"signingCertificateSha256\":\"2a5db9caab8960f9ce522bccc21aec9714d4e07e06ef03eef339efad2a67cc53\",\"url\":\"http:\\/\\/192.168.0.20:41288\\/pickpico-0.16.77.apk\",\"sha256\":\"52052e220a42afa8a2febe1e92ad5c125993dfd4295088553a5d89df76b84370\",\"bytesDownloaded\":53797919,\"updatedAt\":\"2026-09-12T10:00:43.963754Z\",\"message\":\"APK verified. Tap the PickPico update notification to install.\",\"confirmationNotification\":true,\"active\":false,\"canRequestPackageInstalls\":true,\"toolCallCount\":286,\"agent\":\"GPT-6\",\"isError\":false}}"
+      }
+    ],
+    "structuredContent": {
+      "executionId": "cmd-db82775e-3d25-40f2-a022-7aa8db6d9d82",
+      "commandId": "app.update_status",
+      "status": "waiting_user",
+      "isError": false,
+      "startedAt": "2026-09-12T10:00:58.445037Z",
+      "completedAt": "2026-09-12T10:00:58.448343Z",
+      "result": {
+        "status": "pending_user_action",
+        "running": false,
+        "packageName": "com.mcpocket.poc",
+        "currentVersionName": "0.16.76",
+        "currentVersionCode": 113,
+        "candidateVersionName": "0.16.77",
+        "candidateVersionCode": 114,
+        "signingCertificateSha256": "2a5db9caab8960f9ce522bccc21aec9714d4e07e06ef03eef339efad2a67cc53",
+        "url": "http://192.168.0.20:41288/pickpico-0.16.77.apk",
+        "sha256": "52052e220a42afa8a2febe1e92ad5c125993dfd4295088553a5d89df76b84370",
+        "bytesDownloaded": 53797919,
+        "updatedAt": "2026-09-12T10:00:43.963754Z",
+        "message": "APK verified. Tap the PickPico update notification to install.",
+        "confirmationNotification": true,
+        "active": false,
+        "canRequestPackageInstalls": true,
+        "toolCallCount": 286,
+        "agent": "GPT-6",
+        "isError": false
+      }
+    },
+    "isError": false
+  }
+}

@@ -1,6 +1,8 @@
 package com.mcpocket.poc;
 
 import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -21,6 +23,32 @@ final class UiObservationStore {
         if (observation == null || now < observation.at || now - observation.at > MAX_AGE_MS
                 || !observation.fingerprint.equals(fingerprint))
             throw new CommandRuntime.CommandInputException("STALE_OBSERVATION: call ui_inspect and choose a current target; no action was performed");
+    }
+    /** The passive Pico orb changes on every tool call; it is not the app being operated. */
+    static JSONObject guardSnapshot(JSONObject snapshot) throws JSONException {
+        JSONArray windows = snapshot.optJSONArray("windows");
+        if (windows == null) return snapshot;
+        Set<Integer> ignored = new HashSet<>();
+        JSONArray guardedWindows = new JSONArray();
+        for (int i = 0; i < windows.length(); i++) {
+            JSONObject window = windows.getJSONObject(i);
+            if (i > 0 && window.optInt("type") == 3
+                    && "com.mcpocket.poc".equals(window.optString("packageName"))
+                    && !window.optBoolean("active") && !window.optBoolean("focused")) {
+                ignored.add(window.getInt("id"));
+            } else guardedWindows.put(window);
+        }
+        if (ignored.isEmpty()) return snapshot;
+        JSONArray guardedNodes = new JSONArray();
+        JSONArray nodes = snapshot.getJSONArray("nodes");
+        for (int i = 0; i < nodes.length(); i++) {
+            JSONObject node = nodes.getJSONObject(i);
+            String path = node.optString("path");
+            boolean skip = false;
+            for (int id : ignored) if (path.startsWith("w" + id + "/")) { skip = true; break; }
+            if (!skip) guardedNodes.put(node);
+        }
+        return new JSONObject(snapshot.toString()).put("windows", guardedWindows).put("nodes", guardedNodes);
     }
     static JSONObject compact(JSONObject node) throws JSONException {
         JSONObject result = new JSONObject().put("path", node.getString("path"));

@@ -26,7 +26,7 @@ public final class OperationGuidesTest {
 
     @Test public void summariesCanBeFollowedAndDoNotLoadFullGuides() throws Exception {
         JSONArray summaries = OperationGuides.search("", new JSONArray());
-        assertEquals(3, summaries.length());
+        assertEquals(4, summaries.length());
         for (int i = 0; i < summaries.length(); i++) {
             JSONObject summary = summaries.getJSONObject(i);
             assertFalse(summary.has("rules"));
@@ -51,9 +51,30 @@ public final class OperationGuidesTest {
         assertFalse(OperationGuides.get("app.operate").toString().contains("injected"));
     }
 
+    @Test public void wirelessAdbIntentWinsOverGenericOpenAppGuide() throws Exception {
+        JSONArray matches = new JSONArray().put(new JSONObject().put("id", "app.launch"));
+        for (String query : new String[]{"open wireless debugging", "開啟無線偵錯", "開發人員選項", "picoadb.connect"}) {
+            assertEquals("picoadb.connect", OperationGuides.search(query, matches)
+                    .getJSONObject(0).getString("id"));
+        }
+        assertEquals("app.operate", OperationGuides.search("open an app", matches)
+                .getJSONObject(0).getString("id"));
+        assertEquals(0, OperationGuides.search("picoadb.status", new JSONArray()).length());
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void unknownGuideFailsClearly() throws Exception {
         OperationGuides.get("made.up");
+    }
+
+    @Test public void directDeveloperControlIsDisclosedWithoutAnAdbTransport() throws Exception {
+        JSONObject guide = OperationGuides.get("picoadb.connect");
+        assertEquals(6, guide.getInt("revision"));
+        String text = guide.toString();
+        assertTrue(text.contains("picoadb.set_enabled"));
+        assertTrue(text.contains("picoadb.authorize_control"));
+        assertTrue(text.contains("版本號碼"));
+        assertTrue(text.contains("authorizationRequired"));
     }
 
     private boolean has(JSONArray guides, String id) throws Exception {

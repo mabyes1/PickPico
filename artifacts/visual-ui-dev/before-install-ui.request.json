@@ -1,0 +1,1 @@
+{"id":1789207194851,"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"compact":true,"agent":"GPT-6","maxNodes":70},"name":"ui_inspect"}}

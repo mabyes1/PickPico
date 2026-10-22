@@ -1,0 +1,63 @@
+{
+  "at": "2026-10-11T03:23:06.667Z",
+  "launch": {
+    "success": true,
+    "exitCode": 0,
+    "timedOut": false,
+    "validationError": false,
+    "output": "Starting: Intent { cmp=com.mcpocket.poc/.DashboardActivity (has extras) }\n",
+    "isError": false,
+    "serial": "192.168.0.15:46627",
+    "outputTruncated": false,
+    "bytes": 74,
+    "workspacePath": "adb-output/adb-3835978116734783401.log",
+    "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+    "toolCallCount": 100,
+    "agent": "GPT-6"
+  },
+  "status": {
+    "state": "ready_to_connect",
+    "paired": true,
+    "connected": true,
+    "connection": {
+      "state": "connected",
+      "connected": true,
+      "checking": false,
+      "checkedAt": "2026-10-11T03:23:06.664656Z",
+      "error": "",
+      "serial": "192.168.0.15:46627"
+    },
+    "lastPairAt": "2026-10-08T04:34:14.676352Z",
+    "lastConnectAt": "2026-10-11T03:23:06.343104Z",
+    "lastSerial": "192.168.0.15:46627",
+    "discoveryDeadlineElapsedMs": 317769340,
+    "engine": {
+      "enginePath": "/data/app/~~yxpCzsvDpynhQkBuGRUSyA==/com.mcpocket.poc-EwW3EdMMHxmwg_Dh3tyqbw==/lib/arm64/libadb.so",
+      "enginePresent": true,
+      "engineExecutable": true,
+      "home": "/data/user/0/com.mcpocket.poc/files/picoadb",
+      "identityCreated": true,
+      "pairedIdentityPersistent": true
+    },
+    "discovery": {
+      "discoveryStarted": true,
+      "pairingServiceType": "_adb-tls-pairing._tcp.",
+      "connectServiceType": "_adb-tls-connect._tcp.",
+      "pairingEndpoints": [],
+      "connectEndpoints": [
+        {
+          "name": "adb-RFCW70VZZBY-91syHK",
+          "host": "192.168.0.15",
+          "port": 46627
+        }
+      ],
+      "lastError": ""
+    },
+    "lastAction": "shell",
+    "lastError": "",
+    "lastOutput": "ADB command completed",
+    "toolCallCount": 101,
+    "agent": "GPT-6",
+    "isError": false
+  }
+}

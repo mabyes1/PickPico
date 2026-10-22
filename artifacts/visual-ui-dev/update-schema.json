@@ -1,0 +1,64 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207039175,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"app.update\",\"description\":\"Install PickPico from verified APK URL and hash\",\"category\":\"app\",\"risk\":\"software_update\",\"sideEffect\":true,\"tool\":\"command_run\",\"group\":\"core\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{\"url\":{\"type\":\"string\",\"minLength\":8,\"maxLength\":4096,\"description\":\"HTTP(S) URL for the candidate PickPico APK.\"},\"sha256\":{\"type\":\"string\",\"minLength\":64,\"maxLength\":64,\"description\":\"Required SHA-256 of the exact APK bytes.\"},\"allowSameVersion\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Development-only override for reinstalling the same version.\"}},\"required\":[\"url\",\"sha256\"],\"additionalProperties\":false},\"schemaVersion\":\"0.16.76\",\"call\":{\"tool\":\"command_run\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{\"commandId\":\"app.update\",\"arguments\":{}},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "app.update",
+      "description": "Install PickPico from verified APK URL and hash",
+      "category": "app",
+      "risk": "software_update",
+      "sideEffect": true,
+      "tool": "command_run",
+      "group": "core",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 4096,
+            "description": "HTTP(S) URL for the candidate PickPico APK."
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "Required SHA-256 of the exact APK bytes."
+          },
+          "allowSameVersion": {
+            "type": "boolean",
+            "default": false,
+            "description": "Development-only override for reinstalling the same version."
+          }
+        },
+        "required": [
+          "url",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.76",
+      "call": {
+        "tool": "command_run",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {
+          "commandId": "app.update",
+          "arguments": {}
+        },
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

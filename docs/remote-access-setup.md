@@ -1,6 +1,6 @@
 # PickPico 連線指南
 
-本文依 Android 0.16.47 的程式與介面整理（2026-09-05）。說明目前可操作的設定流程；介面改版後，按鈕位置可能調整。
+本文包含 2026-10-20 的 Relay OAuth 流程。手機仍使用現有 APK 與配對，介面按鈕位置可能依版本調整。
 
 **PickPico 不提供公共 Relay。遠端使用前，請先部署自己的 Relay；下列網址都只是範例。**
 
@@ -22,22 +22,28 @@
    https://your-relay.example.com
    ```
 
-   這裡不要填手機的 `/v3/nodes/.../mcp` 完整網址，也不要填區域網路 IP。
+   這裡不要填手機的 `/v4/nodes/.../mcp` 完整網址，也不要填區域網路 IP。
 
 3. 點 **SAVE RELAY**。若服務已在運行，選 **Restart** 套用；若尚未啟動，回首頁按 **START**。
 4. 等待 **REMOTE ACCESS** 顯示 **CONNECTED**。
 5. 點首頁的 **COPY CONNECTION**，將連線資訊貼到支援遠端 MCP 的客戶端。
+6. 在客戶端選擇 **OAuth**。授權頁會顯示客戶端、授權目的地及六位確認碼；核對手機 HUMAN HELP 顯示相同確認碼後，選「允許此連線」。
+7. 客戶端會保存憑證並自動續期，正常使用不需反覆登入。手機斷線重連不會清除授權。
 
 遠端連線資訊的形式如下。以下是佔位範例，不是可直接使用的裝置網址：
 
 ```json
 {
-  "url": "https://your-relay.example.com/v3/nodes/<你的裝置識別碼>/mcp",
-  "authentication": "none"
+  "url": "https://your-relay.example.com/v4/nodes/<你的裝置識別碼>/mcp",
+  "authentication": "oauth"
 }
 ```
 
-`authentication: none` 表示客戶端不必另外提供登入或 Bearer header。**完整網址本身就是存取憑證**，持有它的人可以向這支手機提出指令，仍受手機上的權限與核准模式控制。
+完整網址只用來定位手機，Relay 另以 OAuth token 驗證。舊 APK 的複製內容可能仍標示 `authentication: none`；請使用其中的 URL，在客戶端選 OAuth。這個示意欄位不是每個客戶端都支援的設定格式。
+
+授權後仍受手機上的能力開關、Android 權限與核准模式控制。Access token 有效一小時，refresh token 自動輪換並在持續使用時延長期限；閒置 180 天、撤銷或客戶端遺失憑證時才需重新授權。客戶端本身也必須保存及更新憑證。
+
+要撤銷某個客戶端，開啟 `https://<你的 Relay>/oauth/<你的裝置識別碼>/manage`，在手機確認管理權限後選擇撤銷。其他連線與手機配對保持不變。
 
 不同客戶端可能要求只貼網址，或把欄位放進自己的設定結構；App 複製的 JSON 是連線資料，不是所有客戶端通用的完整設定檔。
 

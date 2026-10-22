@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207487320,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"woke\":false,\"interactive\":true,\"keyguardLocked\":true,\"secureKeyguard\":true,\"dismissRequested\":true,\"homeRequested\":true,\"atHome\":false,\"requiresUserAction\":true,\"transition\":\"keyguard_dismiss_requested\",\"toolCallCount\":11,\"agent\":\"GPT-6\",\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "woke": false,
+      "interactive": true,
+      "keyguardLocked": true,
+      "secureKeyguard": true,
+      "dismissRequested": true,
+      "homeRequested": true,
+      "atHome": false,
+      "requiresUserAction": true,
+      "transition": "keyguard_dismiss_requested",
+      "toolCallCount": 11,
+      "agent": "GPT-6",
+      "isError": false
+    },
+    "isError": false
+  }
+}

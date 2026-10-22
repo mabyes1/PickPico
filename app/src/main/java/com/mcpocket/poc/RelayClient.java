@@ -1,10 +1,14 @@
 package com.mcpocket.poc;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -59,6 +63,9 @@ final class RelayClient {
     private static final long[] RECONNECT_DELAYS_MS = {1000L, 2000L, 4000L, 8000L, 16000L, 30000L};
     private static final long HEARTBEAT_INTERVAL_MS = 10_000L;
     private static final long HEARTBEAT_TIMEOUT_MS = 15_000L;
+    // After the screen comes on, a connection that died while the phone slept should be
+    // noticed in seconds, not after a full heartbeat cycle.
+    private static final long WAKE_PROBE_TIMEOUT_MS = 6_000L;
 
     private final Context context;
     private final String relayBaseUrl;
@@ -87,6 +94,13 @@ final class RelayClient {
     private volatile boolean closed;
     private int reconnectAttempt;
     private long reconnectAttemptCount;
+    private long disconnectCount;
+    private long heartbeatSentCount;
+    private long heartbeatPongCount;
+    private final HeartbeatGapTracker heartbeatGaps = new HeartbeatGapTracker();
+    private BroadcastReceiver wakeReceiver;
+    private long wakeProbeCount;
+    private String lastWakeProbeAt = "";
     private volatile String pendingHeartbeatNonce;
     private volatile ScheduledFuture<?> heartbeatFuture;
     private volatile ScheduledFuture<?> heartbeatTimeoutFuture;
@@ -125,9 +139,9 @@ final class RelayClient {
         // Keep the node transport on v1, but version the public MCP endpoint separately.
         // ChatGPT/OpenAI may retain a tool schema for a previously seen MCP URL, so a
         // deliberate public-schema version bump gives schema-breaking changes a clean
-        // cache boundary without rotating the node identity or relay secret. v3 is the
-        // Thin MCP profile; v1/v2 remain relay-compatible for existing clients.
-        this.remoteEndpoint = this.relayBaseUrl + "/v3/nodes/" + nodeId + "/mcp";
+        // cache boundary without rotating the node identity or relay secret. v4 is the
+        // current Thin MCP schema boundary; older versions remain relay-compatible.
+        this.remoteEndpoint = this.relayBaseUrl + "/v4/nodes/" + nodeId + "/mcp";
     }
 
     static String migrateLegacyRelayIfNeeded(SharedPreferences prefs, String relayBaseUrl) {
@@ -147,6 +161,7 @@ final class RelayClient {
         closed = false;
         reconnectAttempt = 0;
         registerNetworkCallback();
+        registerWakeReceiver();
         connect();
     }
 
@@ -155,6 +170,7 @@ final class RelayClient {
         mainHandler.removeCallbacksAndMessages(null);
         clearHeartbeatState();
         unregisterNetworkCallback();
+        unregisterWakeReceiver();
         WebSocket socket = webSocket;
         webSocket = null;
         cancelPendingProxies(null);
@@ -181,6 +197,12 @@ final class RelayClient {
                 .put("lastLoopbackProxyRequestId", lastLoopbackProxyRequestId)
                 .put("loopbackHealthy", loopbackHealthy)
                 .put("reconnectAttemptCount", reconnectAttemptCount)
+                .put("disconnectCount", disconnectCount)
+                .put("heartbeatSentCount", heartbeatSentCount)
+                .put("heartbeatPongCount", heartbeatPongCount)
+                .put("heartbeatGaps", heartbeatGaps.toJson())
+                .put("wakeProbeCount", wakeProbeCount)
+                .put("lastWakeProbeAt", lastWakeProbeAt)
                 .put("reconnectBackoffAttempt", reconnectAttempt)
                 .put("currentNetworkType", observedNetworkType)
                 .put("socketPresent", webSocket != null);
@@ -243,6 +265,7 @@ final class RelayClient {
         socket.cancel();
         lastRelayDisconnectAt = Instant.now().toString();
         lastRelayDisconnectReason = detail == null ? "" : detail;
+        disconnectCount++;
         ConnectionDiagnostics.record(context, lastRelayDisconnectReason);
         listener.onRelayState("disconnected", remoteEndpoint, detail);
         scheduleReconnect();
@@ -257,7 +280,12 @@ final class RelayClient {
         mainHandler.postDelayed(this::connect, delay);
     }
 
-    private synchronized void sendHeartbeat(WebSocket socket) {
+    private void sendHeartbeat(WebSocket socket) {
+        sendHeartbeat(socket, HEARTBEAT_TIMEOUT_MS, true);
+    }
+
+    private synchronized void sendHeartbeat(WebSocket socket, long timeoutMs, boolean periodic) {
+        if (periodic) heartbeatGaps.tick(SystemClock.elapsedRealtime());
         if (closed || socket != webSocket || pendingHeartbeatNonce != null) {
             return;
         }
@@ -270,6 +298,7 @@ final class RelayClient {
                     .put("nonce", nonce)
                     .put("sentAtElapsedMs", SystemClock.elapsedRealtime())
                     .toString());
+            if (queued) heartbeatSentCount++;
             if (!queued) {
                 pendingHeartbeatNonce = null;
                 listener.onRelayState("stale", remoteEndpoint, "relay heartbeat could not be queued");
@@ -287,12 +316,13 @@ final class RelayClient {
         }
         heartbeatTimeoutFuture = heartbeatExecutor.schedule(
                 () -> handleHeartbeatTimeout(socket, nonce),
-                HEARTBEAT_TIMEOUT_MS,
+                timeoutMs,
                 TimeUnit.MILLISECONDS);
     }
 
     private void startHeartbeatLoop(WebSocket socket) {
         clearHeartbeatState();
+        heartbeatGaps.resetBaseline();
         sendHeartbeat(socket);
         heartbeatFuture = heartbeatExecutor.scheduleWithFixedDelay(
                 () -> sendHeartbeat(socket),
@@ -343,7 +373,67 @@ final class RelayClient {
             relayConnectedAt = Instant.now().toString();
         }
         lastRelayPongAt = Instant.now().toString();
+        heartbeatPongCount++;
         listener.onRelayState("connected", remoteEndpoint, "relay heartbeat healthy");
+    }
+
+    private synchronized void registerWakeReceiver() {
+        if (wakeReceiver != null) return;
+        wakeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context receiverContext, Intent intent) {
+                probeAfterWake();
+            }
+        };
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(wakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                context.registerReceiver(wakeReceiver, filter);
+            }
+        } catch (RuntimeException ignored) {
+            wakeReceiver = null;
+        }
+    }
+
+    private synchronized void unregisterWakeReceiver() {
+        if (wakeReceiver == null) return;
+        try {
+            context.unregisterReceiver(wakeReceiver);
+        } catch (RuntimeException ignored) {
+        }
+        wakeReceiver = null;
+    }
+
+    /**
+     * The screen just came on. Anything that died while the phone slept is found out now:
+     * no socket means reconnect immediately (skipping the backoff, which does not tick during
+     * sleep); an existing socket gets a short-fuse ping so a zombie is replaced within seconds.
+     */
+    private void probeAfterWake() {
+        synchronized (this) {
+            if (closed) return;
+            wakeProbeCount++;
+            lastWakeProbeAt = Instant.now().toString();
+            if (webSocket == null) {
+                reconnectAttempt = 0;
+                mainHandler.post(this::connect);
+                return;
+            }
+        }
+        try {
+            heartbeatExecutor.execute(() -> {
+                synchronized (RelayClient.this) {
+                    WebSocket socket = webSocket;
+                    if (closed || socket == null) return;
+                    pendingHeartbeatNonce = null;
+                    sendHeartbeat(socket, WAKE_PROBE_TIMEOUT_MS, false);
+                }
+            });
+        } catch (RejectedExecutionException ignored) {
+        }
     }
 
     private synchronized void registerNetworkCallback() {

@@ -1,0 +1,47 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207389214,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"name\":\"PickPico\",\"version\":\"0.16.76\",\"device\":\"samsung SM-S9110\",\"androidRelease\":\"16\",\"apiLevel\":36,\"endpoint\":\"http:\\/\\/192.168.0.15:8765\\/mcp\",\"remoteEndpoint\":\"https:\\/\\/relay.pickpico.workers.dev\\/v3\\/nodes\\/wjLVc8x8sGvNvNRzjYOhtQ\\/mcp\",\"relayStatus\":\"connected\",\"workspaceRoot\":\"\\/data\\/user\\/0\\/com.mcpocket.poc\\/files\\/workspaces\",\"uptimeSeconds\":3551,\"nodeStartedAt\":\"2026-09-12T09:03:56.826391Z\",\"processStartedAt\":\"2026-09-12T09:03:56.498588Z\",\"processUptimeSeconds\":3552,\"toolCallCount\":296,\"relay\":{\"connectionId\":\"def3d14e-4256-4169-925d-c80b6bc145ea\",\"relayConnectedAt\":\"2026-09-12T09:52:01.621655Z\",\"lastRelayHeartbeatAt\":\"2026-09-12T10:03:01.646602Z\",\"lastRelayPongAt\":\"2026-09-12T10:03:01.796715Z\",\"lastRelayDisconnectAt\":\"2026-09-12T09:52:00.189500Z\",\"lastRelayDisconnectReason\":\"relay error: EOFException\",\"lastLoopbackProxyErrorAt\":\"\",\"lastLoopbackProxyErrorType\":\"\",\"lastLoopbackProxyErrorMessage\":\"\",\"lastLoopbackProxyRequestId\":\"\",\"loopbackHealthy\":true,\"reconnectAttemptCount\":2,\"reconnectBackoffAttempt\":0,\"currentNetworkType\":\"wifi\",\"socketPresent\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "name": "PickPico",
+      "version": "0.16.76",
+      "device": "samsung SM-S9110",
+      "androidRelease": "16",
+      "apiLevel": 36,
+      "endpoint": "http://192.168.0.15:8765/mcp",
+      "remoteEndpoint": "https://relay.pickpico.workers.dev/v3/nodes/wjLVc8x8sGvNvNRzjYOhtQ/mcp",
+      "relayStatus": "connected",
+      "workspaceRoot": "/data/user/0/com.mcpocket.poc/files/workspaces",
+      "uptimeSeconds": 3551,
+      "nodeStartedAt": "2026-09-12T09:03:56.826391Z",
+      "processStartedAt": "2026-09-12T09:03:56.498588Z",
+      "processUptimeSeconds": 3552,
+      "toolCallCount": 296,
+      "relay": {
+        "connectionId": "def3d14e-4256-4169-925d-c80b6bc145ea",
+        "relayConnectedAt": "2026-09-12T09:52:01.621655Z",
+        "lastRelayHeartbeatAt": "2026-09-12T10:03:01.646602Z",
+        "lastRelayPongAt": "2026-09-12T10:03:01.796715Z",
+        "lastRelayDisconnectAt": "2026-09-12T09:52:00.1895Z",
+        "lastRelayDisconnectReason": "relay error: EOFException",
+        "lastLoopbackProxyErrorAt": "",
+        "lastLoopbackProxyErrorType": "",
+        "lastLoopbackProxyErrorMessage": "",
+        "lastLoopbackProxyRequestId": "",
+        "loopbackHealthy": true,
+        "reconnectAttemptCount": 2,
+        "reconnectBackoffAttempt": 0,
+        "currentNetworkType": "wifi",
+        "socketPresent": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

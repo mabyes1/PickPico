@@ -1,0 +1,18 @@
+[
+  {
+    "name": "task_update",
+    "description": "Update task progress. ALWAYS finish with completed/failed/cancelled to release its screen-awake hold. Operational commands and task updates renew a three-minute task activity lease; inactivity releases the display automatically. Other active tasks retain their holds."
+  },
+  {
+    "name": "capability_search",
+    "description": "Fallback when the capability index is unclear. Use 1-3 English keywords preserving the action, e.g. calendar list, clipboard read. Prefer capability_status for a known exact ID. No match: use capability_list."
+  },
+  {
+    "name": "command_run",
+    "description": "Execute one capability. Prefer named direct tools when provided. For an unfamiliar ID below, call capability_status(id), fill its schema, then execute; never guess arguments. The same ID/schema can be reused. Dynamic index:\nguide.get: Read an operation guide; guideId=picoadb.connect: enable Wi-Fi ADB through PICO UI and reconnect saved pairing\nphone.ring: Start or stop a find-phone ring\nphone.lock: Lock the screen\nphone.notify: Post a phone notification\naudio.status: Read media, ring, alarm and notification volume\naudio.set: Set one audio stream volume percentage\nmicrophone.record: Record a short microphone clip\nnotification.get: Read one notification by key\nnotification.dismiss: Clear one notification, or batch-clear all with a saved digest\nnotification.actions: Read notification buttons and reply options\nnotification.invoke_action: Invoke a discovered notification button\nclipboard.get: Read clipboard text\nclipboard.set: Replace clipboard text\ncontacts.search: Find contacts by name\ncontacts.get: Read contact details by discovered id\ncalendar.list: Read calendar events in a time range\ncalendar.get: Read an event by eventId\ncalendar.create: Create a calendar event\ncalendar.update: Edit an event by eventId\ncalendar.delete: Delete an event by eventId\nfile.pick: Ask the human to select files\nmedia.pick: Ask the human to select photos or videos\nshare.send: Open share sheet; human selects destination\nworkspace.info: Phone workspace and installed runtimes\nworkspace.list: List phone workspace files\nworkspace.read: Read a chunk of a workspace text file\nworkspace.write: Write or append workspace text\nnode.start: Start a workspace Node.js program\nnode.status: Read Node.js program state\nnode.stop: Stop the Node.js program\napp.update: Install PickPico from verified APK URL and hash\napp.update_check: Check for a PickPico update\napp.update_latest: Install latest PickPico update\napp.update_status: Read PickPico installation progress\nprocess.run: Run a predefined diagnostic\nprocess.exec: Run a phone shell command\nprocess.output: Read process output using offsets\nprocess.stop: Stop a process session"
+  },
+  {
+    "name": "picoadb_status",
+    "description": "Wireless Debugging and privileged access state; disconnected: guide.get(picoadb.connect) uses PICO UI to enable Wi-Fi ADB."
+  }
+]

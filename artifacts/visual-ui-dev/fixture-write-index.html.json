@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207308733,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"executionId\":\"cmd-fedf945c-94a4-487b-a34c-0c634dc23314\",\"commandId\":\"workspace.write\",\"status\":\"completed\",\"isError\":false,\"startedAt\":\"2026-09-12T10:01:48.200419Z\",\"completedAt\":\"2026-09-12T10:01:48.275197Z\",\"result\":{\"path\":\"benchmarks\\/VISUAL-20260912-1800\\/index.html\",\"bytesWritten\":5464,\"sizeBytes\":5464,\"append\":false,\"toolCallCount\":291,\"agent\":\"GPT-6\",\"isError\":false}}"
+      }
+    ],
+    "structuredContent": {
+      "executionId": "cmd-fedf945c-94a4-487b-a34c-0c634dc23314",
+      "commandId": "workspace.write",
+      "status": "completed",
+      "isError": false,
+      "startedAt": "2026-09-12T10:01:48.200419Z",
+      "completedAt": "2026-09-12T10:01:48.275197Z",
+      "result": {
+        "path": "benchmarks/VISUAL-20260912-1800/index.html",
+        "bytesWritten": 5464,
+        "sizeBytes": 5464,
+        "append": false,
+        "toolCallCount": 291,
+        "agent": "GPT-6",
+        "isError": false
+      }
+    },
+    "isError": false
+  }
+}

@@ -70,7 +70,17 @@ public final class DevBridgeService extends Service {
         if ("mcp_command".equals(action)) {
             String commandId = intent.getStringExtra("commandId");
             String argumentsBase64 = intent.getStringExtra("argumentsBase64");
-            runMcpCommand(commandId, argumentsBase64);
+            String agent = intent.getStringExtra("agent");
+            runMcpCommand(commandId, argumentsBase64, agent);
+            return START_NOT_STICKY;
+        }
+        if ("picoadb_pair".equals(action)) {
+            String pairingCode = intent.getStringExtra("pairingCode");
+            runPicoAdbPair(pairingCode);
+            return START_NOT_STICKY;
+        }
+        if ("picoadb_connect".equals(action)) {
+            runPicoAdbConnect();
             return START_NOT_STICKY;
         }
         if ("stop_ring".equals(action)) {
@@ -104,7 +114,7 @@ public final class DevBridgeService extends Service {
         }
     }
 
-    private void runMcpCommand(String commandId, String argumentsBase64) {
+    private void runMcpCommand(String commandId, String argumentsBase64, String agent) {
         new Thread(() -> {
             try {
                 String token = getSharedPreferences(McpNodeService.PREFS, MODE_PRIVATE)
@@ -128,6 +138,9 @@ public final class DevBridgeService extends Service {
                                 .put("name", "command_run")
                                 .put("arguments", new JSONObject()
                                         .put("commandId", commandId == null ? "" : commandId)
+                                        .put("agent", agent == null || agent.trim().isEmpty()
+                                                ? "unknown (model not exposed)"
+                                                : agent.trim())
                                         .put("arguments", new JSONObject(argumentsJson))));
 
                 HttpURLConnection connection = (HttpURLConnection) new URL(
@@ -163,6 +176,46 @@ public final class DevBridgeService extends Service {
                 mainHandler.post(this::stopBridge);
             }
         }, "mcpocket-dev-command").start();
+    }
+
+    private void runPicoAdbPair(String pairingCode) {
+        if (!PicoAdbClient.isValidPairingCode(pairingCode)) {
+            try {
+                writeDevResult(new JSONObject()
+                        .put("action", "picoadb_pair")
+                        .put("error", "Pairing code must contain exactly 6 digits"));
+            } catch (Exception ignored) {
+            }
+            mainHandler.post(this::stopBridge);
+            return;
+        }
+
+        PicoAdbManager manager = PicoAdbManager.get(this);
+        manager.discover();
+        mainHandler.postDelayed(() -> manager.pair(pairingCode, result -> {
+            try {
+                writeDevResult(new JSONObject()
+                        .put("action", "picoadb_pair")
+                        .put("result", result));
+            } catch (Exception ignored) {
+            } finally {
+                stopBridge();
+            }
+        }), 1_200L);
+    }
+
+    private void runPicoAdbConnect() {
+        PicoAdbManager manager = PicoAdbManager.get(this);
+        manager.connect(result -> {
+            try {
+                writeDevResult(new JSONObject()
+                        .put("action", "picoadb_connect")
+                        .put("result", result));
+            } catch (Exception ignored) {
+            } finally {
+                stopBridge();
+            }
+        });
     }
 
     private static String readAll(InputStream input) throws Exception {

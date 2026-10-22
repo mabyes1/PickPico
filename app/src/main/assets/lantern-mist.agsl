@@ -1,0 +1,64 @@
+// Smoke for the Lantern orb. Borrows the original orb's domain-warped cloud so the two
+// styles share one visual language: slow pearl mist, warmed by the candle near the paper.
+uniform float2 resolution;
+uniform float time;
+uniform float energy;
+uniform float layer;          // 0 = behind the lantern, 1 = a thin veil drifting in front
+layout(color) uniform half4 warm;
+layout(color) uniform half4 cool;
+
+float hash(float2 p) {
+    p = fract(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+float noise(float2 p) {
+    float2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + float2(1, 0)), f.x),
+               mix(hash(i + float2(0, 1)), hash(i + float2(1, 1)), f.x), f.y);
+}
+float cloud(float2 p) {
+    float v = 0.0, amplitude = 0.52;
+    for (int i = 0; i < 5; i++) {
+        v += amplitude * noise(p);
+        p = float2(p.x * 1.62 - p.y * 1.18, p.x * 1.18 + p.y * 1.62) + 13.7;
+        amplitude *= 0.48;
+    }
+    return v;
+}
+
+half4 main(float2 coord) {
+    float radius = min(resolution.x, resolution.y) * 0.3;
+    float2 p = (coord - resolution * 0.5) / radius;
+    float t = time;
+    float dir = layer < 0.5 ? 1.0 : -1.0;
+
+    // Smoke rises and the whole field slides sideways; the warp makes it curl.
+    float2 rise = float2(0.0, t * 0.15);
+    float2 slide = float2(dir * t * 0.06, 0.0);
+    float2 seed = float2(layer * 17.0, layer * 5.0);
+    float2 q = float2(cloud(p * 1.3 + rise + slide + seed + float2(0.0, 3.0)),
+                      cloud(p * 1.3 - rise + slide + seed + 7.3));
+    float mist = cloud(p * 2.1 + q * 2.4 + float2(-t * 0.06 * dir, t * 0.1));
+    float wisps = cloud(p * 5.5 + q * 3.6 + rise * 1.7 + seed);
+
+    // Keep the smoke well inside the view so nothing is cut at the edges.
+    float edge = 1.0 - smoothstep(0.45, 0.98, length(p / float2(1.95, 1.58)));
+    float body = smoothstep(0.34, 0.78, mist) * (0.4 + 0.6 * wisps);
+
+    float candle = exp(-length(p * float2(0.9, 1.1)) * 1.05);
+    float3 tint = mix(float3(cool.rgb), float3(warm.rgb), clamp(candle * 1.25, 0.0, 1.0));
+
+    float density;
+    if (layer < 0.5) {
+        // Behind the paper: gathers around the lantern and thins toward the corners.
+        density = body * edge * (0.55 + 0.75 * candle);
+    } else {
+        // In front: only a low veil across the base and tassel.
+        float low = smoothstep(0.35, 1.05, p.y) * (1.0 - smoothstep(1.05, 1.5, p.y));
+        density = body * edge * low * 0.8;
+    }
+    float alpha = clamp(density * energy, 0.0, 0.6);
+    return half4(half3(tint * alpha), half(alpha));
+}

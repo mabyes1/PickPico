@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-10",
+  "device": "Samsung SM-S9110",
+  "appVersion": "0.17.5",
+  "node": {
+    "startedAt": "2026-10-10T10:49:32.032Z",
+    "node": "v18.20.4",
+    "arch": "arm64",
+    "platform": "android",
+    "cryptoPass": true,
+    "filesystemPass": true,
+    "childProcessPass": true,
+    "localMcpPass": true,
+    "adbDevices": "List of devices attached\n\n",
+    "completedAt": "2026-10-10T10:49:32.119Z",
+    "success": true,
+    "exitCode": 0
+  },
+  "shortcut": {
+    "openedWindow": "開發人員選項",
+    "packageName": "com.android.settings",
+    "beforeSwitchState": "not measured",
+    "afterScreenshot": {
+      "developerOptions": "on",
+      "wirelessDebugging": "on"
+    },
+    "changedSwitchesByThisRun": false
+  },
+  "reconnect": {
+    "startedAt": "2026-10-10T10:52:59.013Z",
+    "completedAt": "2026-10-10T10:53:14.275Z",
+    "devicesBefore": "List of devices attached\n\n",
+    "devicesAfter": "List of devices attached\n\n",
+    "success": false,
+    "errorCode": "picoadb_not_connected",
+    "lastConnectAtUnchanged": true,
+    "identityPreserved": true,
+    "systemAdbdObserved": "stopped",
+    "concurrentPhoneTaskObserved": true,
+    "conclusion": "First attempt failed; automatic reconnect remains unverified; user chose to let the other chat continue."
+  },
+  "cleanup": {
+    "ownTaskId": "task-68220118-fab1-48da-8c0c-a4f2d2dd02c7",
+    "ownTaskStatus": "cancelled",
+    "screenAwake": {
+      "activeTasks": 1,
+      "activeOperations": 0,
+      "requested": false,
+      "watchdogMs": 360000,
+      "remainingWatchdogMs": 0,
+      "overlayHeld": false,
+      "wakeLockHeld": false,
+      "restoration": "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"
+    },
+    "nodeRunning": false,
+    "discoveryStarted": false
+  }
+}

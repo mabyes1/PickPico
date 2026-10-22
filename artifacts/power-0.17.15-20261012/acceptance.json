@@ -1,0 +1,56 @@
+{
+  "version": "0.17.15",
+  "device": "samsung SM-S9110",
+  "tests": {
+    "count": 256,
+    "failures": 0
+  },
+  "uiVerified": true,
+  "holdAfter30Seconds": {
+    "interactive": true,
+    "requested": true,
+    "wakeLockHeld": true
+  },
+  "idleRelease": {
+    "idleSeconds": 249,
+    "interactive": false,
+    "screenAwake": {
+      "activeTasks": 1,
+      "activeOperations": 0,
+      "requested": false,
+      "taskIdleTimeoutMs": 180000,
+      "watchdogMs": 360000,
+      "remainingWatchdogMs": 0,
+      "overlayHeld": false,
+      "wakeLockHeld": false,
+      "restoration": "Active tasks keep the screen awake between commands; finish/cancel releases it. Three minutes without Agent activity also releases it; standalone commands release on completion."
+    }
+  },
+  "finalScreen": {
+    "activeTasks": 0,
+    "activeOperations": 0,
+    "requested": false,
+    "taskIdleTimeoutMs": 180000,
+    "watchdogMs": 360000,
+    "remainingWatchdogMs": 0,
+    "overlayHeld": false,
+    "wakeLockHeld": false,
+    "restoration": "Active tasks keep the screen awake between commands; finish/cancel releases it. Three minutes without Agent activity also releases it; standalone commands release on completion."
+  },
+  "buttonPad": {
+    "enabled": false,
+    "connected": false,
+    "scanning": false,
+    "searchActive": false,
+    "scanAttempts": 0,
+    "maxScanAttempts": 3,
+    "scanWindowMs": 10000,
+    "retryMs": 30000,
+    "scanMode": "low_power"
+  },
+  "pairing": {
+    "paired": true,
+    "lastPairAt": "2026-10-08T04:34:14.676352Z",
+    "identityPersistent": true
+  }
+}

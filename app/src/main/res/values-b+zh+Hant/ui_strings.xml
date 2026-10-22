@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_ready" formatted="false">"● 就緒"</string>
+    <string name="ui_stop" formatted="false">"停止"</string>
+    <string name="ui_home" formatted="false">"首頁"</string>
+    <string name="ui_activity" formatted="false">"活動紀錄"</string>
+    <string name="ui_capabilities" formatted="false">"功能權限"</string>
+    <string name="ui_settings" formatted="false">"設定"</string>
+    <string name="ui_capabilities_ca09c5" formatted="false">"功能權限"</string>
+    <string name="ui_what_agents_can_do" formatted="false">"允許 AI 使用的功能"</string>
+    <string name="ui_settings_c7f73b" formatted="false">"設定"</string>
+    <string name="ui_remote_access" formatted="false">"遠端連線"</string>
+    <string name="ui_connect_from_anywhere" formatted="false">"讓 AI 從遠端連到手機"</string>
+    <string name="ui_developer_diagnostics" formatted="false">"開發與診斷"</string>
+    <string name="ui_advanced" formatted="false">"進階"</string>
+    <string name="ui_appearance" formatted="false">"外觀"</string>
+    <string name="ui_personalization" formatted="false">"個人化"</string>
+    <string name="ui_system_control" formatted="false">"系統操作（ADB）"</string>
+    <string name="ui_wireless_debugging" formatted="false">"無線偵錯"</string>
+    <string name="ui_your_agent_in_action" formatted="false">"AI 正在為你工作"</string>
+    <string name="ui_no_active_agent_tasks" formatted="false">"目前沒有進行中的任務"</string>
+    <string name="ui_ready_004de6" formatted="false">" · 就緒"</string>
+    <string name="ui_waiting_for_an_agent_task" formatted="false">"等待 AI 任務"</string>
+    <string name="ui_current_agent_activity_open_activity_for_details" formatted="false">"目前的 AI 任務，點開活動紀錄查看詳情。"</string>
+    <string name="ui_system_status" formatted="false">"服務狀態"</string>
+    <string name="ui_current_task" formatted="false">"目前任務"</string>
+    <string name="ui_open_task" formatted="false">"查看任務  →"</string>
+    <string name="ui_unable_to_open_human_help_preview" formatted="false">"無法開啟求助預覽"</string>
+    <string name="ui_unable_to_open_human_help" formatted="false">"無法開啟求助畫面"</string>
+    <string name="ui_choose_what_your_agents_can_use" formatted="false">"選擇要開放給 AI 使用的功能。"</string>
+    <string name="ui_built_in" formatted="false">"內建功能"</string>
+    <string name="ui_workspace_shell_background_sessions_and_embedded_node" formatted="false">"工作區、命令列、背景工作與 Node 執行環境"</string>
+    <string name="ui_built_into_pickpico_and_available_while_the_node_is_running" formatted="false">"PickPico 服務啟動後即可使用。"</string>
+    <string name="ui_phone_access" formatted="false">"手機資料與感測器"</string>
+    <string name="ui_camera" formatted="false">"相機"</string>
+    <string name="ui_allow_agents_to_capture_photos" formatted="false">"讓 AI 拍攝照片。"</string>
+    <string name="ui_disable_camera_permission_in_android_settings" formatted="false">"請到 Android 設定關閉相機權限。"</string>
+    <string name="ui_microphone" formatted="false">"麥克風"</string>
+    <string name="ui_allow_agents_to_record_short_audio_clips" formatted="false">"讓 AI 錄製短音訊。"</string>
+    <string name="ui_disable_microphone_permission_in_android_settings" formatted="false">"請到 Android 設定關閉麥克風權限。"</string>
+    <string name="ui_location" formatted="false">"位置"</string>
+    <string name="ui_allow_agents_to_read_this_phone_s_location" formatted="false">"讓 AI 讀取手機位置。"</string>
+    <string name="ui_disable_location_permission_in_android_settings" formatted="false">"請到 Android 設定關閉位置權限。"</string>
+    <string name="ui_contacts" formatted="false">"聯絡人"</string>
+    <string name="ui_allow_agents_to_search_and_read_contacts" formatted="false">"讓 AI 搜尋與讀取聯絡人。"</string>
+    <string name="ui_disable_contacts_permission_in_android_settings" formatted="false">"請到 Android 設定關閉聯絡人權限。"</string>
+    <string name="ui_calendar" formatted="false">"行事曆"</string>
+    <string name="ui_allow_agents_to_read_and_manage_calendar_events" formatted="false">"讓 AI 讀取與管理行事曆活動。"</string>
+    <string name="ui_disable_calendar_permission_in_android_settings" formatted="false">"請到 Android 設定關閉行事曆權限。"</string>
+    <string name="ui_notifications" formatted="false">"通知"</string>
+    <string name="ui_allow_agents_to_inspect_active_android_notifications" formatted="false">"讓 AI 查看手機目前的通知。"</string>
+    <string name="ui_device_actions" formatted="false">"手機操作"</string>
+    <string name="ui_lock_phone" formatted="false">"鎖定手機"</string>
+    <string name="ui_allow_agents_to_lock_this_device" formatted="false">"讓 AI 鎖定這支手機。"</string>
+    <string name="ui_advanced_access" formatted="false">"進階操作權限"</string>
+    <string name="ui_hyper_mode" formatted="false">"進階操作模式"</string>
+    <string name="ui_advanced_ui_screen_control_plus_lock_screen_dismissal_for_urgent_agent_handoffs_secure_locks_still_require_android_authentication" formatted="false">"讓 AI 操作畫面，並在需要你接手時喚醒手機。安全鎖定仍需通過 Android 驗證。"</string>
+    <string name="ui_allow_full_screen_alerts_so_hyper_mode_can_dismiss_the_lock_screen" formatted="false">"請允許全螢幕通知，讓進階操作模式能喚起鎖定畫面"</string>
+    <string name="ui_hyper_mode_enabled" formatted="false">"已開啟進階操作模式"</string>
+    <string name="ui_hyper_mode_disabled" formatted="false">"已關閉進階操作模式"</string>
+    <string name="ui_background_app_launch" formatted="false">"背景切換應用程式"</string>
+    <string name="ui_allow_hyper_mode_to_move_between_apps_while_pickpico_itself_is_not_on_screen" formatted="false">"即使 PickPico 不在前景，也讓 AI 切換應用程式。"</string>
+    <string name="ui_turn_on_hyper_mode_first" formatted="false">"請先開啟進階操作模式"</string>
+    <string name="ui_allow_pickpico_to_display_over_other_apps_so_android_permits_agent_app_switching" formatted="false">"請允許 PickPico 顯示在其他應用程式上層，讓 AI 能切換應用程式"</string>
+    <string name="ui_background_app_launch_is_already_allowed" formatted="false">"已允許背景切換應用程式"</string>
+    <string name="ui_accessibility_ui_control" formatted="false">"無障礙服務・畫面操作"</string>
+    <string name="ui_inspect_and_operate_accessible_ui_elements_in_other_apps" formatted="false">"讓 AI 辨識並操作其他應用程式的畫面元件。"</string>
+    <string name="ui_checking" formatted="false">"檢查中"</string>
+    <string name="ui_agent_behavior" formatted="false">"AI 的操作方式"</string>
+    <string name="ui_approval_policy" formatted="false">"操作核准方式"</string>
+    <string name="ui_choose_when_an_agent_must_ask_before_it_performs_an_action" formatted="false">"選擇 AI 何時需要先詢問你。"</string>
+    <string name="ui_auto_approve" formatted="false">"代我核准"</string>
+    <string name="ui_agent_connection" formatted="false">"AI 連線"</string>
+    <string name="ui_let_your_agent_reach_this_phone_over_the_internet" formatted="false">"讓 AI 透過網際網路連到這支手機。"</string>
+    <string name="ui_not_configured" formatted="false">"尚未設定"</string>
+    <string name="ui_android_system_access" formatted="false">"Android 系統操作"</string>
+    <string name="ui_add_system_commands_file_transfers_and_apk_installation_your_agent_chooses_when_to_use_them" formatted="false">"提供系統指令、檔案傳輸與 APK 安裝，AI 會自行選擇何時使用。"</string>
+    <string name="ui_connection_checking" formatted="false">"目前連線・檢查中"</string>
+    <string name="ui_pairing_checking" formatted="false">"配對狀態・檢查中"</string>
+    <string name="ui_appearance_136360" formatted="false">"外觀"</string>
+    <string name="ui_theme" formatted="false">"主題"</string>
+    <string name="ui_background_color_glass_style_transparency_and_highlights" formatted="false">"調整背景顏色、玻璃風格、透明度與光澤。"</string>
+    <string name="ui_customize" formatted="false">"自訂"</string>
+    <string name="ui_pico_ball" formatted="false">"Pico 懸浮球"</string>
+    <string name="ui_keep_the_home_fluid_orb_visible_above_other_apps_while_the_node_is_running" formatted="false">"服務啟動時，在其他應用程式上方顯示 Pico 懸浮球。"</string>
+    <string name="ui_open_android_settings_and_allow_display_over_other_apps" formatted="false">"請到 Android 設定允許顯示在其他應用程式上層"</string>
+    <string name="ui_pico_return_app" formatted="false">"返回應用程式與文字大小"</string>
+    <string name="ui_choose_your_default_return_app_and_pico_text_size" formatted="false">"設定預設返回的應用程式，以及 Pico 的文字大小。"</string>
+    <string name="ui_app" formatted="false">"應用程式"</string>
+    <string name="ui_pickpico_update" formatted="false">"PickPico 更新"</string>
+    <string name="ui_version" formatted="false">"版本 —"</string>
+    <string name="ui_checking_update_state" formatted="false">"正在檢查更新狀態…"</string>
+    <string name="ui_check_for_update" formatted="false">"檢查更新"</string>
+    <string name="ui_endpoints_transport_state_credentials_runtime_and_debug_information" formatted="false">"查看連線位址、連線狀態、驗證資訊與診斷資料。"</string>
+    <string name="ui_your_agent_chooses_tools_automatically_system_access_adds_android_commands_file_transfers_and_apk_installation_through_adb" formatted="false">"AI 會自動選擇適合的工具。啟用 ADB 後，可使用 Android 系統指令、傳輸檔案及安裝 APK。"</string>
+    <string name="ui_system_control_a2fc0e" formatted="false">"系統操作（ADB）"</string>
+    <string name="ui_reading_picoadb_state" formatted="false">"正在讀取 ADB 狀態…"</string>
+    <string name="ui_ready_when_needed" formatted="false">"需要時自動連線"</string>
+    <string name="ui_keep_android_wireless_debugging_on_when_you_want_system_access_your_agent_reconnects_automatically_when_it_needs_adb" formatted="false">"需要系統操作時，請保持 Android「無線偵錯」開啟。AI 使用 ADB 時會自動重新連線。"</string>
+    <string name="ui_reconnect_now" formatted="false">"重新連線"</string>
+    <string name="ui_android_wireless_debugging" formatted="false">"開啟無線偵錯設定"</string>
+    <string name="ui_pairing_settings" formatted="false">"配對設定"</string>
+    <string name="ui_1_android_authorization" formatted="false">"1・Android 授權"</string>
+    <string name="ui_open_wireless_debugging_enable_it_then_choose_pair_device_with_pairing_code_keep_that_six_digit_dialog_open_split_screen_is_the_most_reliable_setup_on_samsung" formatted="false">"開啟「無線偵錯」，選擇「使用配對碼配對裝置」，並保持六位數配對碼視窗開啟。Samsung 手機建議使用分割畫面操作。"</string>
+    <string name="ui_open_wireless_debugging" formatted="false">"開啟無線偵錯設定"</string>
+    <string name="ui_scan_for_endpoints" formatted="false">"搜尋偵錯服務"</string>
+    <string name="ui_scanning_for_wireless_debugging_for_15_seconds" formatted="false">"正在搜尋無線偵錯服務，約需 15 秒"</string>
+    <string name="ui_2_pair_this_phone" formatted="false">"2・配對這支手機"</string>
+    <string name="ui_enter_the_six_digit_code_shown_by_android_pickpico_stores_its_adb_identity_in_private_app_storage_the_code_itself_is_never_saved" formatted="false">"輸入 Android 顯示的六位數配對碼。PickPico 會保存 ADB 配對身分，配對碼本身不會儲存。"</string>
+    <string name="ui_6_digit_pairing_code" formatted="false">"六位數配對碼"</string>
+    <string name="ui_pair" formatted="false">"配對"</string>
+    <string name="ui_camera_notifications_and_screen_tools_keep_working_without_adb_when_their_permissions_are_enabled_system_commands_follow_your_hyper_mode_and_approval_settings" formatted="false">"相機、通知與畫面工具在取得各自權限後即可使用。ADB 系統指令會遵守進階操作模式及核准設定。"</string>
+    <string name="ui_pairing_saved_your_agent_can_connect_automatically" formatted="false">"已儲存配對，AI 可自動連線。"</string>
+    <string name="ui_pico_orb" formatted="false">"Pico 懸浮球"</string>
+    <string name="ui_theme_d91e30" formatted="false">"主題"</string>
+    <string name="ui_choose_a_solid_color_or_gradient_then_tune_how_the_glass_sits_above_it" formatted="false">"選擇純色或漸層背景，再調整玻璃效果。"</string>
+    <string name="ui_gradient_background" formatted="false">"漸層背景"</string>
+    <string name="ui_color_a" formatted="false">"顏色 A"</string>
+    <string name="ui_color_b" formatted="false">"顏色 B"</string>
+    <string name="ui_glass" formatted="false">"玻璃效果"</string>
+    <string name="ui_soft" formatted="false">"柔和"</string>
+    <string name="ui_clear" formatted="false">"清除"</string>
+    <string name="ui_crisp" formatted="false">"鮮明"</string>
+    <string name="ui_transparency_see_more_background" formatted="false">"透明度・顯露更多背景"</string>
+    <string name="ui_shine_brighter_glass_edge" formatted="false">"光澤・邊緣亮度"</string>
+    <string name="ui_color_strength_more_less_background" formatted="false">"背景顏色強度"</string>
+    <string name="ui_choose_color" formatted="false">"選擇顏色 "</string>
+    <string name="ui_open_color_palette" formatted="false">"，開啟調色盤"</string>
+    <string name="ui_color_a_263930" formatted="false">"顏色 A"</string>
+    <string name="ui_color_b_46d602" formatted="false">"顏色 B"</string>
+    <string name="ui_cancel" formatted="false">"取消"</string>
+    <string name="ui_apply" formatted="false">"套用"</string>
+    <string name="ui_remote_access_e235e3" formatted="false">"遠端連線"</string>
+    <string name="ui_local_access_still_works_a_compatible_relay_is_required_for_cloud_agents_outside_your_lan" formatted="false">"區域網路內可直接連線。外部的雲端 AI 需要透過相容的中繼服務。"</string>
+    <string name="ui_how_it_works" formatted="false">"設定方式"</string>
+    <string name="ui_deploy_a_pickpico_compatible_relay_the_cloudflare_worker_durable_object_in_the_repository_is_the_reference_implementation" formatted="false">"先部署相容的中繼服務。專案提供 Cloudflare Worker 與 Durable Object 的參考實作。"</string>
+    <string name="ui_paste_the_relay_base_url_below_pickpico_keeps_the_outbound_connection_itself_your_pc_does_not_need_to_stay_on" formatted="false">"在下方貼上中繼服務網址。PickPico 會自行維持連線，電腦可關機。"</string>
+    <string name="ui_restart_pickpico_after_saving_when_the_relay_connects_cloud_agents_can_use_the_stable_remote_mcp_url" formatted="false">"儲存後重新啟動服務。中繼連線成功後，雲端 AI 就能使用固定的遠端 MCP 網址。"</string>
+    <string name="ui_relay_url" formatted="false">"中繼服務網址"</string>
+    <string name="ui_save_relay" formatted="false">"儲存中繼設定"</string>
+    <string name="ui_leave_the_field_empty_to_disable_remote_access_pickpico_does_not_assume_that_every_open_source_installation_uses_the_project_relay" formatted="false">"留空即可停用遠端連線。你可以使用自行部署的中繼服務。"</string>
+    <string name="ui_relay_identity" formatted="false">"遠端連線身分"</string>
+    <string name="ui_reset_this_phone_s_remote_identity_if_another_device_may_be_using_the_same_remote_mcp_url_your_local_settings_inbox_approval_mode_and_theme_are_kept" formatted="false">"若另一支裝置也在使用相同的遠端 MCP 網址，可重設這支手機的遠端身分。本機設定、訊息、核准方式與主題都會保留。"</string>
+    <string name="ui_reset_relay_identity" formatted="false">"重設遠端連線身分"</string>
+    <string name="ui_technical_information_for_debugging_and_advanced_setup_normal_pickpico_use_should_not_require_anything_on_this_page" formatted="false">"這裡提供診斷與進階設定資料，日常使用通常不需調整。"</string>
+    <string name="ui_endpoints" formatted="false">"連線位址"</string>
+    <string name="ui_local_mcp" formatted="false">"本機 MCP"</string>
+    <string name="ui_remote_mcp" formatted="false">"遠端 MCP"</string>
+    <string name="ui_relay" formatted="false">"中繼連線"</string>
+    <string name="ui_status" formatted="false">"狀態"</string>
+    <string name="ui_relay_url_7cfb35" formatted="false">"中繼服務網址"</string>
+    <string name="ui_authentication" formatted="false">"身分驗證"</string>
+    <string name="ui_local_bearer" formatted="false">"本機存取憑證"</string>
+    <string name="ui_runtime" formatted="false">"執行狀態"</string>
+    <string name="ui_node" formatted="false">"服務"</string>
+    <string name="ui_recent_action" formatted="false">"最近操作"</string>
+    <string name="ui_open_legacy_engineering_console" formatted="false">"開啟舊版工程主控台"</string>
+    <string name="ui_ready_for_your_next_idea" formatted="false">"隨時準備好接下個任務"</string>
+    <string name="ui_failed" formatted="false">"・失敗"</string>
+    <string name="ui_just_now" formatted="false">"剛剛"</string>
+    <string name="ui_m_ago" formatted="false">" 分鐘前"</string>
+    <string name="ui_h_ago" formatted="false">" 小時前"</string>
+    <string name="ui_running" formatted="false">"執行中"</string>
+    <string name="ui_waiting" formatted="false">"等待中"</string>
+    <string name="ui_blocked" formatted="false">"需要處理"</string>
+    <string name="ui_connecting" formatted="false">"連線中"</string>
+    <string name="ui_just_finished" formatted="false">"剛完成"</string>
+    <string name="ui_ready_20c7c5" formatted="false">"就緒"</string>
+    <string name="ui_node_nstopped" formatted="false">"服務\n已停止"</string>
+    <string name="ui_local_nconnection" formatted="false">"區域網路\n連線"</string>
+    <string name="ui_connected_nthrough_relay" formatted="false">"中繼服務\n已連線"</string>
+    <string name="ui_relay_n" formatted="false">"中繼服務\n"</string>
+    <string name="ui_checking_ncapabilities" formatted="false">"正在檢查\n可用功能"</string>
+    <string name="ui_capabilities_navailable" formatted="false">" 項功能\n可使用"</string>
+    <string name="ui_capabilities_npaused" formatted="false">"功能\n已暫停"</string>
+    <string name="ui_your_update_is_ready" formatted="false">"更新已準備好"</string>
+    <string name="ui_finish_installing_the_verified_pickpico_update" formatted="false">"請完成 PickPico 更新安裝。"</string>
+    <string name="ui_view_update" formatted="false">"查看更新"</string>
+    <string name="ui_node_stopped" formatted="false">"服務已停止"</string>
+    <string name="ui_node_local_only_relay_disconnected" formatted="false">"僅限區域網路連線，中繼服務未連線"</string>
+    <string name="ui_node_ready" formatted="false">"服務已就緒"</string>
+    <string name="ui_online" formatted="false">"● 已啟動"</string>
+    <string name="ui_offline" formatted="false">"● 已停止"</string>
+    <string name="ui_ask_me" formatted="false">"詢問我"</string>
+    <string name="ui_yolo_mode" formatted="false">"全部放行（YOLO）"</string>
+    <string name="ui_start" formatted="false">"啟動"</string>
+    <string name="ui_ready_fc554d" formatted="false">"可使用"</string>
+    <string name="ui_setup_required" formatted="false">"需要設定"</string>
+    <string name="ui_off" formatted="false">"已關閉"</string>
+    <string name="ui_active_session" formatted="false">"正在擷取畫面"</string>
+    <string name="ui_not_active" formatted="false">"尚未啟用"</string>
+    <string name="ui_connected" formatted="false">"已連線"</string>
+    <string name="ui_version_03283e" formatted="false">"版本 "</string>
+    <string name="ui_build" formatted="false">"・組建 "</string>
+    <string name="ui_checking_for_update" formatted="false">"正在檢查更新…"</string>
+    <string name="ui_downloading_update" formatted="false">"正在下載更新…"</string>
+    <string name="ui_install" formatted="false">"安裝 "</string>
+    <string name="ui_remote_mcp_is_ready_this_phone_maintains_the_relay_connection_itself" formatted="false">"遠端 MCP 已就緒，這支手機會自行維持中繼連線。"</string>
+    <string name="ui_relay_is_configured_but_not_currently_connected_local_access_remains_available" formatted="false">"中繼服務已設定，目前尚未連線。區域網路連線仍可使用。"</string>
+    <string name="ui_running_5080a2" formatted="false">"執行中"</string>
+    <string name="ui_stopped" formatted="false">"已停止"</string>
+    <string name="ui_tool_calls" formatted="false">"・工具呼叫 "</string>
+    <string name="ui_app_884b0c" formatted="false">"・版本 "</string>
+    <string name="ui_no_tool_calls_yet" formatted="false">"尚無工具呼叫"</string>
+    <string name="ui_connection_error" formatted="false">"目前連線・發生錯誤"</string>
+    <string name="ui_engine_missing" formatted="false">"缺少 ADB 引擎"</string>
+    <string name="ui_this_build_does_not_contain_the_verified_picoadb_engine" formatted="false">"這個版本缺少 PicoADB 引擎。"</string>
+    <string name="ui_pairing" formatted="false">"配對中"</string>
+    <string name="ui_authenticating_the_six_digit_code_through_android_s_tls_spake2_pairing_flow" formatted="false">"正在透過 Android 的安全配對流程驗證配對碼。"</string>
+    <string name="ui_connecting_48b998" formatted="false">"連線中"</string>
+    <string name="ui_connecting_to_the_trusted_local_wireless_debugging_endpoint" formatted="false">"正在連線到已信任的無線偵錯服務。"</string>
+    <string name="ui_diagnosing" formatted="false">"診斷中"</string>
+    <string name="ui_collecting_privileged_android_system_diagnostics" formatted="false">"正在收集 Android 系統診斷資料。"</string>
+    <string name="ui_running_command" formatted="false">"執行指令中"</string>
+    <string name="ui_executing_an_agent_adb_command_on_this_phone" formatted="false">"AI 正在這支手機上執行 ADB 指令。"</string>
+    <string name="ui_pairing_endpoint_found" formatted="false">"已找到配對服務"</string>
+    <string name="ui_pairing_endpoint_found_enter_the_code_while_android_s_pairing_dialog_remains_open" formatted="false">" 個配對服務已找到。請保持 Android 配對視窗開啟，並輸入配對碼。"</string>
+    <string name="ui_ready_to_connect" formatted="false">"可開始連線"</string>
+    <string name="ui_endpoint_found_connect_or_run_an_agent_adb_command_to_activate_shell_access" formatted="false">" 個偵錯服務已找到。點選連線，或讓 AI 執行 ADB 指令即可開始使用。"</string>
+    <string name="ui_scanning" formatted="false">"搜尋中"</string>
+    <string name="ui_searching_briefly_for_android_wireless_debugging_services_on_this_wi_fi_network" formatted="false">"正在這個 Wi-Fi 網路搜尋 Android 無線偵錯服務。"</string>
+    <string name="ui_paired" formatted="false">"已配對"</string>
+    <string name="ui_pairing_is_saved_enable_wireless_debugging_to_use_adb_commands" formatted="false">"配對已儲存。開啟無線偵錯後即可使用 ADB 指令。"</string>
+    <string name="ui_enable_wireless_debugging_and_pair_this_pickpico_installation_once" formatted="false">"請開啟無線偵錯，完成一次 PickPico 配對。"</string>
+    <string name="ui_offline_c68993" formatted="false">"已離線"</string>
+    <string name="ui_authorization_required" formatted="false">"需要授權"</string>
+    <string name="ui_check_failed" formatted="false">"檢查失敗"</string>
+    <string name="ui_not_connected" formatted="false">"尚未連線"</string>
+    <string name="ui_pairing_1f2ce3" formatted="false">"配對狀態・"</string>
+    <string name="ui_saved" formatted="false">"已儲存"</string>
+    <string name="ui_not_paired" formatted="false">"尚未配對"</string>
+    <string name="ui_connection" formatted="false">"目前連線・"</string>
+    <string name="ui_hide_pairing_settings" formatted="false">"收起配對設定"</string>
+    <string name="ui_adb_shell_access_is_available_your_agent_can_run_commands_transfer_files_and_install_apks" formatted="false">"ADB 已可使用。AI 可以執行系統指令、傳輸檔案與安裝 APK。"</string>
+    <string name="ui_scanning_971444" formatted="false">"搜尋中…"</string>
+    <string name="ui_pairing_e8690e" formatted="false">"配對中…"</string>
+    <string name="ui_connecting_f361a7" formatted="false">"連線中…"</string>
+    <string name="ui_checking_the_official_update_channel" formatted="false">"正在檢查官方更新…"</string>
+    <string name="ui_update_check_failed" formatted="false">"檢查更新失敗・"</string>
+    <string name="ui_downloading" formatted="false">"下載中 "</string>
+    <string name="ui_downloading_9069f3" formatted="false">"下載中・"</string>
+    <string name="ui_download_verified_preparing_the_installer" formatted="false">"下載已驗證・正在準備安裝"</string>
+    <string name="ui_update_ready_tap_install_to_continue" formatted="false">"更新已準備好・點選安裝以繼續"</string>
+    <string name="ui_is_ready_to_install" formatted="false">" 已可安裝"</string>
+    <string name="ui_android_permission_needed_allow_pickpico_to_install_updates" formatted="false">"需要 Android 授權・請允許 PickPico 安裝更新"</string>
+    <string name="ui_unknown_update_error" formatted="false">"未知的更新錯誤"</string>
+    <string name="ui_update_failed" formatted="false">"更新失敗・"</string>
+    <string name="ui_pickpico_is_up_to_date" formatted="false">"PickPico 已是最新版本"</string>
+    <string name="ui_update_installed_successfully" formatted="false">"更新安裝成功"</string>
+    <string name="ui_ready_to_check_the_official_update_channel" formatted="false">"可檢查官方更新"</string>
+    <string name="ui_unknown_error" formatted="false">"未知錯誤"</string>
+    <string name="ui_stop_pickpico" formatted="false">"停止 PickPico？"</string>
+    <string name="ui_agents_will_not_be_able_to_reach_this_phone_until_pickpico_starts_again" formatted="false">"重新啟動 PickPico 前，AI 將無法連到這支手機。"</string>
+    <string name="ui_stop_9e2534" formatted="false">"停止"</string>
+    <string name="ui_starting_pickpico" formatted="false">"正在啟動 PickPico…"</string>
+    <string name="ui_yolo_mode_af1945" formatted="false">"全部放行（YOLO）"</string>
+    <string name="ui_approval_mode" formatted="false">"操作核准方式"</string>
+    <string name="ui_relay_url_must_start_with_https" formatted="false">"中繼服務網址需以 https:// 開頭"</string>
+    <string name="ui_relay_saved" formatted="false">"中繼設定已儲存"</string>
+    <string name="ui_restart_pickpico_now_to_apply_the_remote_access_change" formatted="false">"現在重新啟動 PickPico，套用遠端連線設定嗎？"</string>
+    <string name="ui_later" formatted="false">"稍後"</string>
+    <string name="ui_restart" formatted="false">"重新啟動"</string>
+    <string name="ui_reset_relay_identity_ea7796" formatted="false">"重設遠端連線身分？"</string>
+    <string name="ui_pickpico_will_create_a_new_remote_mcp_url_for_this_phone_existing_integrations_using_the_old_url_will_stop_working_local_settings_and_data_are_kept" formatted="false">"將為這支手機建立新的遠端 MCP 網址。使用舊網址的連線需要重新設定，本機設定與資料會保留。"</string>
+    <string name="ui_reset" formatted="false">"重設"</string>
+    <string name="ui_relay_identity_reset_a_new_remote_mcp_url_will_be_created" formatted="false">"遠端身分已重設，將建立新的遠端 MCP 網址。"</string>
+    <string name="ui_start_pickpico_first" formatted="false">"請先啟動 PickPico"</string>
+    <string name="ui_0_messages" formatted="false">"0 則訊息"</string>
+    <string name="ui_recent" formatted="false">"最近紀錄"</string>
+    <string name="ui_clear_agent_activity" formatted="false">"清除活動紀錄？"</string>
+    <string name="ui_this_removes_every_saved_request_and_message_from_this_phone" formatted="false">"將清除這支手機上儲存的所有請求與訊息。"</string>
+    <string name="ui_clear_719ea3" formatted="false">"清除"</string>
+    <string name="ui_agent_activity_cleared" formatted="false">"活動紀錄已清除"</string>
+    <string name="ui_activity_81c0d9" formatted="false">"活動紀錄"</string>
+    <string name="ui_recent_commands_this_session" formatted="false">"這次工作階段的最近指令"</string>
+    <string name="ui_finished" formatted="false">"・完成"</string>
+    <string name="ui_saved_message" formatted="false">" 則已儲存訊息"</string>
+    <string name="ui_saved_messages" formatted="false">" 則已儲存訊息"</string>
+    <string name="ui_no_activity_yet" formatted="false">"尚無活動紀錄"</string>
+    <string name="ui_agent_requests_notifications_and_human_help_handoffs_will_appear_here" formatted="false">"AI 的請求、通知與需要你協助的事項會顯示在這裡。"</string>
+    <string name="ui_copy" formatted="false">"複製"</string>
+    <string name="ui_open" formatted="false">"開啟"</string>
+    <string name="ui_needs_response" formatted="false">"等待回覆"</string>
+    <string name="ui_approval_needed" formatted="false">"需要核准"</string>
+    <string name="ui_human_help" formatted="false">"需要你協助"</string>
+    <string name="ui_agent_is_waiting_for_you" formatted="false">"AI 正在等你"</string>
+    <string name="ui_open_to_respond_and_let_the_agent_continue" formatted="false">"點開回覆，讓 AI 繼續工作。"</string>
+    <string name="ui_copied" formatted="false">"已複製"</string>
+    <string name="ui_no_app_can_open_this_link" formatted="false">"沒有可開啟此連結的應用程式"</string>
+    <string name="ui_pico_settings" formatted="false">"Pico 設定"</string>
+    <string name="ui_text_size" formatted="false">"文字大小・"</string>
+    <string name="ui_text_size_for_pico_and_this_page" formatted="false">"Pico 與此頁面的文字大小"</string>
+    <string name="ui_default_100" formatted="false">"預設・100%"</string>
+    <string name="ui_larger_120" formatted="false">"較大・120%"</string>
+    <string name="ui_largest_140" formatted="false">"最大・140%"</string>
+    <string name="ui_use_the_task_s_return_destination_when_provided_otherwise_open_your_selected_app" formatted="false">"優先返回任務指定的應用程式；未指定時，開啟你在這裡選擇的應用程式。"</string>
+    <string name="ui_search_apps" formatted="false">"搜尋應用程式"</string>
+    <string name="ui_no_matching_apps" formatted="false">"找不到符合的應用程式"</string>
+    <string name="ui_clear_default_return_app" formatted="false">"清除預設返回應用程式"</string>
+    <string name="ui_return_app" formatted="false">"返回應用程式："</string>
+    <string name="ui_default_return_app_n" formatted="false">"預設返回應用程式\n"</string>
+    <string name="ui_not_selected" formatted="false">"尚未選擇"</string>
+    <string name="ui_last" formatted="false">"上次・"</string>
+    <string name="ui_recent_94045a" formatted="false">"最近・"</string>
+    <string name="ui_node_is_stopped" formatted="false">"服務已停止"</string>
+    <string name="ui_local_connection" formatted="false">"區域網路連線"</string>
+    <string name="ui_connected_through_relay" formatted="false">"已透過中繼服務連線"</string>
+    <string name="ui_remote_access_unavailable" formatted="false">"遠端連線無法使用"</string>
+    <string name="ui_waiting_c271b6" formatted="false">"等待中"</string>
+    <string name="ui_waiting_for_your_help" formatted="false">"正在等你協助"</string>
+    <string name="ui_approval_required" formatted="false">"需要核准"</string>
+    <string name="ui_your_help_is_needed" formatted="false">"需要你協助"</string>
+    <string name="ui_an_agent_is_waiting_for_your_response" formatted="false">"AI 正在等待你的回覆。"</string>
+    <string name="ui_review" formatted="false">"查看"</string>
+    <string name="ui_respond" formatted="false">"回覆"</string>
+    <string name="ui_pickpico_is_resting" formatted="false">"PickPico 休息中"</string>
+    <string name="ui_start_the_node_to_welcome_agents" formatted="false">"啟動服務，讓 AI 連到手機"</string>
+    <string name="ui_ready_when_you_are" formatted="false">"準備好就出發"</string>
+    <string name="ui_start_pickpico_to_make_this_phone_available" formatted="false">"啟動 PickPico，讓 AI 使用這支手機。"</string>
+    <string name="ui_start_952f37" formatted="false">"啟動"</string>
+    <string name="ui_blocked_fcc4cc" formatted="false">"需要處理"</string>
+    <string name="ui_task_needs_attention" formatted="false">"任務需要處理"</string>
+    <string name="ui_task_blocked" formatted="false">"任務遇到問題"</string>
+    <string name="ui_review_issue" formatted="false">"查看問題"</string>
+    <string name="ui_active" formatted="false">"工作中"</string>
+    <string name="ui_agent_task_in_progress" formatted="false">"AI 任務進行中"</string>
+    <string name="ui_waiting_for_the_agent_s_next_step" formatted="false">"等待 AI 的下一步"</string>
+    <string name="ui_waiting_on_a_task" formatted="false">"任務等待中"</string>
+    <string name="ui_review_the_task_for_the_next_step" formatted="false">"查看任務，確認下一步。"</string>
+    <string name="ui_open_task_a1f175" formatted="false">"查看任務"</string>
+    <string name="ui_open_current_task" formatted="false">"查看目前任務"</string>
+    <string name="ui_view_details_and_live_progress" formatted="false">"查看詳情與即時進度"</string>
+    <string name="ui_connecting_pickpico" formatted="false">"PickPico 連線中"</string>
+    <string name="ui_relay_connection_lost" formatted="false">"中繼連線已中斷"</string>
+    <string name="ui_establishing_a_relay_session" formatted="false">"正在建立中繼連線"</string>
+    <string name="ui_local_access_is_still_available" formatted="false">"區域網路連線仍可使用"</string>
+    <string name="ui_relay_disconnected" formatted="false">"中繼服務未連線"</string>
+    <string name="ui_remote_access_needs_attention" formatted="false">"請檢查遠端連線。"</string>
+    <string name="ui_review_connection" formatted="false">"查看連線"</string>
+    <string name="ui_an_action_needs_attention" formatted="false">"操作需要處理"</string>
+    <string name="ui_failed_f8d53c" formatted="false">" → 失敗"</string>
+    <string name="ui_action_did_not_finish" formatted="false">"操作未完成"</string>
+    <string name="ui_check_activity_for_the_latest_context" formatted="false">"請到活動紀錄查看最新情況。"</string>
+    <string name="ui_task_completed" formatted="false">"任務已完成"</string>
+    <string name="ui_starting" formatted="false">"啟動中"</string>
+    <string name="ui_agent_tasks" formatted="false">" 個 AI 任務・"</string>
+    <string name="ui_active_a733b8" formatted="false">"工作中"</string>
+    <string name="ui_checking_the_camera_feed" formatted="false">"正在查看相機畫面"</string>
+    <string name="ui_reviewing_the_current_screen" formatted="false">"正在查看目前畫面"</string>
+    <string name="ui_opening_an_app" formatted="false">"正在開啟應用程式"</string>
+    <string name="ui_finding_an_app" formatted="false">"正在尋找應用程式"</string>
+    <string name="ui_checking_notifications" formatted="false">"正在查看通知"</string>
+    <string name="ui_working_on_the_device" formatted="false">"正在執行手機操作"</string>
+    <string name="ui_working_with_files" formatted="false">"正在處理檔案"</string>
+    <string name="ui_preparing_the_next_steps" formatted="false">"正在準備下一步"</string>
+    <string name="ui_checking_the_device_update" formatted="false">"正在檢查更新"</string>
+    <string name="ui_helping_with_an_agent_task" formatted="false">"正在執行 AI 任務"</string>
+    <string name="ui_captured_camera" formatted="false">"已拍攝照片"</string>
+    <string name="ui_captured_screen" formatted="false">"已擷取畫面"</string>
+    <string name="ui_reviewed_current_screen" formatted="false">"已查看目前畫面"</string>
+    <string name="ui_app_launched" formatted="false">"已開啟應用程式"</string>
+    <string name="ui_found_installed_apps" formatted="false">"已取得應用程式清單"</string>
+    <string name="ui_human_help_finished" formatted="false">"協助事項已完成"</string>
+    <string name="ui_entered_text" formatted="false">"已輸入文字"</string>
+    <string name="ui_interacted_with_screen" formatted="false">"已操作畫面"</string>
+    <string name="ui_scrolled_current_screen" formatted="false">"已捲動畫面"</string>
+    <string name="ui_replied_to_notification" formatted="false">"已回覆通知"</string>
+    <string name="ui_read_operation_guide" formatted="false">"已讀取操作指南"</string>
+    <string name="ui_extra_62cbe28803" formatted="false">"即時螢幕分享"</string>
+    <string name="ui_extra_3a16d0094a" formatted="false">"選用的即時畫面分享。進階操作模式也可透過無障礙服務按需擷取畫面。"</string>
+    <string name="ui_extra_4dd1672772" formatted="false">"請開啟「開發人員選項」→「無線偵錯」"</string>
+    <string name="ui_extra_6bc452d636" formatted="false">"請輸入 Android 顯示的六位數配對碼"</string>
+    <string name="ui_extra_ff9aa7b7f0" formatted="false">"配對失敗"</string>
+    <string name="ui_extra_16bb313e84" formatted="false">"ADB 系統操作已就緒。"</string>
+    <string name="ui_extra_202caaa870" formatted="false">"連線失敗"</string>
+    <string name="ui_extra_b9b3a1654c" formatted="false">"外觀調整會立即套用，不影響 AI 的權限與操作方式。"</string>
+    <string name="ui_extra_a93421b010" formatted="false">"選擇喜歡的樣式，隨時都能切換。"</string>
+    <string name="ui_extra_c0a8060f3b" formatted="false">"原版"</string>
+    <string name="ui_extra_245eb6d90c" formatted="false">"火焰"</string>
+    <string name="ui_extra_26e55d0487" formatted="false">"火焰樣式需要 Android 13 以上；原版樣式皆可使用。"</string>
+    <string name="ui_extra_78d4784b89" formatted="false">"這支手機不支援火焰樣式，可使用原版。"</string>
+    <string name="ui_extra_63add8f1fc" formatted="false">"原版懸浮球"</string>
+    <string name="ui_extra_d7a1e57362" formatted="false">"，已選取"</string>
+    <string name="ui_extra_383a3221cf" formatted="false">"火焰懸浮球"</string>
+    <string name="ui_orb_lantern" formatted="false">"小燈籠"</string>
+    <string name="ui_orb_lantern_description" formatted="false">"小燈籠懸浮球"</string>
+    <string name="ui_extra_194405e182" formatted="false">"本機存取憑證尚未就緒"</string>
+    <string name="ui_extra_cecf3ba368" formatted="false">"已複製連線資訊"</string>
+    <string name="ui_extra_ca265dedb7" formatted="false">"允許這項功能後，AI 可透過 PickPico 鎖定手機。"</string>
+    <string name="ui_extra_9b55a452e2" formatted="false">"無障礙畫面操作"</string>
+    <string name="ui_extra_20c53c8b5b" formatted="false">"這項特殊權限由 Android 管理。請到無障礙設定停用。"</string>
+    <string name="ui_extra_fd7108f831" formatted="false">"開啟設定"</string>
+    <string name="ui_extra_7fe2a5b980" formatted="false">"啟用畫面操作"</string>
+    <string name="ui_extra_a2497a1268" formatted="false">"自行安裝的版本可能需要額外授權：先到應用程式資訊選擇「允許受限制的設定」（若有顯示），再到無障礙設定啟用 PickPico。"</string>
+    <string name="ui_extra_64dec0b01a" formatted="false">"應用程式資訊"</string>
+    <string name="ui_extra_d660049bc1" formatted="false">"無障礙設定"</string>
+    <string name="ui_extra_39c84fd306" formatted="false">"這支手機無法使用螢幕擷取"</string>
+    <string name="ui_extra_5157e0610f" formatted="false">"尚未取得螢幕擷取授權"</string>
+    <string name="ui_extra_1c7a1da2ac" formatted="false">"必要權限尚未允許，PickPico 尚未啟動。"</string>
+    <string name="ui_extra_1e214136aa" formatted="false">"PickPico 更新："</string>
+    <string name="ui_extra_f2d520d627" formatted="false">"找不到這項求助請求"</string>
+    <string name="ui_extra_46258f6dbc" formatted="false">"AI 需要你核准"</string>
+    <string name="ui_extra_b7d25c3c92" formatted="false">"AI 等你接手"</string>
+    <string name="ui_extra_e6688f2ddc" formatted="false">"需要你的回覆。"</string>
+    <string name="ui_extra_e982def1af" formatted="false">"AI 需要你協助"</string>
+    <string name="ui_extra_35fabd891f" formatted="false">"AI 補充說明"</string>
+    <string name="ui_extra_9120423983" formatted="false">"詳細資訊"</string>
+    <string name="ui_extra_c256d9bd28" formatted="false">"可以補充說明或圖片，幫助 AI 繼續工作。"</string>
+    <string name="ui_extra_c9414f7e6b" formatted="false">"補充說明（選填）"</string>
+    <string name="ui_extra_e8056001a1" formatted="false">"給 AI 的補充說明（選填）…"</string>
+    <string name="ui_extra_f804d60449" formatted="false">"輸入要給 AI 的訊息…"</string>
+    <string name="ui_extra_7da8c7087f" formatted="false">"附加圖片・選填"</string>
+    <string name="ui_extra_e828e6e82d" formatted="false">"尚未附加圖片"</string>
+    <string name="ui_extra_f35dec5f75" formatted="false">"選擇圖片"</string>
+    <string name="ui_extra_7ebd5d4c91" formatted="false">"拍照"</string>
+    <string name="ui_extra_3091c8446f" formatted="false">"語音"</string>
+    <string name="ui_extra_dc3decbb93" formatted="false">"詳情"</string>
+    <string name="ui_extra_3cd46e950e" formatted="false">"●  Pico Dock 已連線"</string>
+    <string name="ui_extra_c888ab1ad8" formatted="false">"   ・   語音   ・   詳情"</string>
+    <string name="ui_extra_d623d3887b" formatted="false">"使用手機按鈕"</string>
+    <string name="ui_extra_47a7097872" formatted="false">"已傳送給 AI"</string>
+    <string name="ui_extra_2ec46e92c9" formatted="false">"找不到相機應用程式"</string>
+    <string name="ui_extra_6dc279ba73" formatted="false">"圖片處理失敗："</string>
+    <string name="ui_extra_350c9e9192" formatted="false">"無法讀取圖片"</string>
+    <string name="ui_extra_cfd84dded8" formatted="false">"無法壓縮圖片"</string>
+    <string name="ui_extra_8b461f9c52" formatted="false">" 張圖片已附加"</string>
+    <string name="ui_extra_b52b36b726" formatted="false">"返回"</string>
+    <string name="ui_extra_97efc8640f" formatted="false">"操作核准"</string>
+    <string name="ui_extra_4644b5262c" formatted="false">"需要你協助"</string>
+    <string name="ui_extra_d20150227f" formatted="false">"AI 已暫停・正在等你"</string>
+    <string name="ui_extra_67e1442d0b" formatted="false">"請說出要回覆 AI 的內容"</string>
+    <string name="ui_extra_520f7ef562" formatted="false">"這支手機無法使用語音輸入"</string>
+    <string name="ui_extra_64cc7c9c45" formatted="false">"語音回覆"</string>
+    <string name="ui_extra_386306f929" formatted="false">"關閉 Pico 面板"</string>
+    <string name="ui_extra_575e50f241" formatted="false">"開啟  →"</string>
+    <string name="ui_extra_076b846007" formatted="false">"返回應用程式與文字大小"</string>
+    <string name="ui_extra_2b485494ee" formatted="false">"返回 "</string>
+    <string name="ui_extra_bcb7e60b53" formatted="false">"尚未選擇返回的應用程式"</string>
+    <string name="ui_extra_27f621cf47" formatted="false">"查看活動紀錄或返回 AI"</string>
+    <string name="ui_extra_083ddda4bd" formatted="false">"查看求助"</string>
+    <string name="ui_extra_8ef81c3d5e" formatted="false">"查看連線"</string>
+    <string name="ui_extra_f327dd9753" formatted="false">"查看活動紀錄"</string>
+    <string name="ui_extra_cc78a57042" formatted="false">"開啟 PickPico"</string>
+    <string name="ui_extra_3228b1fc7d" formatted="false">"需要你協助"</string>
+    <string name="ui_extra_259476cdfc" formatted="false">"PickPico 工作中"</string>
+    <string name="ui_extra_362a26cfd5" formatted="false">"PickPico 已就緒"</string>
+    <string name="ui_agents" formatted="false">" 個 AI"</string>
+    <string name="ui_accessories">配件</string>
+    <string name="ui_button_pad">四按鍵藍牙支架</string>
+    <string name="ui_button_pad_detail">使用手機支架遙控器時才啟用。採低耗電搜尋，最多嘗試三次後停止；找不到裝置時可按「重新搜尋」。</string>
+    <string name="ui_button_pad_search">重新搜尋</string>
+    <string name="ui_button_pad_enable_first">請先啟用四按鍵支架。</string>
+    <string name="ui_button_pad_enabled">已啟用・限次搜尋</string>
+    <string name="ui_button_pad_disabled">已關閉・停止藍牙搜尋</string>
+    <string name="ui_dev_control_title">一鍵開發模式</string>
+    <string name="ui_dev_control_authorize">啟用一鍵控制（只需一次）</string>
+    <string name="ui_dev_control_enable">開啟開發者與 Wi-Fi ADB</string>
+    <string name="ui_dev_control_disable">關閉開發者與偵錯</string>
+    <string name="ui_dev_control_on">開啟</string>
+    <string name="ui_dev_control_off">關閉</string>
+    <string name="ui_dev_control_state">開發者：%1$s · Wi-Fi ADB：%2$s</string>
+    <string name="ui_dev_control_ready">即使 ADB 關閉，也能直接在這裡開關，原配對會保留。關閉時也會停止 USB 偵錯。</string>
+    <string name="ui_dev_control_setup_needed">第一次先開啟無線偵錯，再授權一鍵控制。之後直接使用這裡的開關。</string>
+    <string name="ui_dev_control_first_setup">請進入軟體資訊，點版本號碼七次啟用開發人員選項，再回到 PICO。</string>
+    <string name="ui_dev_control_pending">開發者已啟用。請連上 Wi-Fi；若 Android 顯示網路確認，請允許。</string>
+    <string name="ui_dev_control_enabled">開發者與無線偵錯已開啟</string>
+    <string name="ui_dev_control_disabled">開發者與偵錯已關閉，原配對已保留</string>
+    <string name="ui_adb_authorization_recovery">Android 已不再信任原本的 ADB 身分，可能是閒置 7 天到期或授權被撤銷。請開啟無線偵錯，選「使用配對碼配對裝置」，再使用下方配對區重新授權。原金鑰與 App 設定會保留。</string>
+    <string name="ui_adb_development_settings">開發模式設定</string>
+    <string name="ui_adb_toggle">開關 ADB</string>
+    <string name="ui_adb_toggle_note">開啟或關閉 Android 無線偵錯。</string>
+    <string name="ui_adb_auto_reconnect">自動重新連線</string>
+    <string name="ui_adb_auto_reconnect_note">使用 ADB 時自動恢復連線；手動關閉 ADB 後會保持關閉。</string>
+    <string name="ui_adb_off_status">ADB 已關閉。</string>
+    <string name="ui_adb_waiting_status">ADB 已開啟，使用 ADB 指令時會建立連線。</string>
+    <string name="ui_adb_manual_status">自動重新連線已關閉。需要手動連線時，將 ADB 關閉後再開啟。</string>
+    <string name="ui_adb_samsung_note">同步控制 Wi-Fi 與 USB 偵錯，讓這台 Samsung 鎖屏後仍可使用 ADB。</string>
+</resources>

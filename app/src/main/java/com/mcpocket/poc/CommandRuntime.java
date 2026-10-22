@@ -115,6 +115,54 @@ final class CommandRuntime {
                 (arguments, callCount) -> actions.phoneStatus(callCount));
 
         register(
+                "picoadb.status",
+                "Return PickPico Wireless Debugging engine, pairing, discovery, and connection state.",
+                "system",
+                "read_only",
+                false,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.picoAdbStatus(callCount));
+
+        register(
+                "picoadb.discover",
+                "Temporarily scan this Wi-Fi network for Android Wireless Debugging pairing and connect endpoints. Discovery stops automatically.",
+                "system",
+                "system_access",
+                true,
+                picoAdbDiscoverSchema(),
+                (arguments, callCount) -> actions.picoAdbDiscover(arguments, callCount));
+
+        register("picoadb.set_enabled",
+                "Directly enable Developer options and Wi-Fi ADB, or disable Developer options plus USB/Wi-Fi ADB. Works while ADB is off after one-time WRITE_SECURE_SETTINGS authorization; enabling requires an unlocked phone. Pairing is retained.",
+                "system", "security_action", true,
+                new JSONObject().put("type", "object").put("properties", new JSONObject()
+                        .put("enabled", new JSONObject().put("type", "boolean")))
+                        .put("required", new JSONArray().put("enabled")).put("additionalProperties", false),
+                (arguments, callCount) -> actions.picoAdbSetEnabled(arguments.getBoolean("enabled"), callCount));
+        register("picoadb.authorize_control",
+                "One-time grant of WRITE_SECURE_SETTINGS to PickPico through existing paired ADB; ADB must be enabled for this setup only. Afterwards picoadb.set_enabled works without ADB.",
+                "system", "security_action", true, noArgumentsSchema(),
+                (arguments, callCount) -> actions.picoAdbAuthorizeControl(callCount));
+
+        register(
+                "picoadb.battery_diagnostics",
+                "Use the user-paired local ADB identity to collect full batterystats, power, device-idle, alarm, and job-scheduler dumps into workspace files.",
+                "system",
+                "system_diagnostics",
+                true,
+                noArgumentsSchema(),
+                (arguments, callCount) -> actions.picoAdbBatteryDiagnostics(callCount));
+
+        register("picoadb.shell",
+                "Run an Android shell command through the paired ADB transport with shell UID 2000 access. Automatically reconnects; complete output is saved in the workspace.",
+                "system", "arbitrary_process", true, PicoAdbCommand.schema(true),
+                (arguments, callCount) -> actions.picoAdbExecute(arguments, true, callCount));
+        register("picoadb.exec",
+                "Run an ADB command using the paired phone: shell, push, pull, install, logcat, package management, forwarding and other ADB operations. Local paths use the phone workspace; target serial is supplied automatically.",
+                "system", "arbitrary_process", true, PicoAdbCommand.schema(false),
+                (arguments, callCount) -> actions.picoAdbExecute(arguments, false, callCount));
+
+        register(
                 "capability.list",
                 "List all implemented PickPico capabilities, including disabled/setup-required capabilities and their runtime state.",
                 "capability",
@@ -198,6 +246,37 @@ final class CommandRuntime {
                 true,
                 noArgumentsSchema(),
                 (arguments, callCount) -> actions.phoneHome(callCount));
+
+        register(
+                "phone.extend_unlock",
+                "Temporarily extend Android's lock-after-screen-off timeout (and prevent instant power-button lock) so the phone stays unlocked even when the display turns off, or release/inspect the lease. Requires WRITE_SECURE_SETTINGS and an unlocked phone when extending.",
+                "phone",
+                "security_action",
+                true,
+                new JSONObject()
+                        .put("type", "object")
+                        .put("properties", new JSONObject()
+                                .put("action", new JSONObject()
+                                        .put("type", "string")
+                                        .put("enum", new JSONArray().put("extend").put("release").put("status"))
+                                        .put("default", "extend"))
+                                .put("durationSeconds", new JSONObject()
+                                        .put("type", "integer")
+                                        .put("minimum", 30)
+                                        .put("maximum", 1800)
+                                        .put("default", 180)))
+                        .put("additionalProperties", false),
+                (arguments, callCount) -> {
+                    String action = arguments.optString("action", "extend");
+                    if (!"extend".equals(action) && !"release".equals(action) && !"status".equals(action)) {
+                        throw new CommandInputException("phone.extend_unlock action must be extend, release, or status");
+                    }
+                    int durationSeconds = arguments.optInt("durationSeconds", 180);
+                    if (durationSeconds < 30 || durationSeconds > 1800) {
+                        throw new CommandInputException("phone.extend_unlock durationSeconds must be between 30 and 1800");
+                    }
+                    return actions.phoneExtendUnlock(arguments, callCount);
+                });
 
         register(
                 "camera.capture",
@@ -1280,6 +1359,8 @@ final class CommandRuntime {
             case "process.output":
             case "process.stop":
                 return "shell process command terminal execute linux script runtime";
+            case "phone.extend_unlock":
+                return "extend unlock keep unlocked lock timeout delay screen lock 延長解鎖 延遲鎖定 保持解鎖 免解鎖";
             default:
                 return "";
         }
@@ -1311,16 +1392,29 @@ final class CommandRuntime {
                     .put("next", new JSONObject().put("tool", "capability_status")
                             .put("arguments", new JSONObject().put("id", command.id)));
         }
-        // Every capability funnels through here. Android uses these lifecycle
-        // hooks to keep the display awake for the whole Agent operation and to
-        // renew a short idle lease after the command finishes. The finish hook
-        // matters for commands such as phone.wake that turn the display on only
-        // after the start hook has already observed a sleeping device.
-        actions.onAgentCommandStarted(command.id);
+        // Every capability funnels through here. Background capabilities never
+        // wake or hold the display; screen-requiring capabilities alert the
+        // owner and pend until the phone is unlocked, then hold the unlocked
+        // display awake for the operation and active task bridge.
+        actions.onAgentCommandDispatched(command.id, AgentIdentity.current());
         long pulseId = HomePulse.begin(command.id, AgentIdentity.current());
         boolean pulseFailed = true;
         boolean dispatched = false;
+        boolean startedHook = false;
         try {
+            if (ScreenPolicy.requiresUnlock(command.id, arguments)) {
+                JSONObject unlockBlocked = actions.awaitUnlockIfRequired(
+                        command.id,
+                        command.description,
+                        arguments,
+                        callCount);
+                if (unlockBlocked != null) {
+                    if (!AgentIdentity.current().isEmpty()) unlockBlocked.put("agent", AgentIdentity.current());
+                    return unlockBlocked.put("isError", true);
+                }
+            }
+            actions.onAgentCommandStarted(command.id);
+            startedHook = true;
             if (requiresApproval(command)) {
                 JSONObject approval = actions.requestApproval(
                         command.id,
@@ -1361,11 +1455,13 @@ final class CommandRuntime {
                     .put("next", unknown ? "Verify current device state before retrying; the action may have happened." : "Inspect the error before retrying.");
         } finally {
             HomePulse.finish(pulseId, pulseFailed);
-            actions.onAgentCommandFinished(command.id);
+            if (startedHook) actions.onAgentCommandFinished(command.id);
         }
     }
 
     private static void validateBeforeApproval(String id, JSONObject args) {
+        if (id.equals("picoadb.shell") || id.equals("picoadb.exec"))
+            PicoAdbCommand.validate(args, id.equals("picoadb.shell"));
         if (id.equals("notification.dismiss")) validateNotificationDismiss(args);
         if (id.startsWith("workspace.") && !id.equals("workspace.info")) validateWorkspacePath(args.optString("path", "."));
         if (id.equals("node.start")) validateWorkspacePath(args.optString("entry"));
@@ -1498,6 +1594,19 @@ final class CommandRuntime {
                                 .put("maxLength", 160)
                                 .put("description", "Capability/command ID returned by capability.list.")))
                 .put("required", new JSONArray().put("id"))
+                .put("additionalProperties", false);
+    }
+
+    static JSONObject picoAdbDiscoverSchema() throws JSONException {
+        return new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                        .put("durationSeconds", new JSONObject()
+                                .put("type", "integer")
+                                .put("minimum", 5)
+                                .put("maximum", 60)
+                                .put("default", 15)
+                                .put("description", "Bounded Wireless Debugging discovery window.")))
                 .put("additionalProperties", false);
     }
 

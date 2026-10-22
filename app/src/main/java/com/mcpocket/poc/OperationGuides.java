@@ -10,6 +10,10 @@ final class OperationGuides {
     private OperationGuides() {}
 
     private static final String[][] GUIDES = {
+        {"picoadb.connect", "透過 PICO 開啟 Wi-Fi ADB 並連線",
+            "已授權一鍵控制時直接開關開發者與 Wi-Fi ADB；首次先啟用開發人員選項，再沿用配對授權。",
+            "adb picoadb wireless debugging developer reconnect 無線偵錯 無線調試 无线调试 開發人員 開發者 开发者",
+            "picoadb.status picoadb.set_enabled picoadb.authorize_control picoadb.discover picoadb.shell app.list app.launch ui.inspect ui.action ui.scroll screen.capture human.help"},
         {"app.operate", "開啟 App 並完成畫面操作",
             "有元件就用元件；沒有元件就看截圖，選擇可用的畫面操作方法並驗證結果。",
             "app launch open automate automation operate ui screen 開啟 打開 操作 自動化 应用 应用程式 應用 畫面 页面 頁面 手機",
@@ -27,7 +31,9 @@ final class OperationGuides {
     static JSONArray search(String query, JSONArray capabilities) throws JSONException {
         String normalized = query == null ? "" : query.toLowerCase(Locale.ROOT);
         JSONArray result = new JSONArray();
-        if (normalized.matches("[a-z]+\\.[a-z_]+") && !normalized.equals("app.operate") && !normalized.equals("ui.find_and_fill") && !normalized.equals("ui.recover")) return result;
+        boolean exactGuide = false;
+        for (String[] guide : GUIDES) exactGuide |= normalized.equals(guide[0]);
+        if (normalized.matches("[a-z]+\\.[a-z_]+") && !exactGuide) return result;
         for (String[] guide : GUIDES) {
             boolean matched = normalized.trim().isEmpty() || normalized.contains(guide[0]);
             for (String keyword : guide[3].split(" ")) {
@@ -41,7 +47,8 @@ final class OperationGuides {
             for (int i = 0; i < capabilities.length(); i++) {
                 String id = capabilities.getJSONObject(i).getString("id");
                 // Shared fallback tools alone should not recommend unrelated UI guides.
-                if (id.startsWith("ui.") || id.startsWith("app.") || id.equals("screen.capture")) {
+                if (!guide[0].equals("picoadb.connect")
+                        && (id.startsWith("ui.") || id.startsWith("app.") || id.equals("screen.capture"))) {
                     matched |= (" " + guide[4] + " ").contains(" " + id + " ");
                 }
             }
@@ -55,7 +62,7 @@ final class OperationGuides {
         for (String[] guide : GUIDES) {
             if (!guide[0].equals(id)) continue;
             JSONObject result = summary(guide)
-                    .put("revision", 3)
+                    .put("revision", "picoadb.connect".equals(id) ? 6 : 3)
                     .put("kind", "adaptive_guidance")
                     .put("principle", "依目前畫面選擇下一步，不是逐項照跑。指南不是權限授予，也不代表列出的工具目前可用。已讀過同版指南可沿用；工具狀態仍以當下回傳為準。")
                     .put("capabilityIds", new JSONArray(guide[4].split(" ")))
@@ -77,7 +84,7 @@ final class OperationGuides {
     }
 
     private static JSONObject summary(String[] guide) throws JSONException {
-        return new JSONObject().put("id", guide[0]).put("revision", 3).put("title", guide[1]).put("summary", guide[2])
+        return new JSONObject().put("id", guide[0]).put("revision", "picoadb.connect".equals(guide[0]) ? 6 : 3).put("title", guide[1]).put("summary", guide[2])
                 .put("readWith", new JSONObject().put("tool", "command_run")
                         .put("requiredCallerArguments", new JSONArray().put("agent"))
                         .put("arguments",
@@ -86,7 +93,17 @@ final class OperationGuides {
 
     private static JSONArray decisions(String id) throws JSONException {
         JSONArray steps = new JSONArray();
-        if (id.equals("app.operate")) {
+        if (id.equals("picoadb.connect")) {
+            add(steps, "authorizationRequired=true，或 ADB_AUTHORIZATION_REQUIRED", "Android 已拒絕保存的 ADB 身分，可能是閒置授權到期或被撤銷。paired=true 只表示本機保存配對紀錄。保留原金鑰，透過 Android 無線偵錯的配對碼流程重新授權；不要反覆切換開關或重試連線，也不要自動關閉系統授權逾時。", "重新授權後執行 id，確認 uid=2000(shell) 且 authorizationRequired=false。");
+            add(steps, "已取得一鍵控制權限，ADB 關閉或開發者未啟用", "讀 picoadb.status 的 systemControl.permissionGranted；為 true 時用 picoadb.set_enabled(enabled=true) 直接開啟開發者與 Wi-Fi ADB，不依賴現有 ADB 連線。需要關閉時用 enabled=false，會關閉 USB/Wi-Fi 偵錯但保留配對。啟用要求手機已解鎖。", "systemControl 的實際開關值已符合要求；首次 Wi-Fi 網路确认依現場畫面處理。");
+            add(steps, "使用者要求一鍵控制，但尚未授權", "首次先建立已配對的 ADB 連線，再呼叫 picoadb.authorize_control，或在 PICO 系統操作頁點「啟用一鍵控制（只需一次）」。這次授予系統設定權限；之後即使開發者和 ADB 都關閉仍能開回來。已有授權就沿用，不重複配對。", "systemControl.permissionGranted=true，再使用直接開關工具。");
+            add(steps, "開發人員選項尚未啟用且沒有一鍵權限", "PICO 的開啟無線偵錯設定會先開關於手機。用 ui.inspect(maxDepth=24) 尋找軟體資訊與版本號碼；Samsung 路徑為關於手機 → 軟體資訊 → 版本號碼，逐次觀察並點擊直到啟用，最多七次。系統要求 PIN／本人驗證時只請本人完成那一步。啟用後返回 PICO 再開無線偵錯。", "看到開發者已啟用或開發人員選項頁，並確認無線偵錯可開啟。");
+            add(steps, "需要 ADB，或 ADB 目前斷線", "先讀 picoadb.status，分別確認 paired 與 connected。已連線就接續原任務；已配對但斷線時，優先使用 PICO 的 UI 工具開啟無線偵錯。這條路徑使用無障礙操作，可在 ADB 尚未連線時使用。", "取得目前配對與連線狀態，選擇需要的設定步驟。");
+            add(steps, "已配對，準備開啟無線偵錯", "從 app.list 找到 PickPico 並 app.launch，依當前畫面进入「設定 → 系統操作（ADB）→ 開啟無線偵錯設定」（英文 Android system access / System Control / Android Wireless Debugging）。PICO 會開啟無線偵錯頁，或開發人員選項；後者用 ui.inspect、ui.scroll 找「無線偵錯 / Wireless debugging」。每次畫面改變重新觀察，使用最新 observationId 與唯一目標。", "看到 Android 無線偵錯頁與開關；UI 元件缺失時依 ui.recover 使用截圖操作。");
+            add(steps, "無線偵錯開關關閉", "依畫面確認 Wi-Fi 已連線，再用 ui.action 開啟無線偵錯。出現目前 Wi-Fi 的允許偵錯確認時，依使用者這次 ADB 授權確認；長期一律允許選项依使用者偏好處理。開關已開就接續重連。", "重新觀察，確認無線偵錯已開啟且確認視窗已處理。");
+            add(steps, "無線偵錯已開啟且 paired=true", "PICO「設定 → 系統操作（ADB）→ 開發模式設定」是一張卡片，包含「開關 ADB」、「自動重新連線」與「開啟無線偵錯設定」。autoReconnectEnabled=true 時 ADB 指令會探索並重連；為 false 時沿用現有連線，斷線需本人開啟自動重新連線，或切換 ADB 開關手動連線。尊重關閉設定，不自行覆寫。", "picoadb.status 的 connected=true，或 id 成功回傳 uid=2000(shell)，然後接續原任務。");
+            add(steps, "paired=false，或設定入口不可用", "首次配對走 PICO「配對設定」與 Android「使用配對碼配對裝置」。已有配對時保留身分與金鑰。若入口缺失，先觀察 Android 設定中的開發人員選項；只有本人解鎖、驗證或目前 UI 能力確實無法完成的具體一步，才用 human.help。", "配對後重新讀取狀態並驗證連線；求助回覆後重新觀察再繼續。");
+        } else if (id.equals("app.operate")) {
             add(steps, "不知道目標 App 的套件名稱", "用 app.list 查實際安裝名稱與 packageName；名稱有歧義時先辨認，不猜套件名稱。", "找到與需求一致的 App。");
             add(steps, "準備開啟 App", "先確認相關工具狀態。用 app.launch 開啟；只有已知且適用的連結才用 url.open，不編造深層連結。", "用 ui.inspect 確認前景 App 與目標畫面；啟動回覆不能代替畫面確認。");
             add(steps, "開啟後仍是原畫面或顯示載入", "重新觀察是否已有進展；若停住，讀 ui.recover。檢查是否被鎖定畫面、權限或背景啟動限制擋住，不反覆 launch。", "目標畫面已可操作，或取得具體阻礙。");

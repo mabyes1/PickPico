@@ -1,0 +1,1 @@
+{"params":{"arguments":{"title":"安裝 PICO 畫面操作測試版","idleTimeoutSeconds":360,"allowTextReply":true,"actions":["已安裝完成"],"allowImages":false,"instruction":"測試版 0.16.77 已下載且簽章/雜湊驗證通過。請解鎖手機，點「PickPico 更新」通知並完成 Android 的安裝確認，裝好後開啟 PICO。這一步是 Android 要求的本機操作，完成後我會接續實機測試。","agent":"GPT-6","wait":false},"name":"human_help"},"id":1789207276783,"method":"tools/call","jsonrpc":"2.0"}

@@ -1,0 +1,10 @@
+{
+  "activeTasks": 0,
+  "activeOperations": 0,
+  "requested": false,
+  "watchdogMs": 360000,
+  "remainingWatchdogMs": 0,
+  "overlayHeld": false,
+  "wakeLockHeld": false,
+  "restoration": "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"
+}

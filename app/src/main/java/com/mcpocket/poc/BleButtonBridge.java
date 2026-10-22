@@ -28,6 +28,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -41,7 +42,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Auto-connects PickPico to the tiny four-button BLE remote used by the phone stand.
+ * Opt-in connection to the tiny four-button BLE remote used by the phone stand.
  *
  * Packet v1 is deliberately tiny: [protocolVersion, event, sequence]. The ESP32 is a
  * dumb input device; all human-help state, microphone capture, and Agent delivery stay
@@ -59,8 +60,9 @@ final class BleButtonBridge {
     private static final int EVENT_VOICE_DOWN = 4;
     private static final int EVENT_VOICE_UP = 5;
 
-    private static final long RETRY_MS = 4_000L;
-    private static final long SCAN_WINDOW_MS = 12_000L;
+    static final long RETRY_MS = 30_000L;
+    static final long SCAN_WINDOW_MS = 10_000L;
+    static final int MAX_SCAN_ATTEMPTS = 3;
     private static final long MAX_VOICE_MS = 45_000L;
 
     private static volatile boolean connected;
@@ -70,6 +72,7 @@ final class BleButtonBridge {
 
     private volatile boolean active;
     private boolean scanning;
+    private int scanAttempts;
     private BluetoothLeScanner scanner;
     private BluetoothGatt gatt;
     private VoiceRecorder voiceRecorder;
@@ -87,10 +90,11 @@ final class BleButtonBridge {
     }
 
     void start() {
-        if (active) {
+        if (active || !McpocketPolicySettings.isButtonPadEnabled(service)) {
             return;
         }
         active = true;
+        scanAttempts = 0;
         mainHandler.post(this::scanOrRetry);
     }
 
@@ -107,13 +111,22 @@ final class BleButtonBridge {
         return connected;
     }
 
+    JSONObject status() throws JSONException {
+        return new JSONObject().put("enabled", McpocketPolicySettings.isButtonPadEnabled(service))
+                .put("connected", connected).put("scanning", scanning)
+                .put("searchActive", active && !connected).put("scanAttempts", scanAttempts)
+                .put("maxScanAttempts", MAX_SCAN_ATTEMPTS).put("scanWindowMs", SCAN_WINDOW_MS)
+                .put("retryMs", RETRY_MS).put("scanMode", "low_power");
+    }
+
     private void scanOrRetry() {
         if (!active || gatt != null) {
             return;
         }
+        if (!McpocketPolicySettings.isButtonPadEnabled(service)) { stop(); return; }
         if (!hasBluetoothPermissions()) {
             recordRecent("Button pad waiting for Bluetooth permission");
-            scheduleRetry();
+            active = false;
             return;
         }
 
@@ -121,13 +134,13 @@ final class BleButtonBridge {
         BluetoothAdapter adapter = manager == null ? null : manager.getAdapter();
         if (adapter == null || !adapter.isEnabled()) {
             recordRecent("Button pad waiting for Bluetooth");
-            scheduleRetry();
+            active = false;
             return;
         }
 
         scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) {
-            scheduleRetry();
+            active = false;
             return;
         }
         try {
@@ -135,9 +148,10 @@ final class BleButtonBridge {
                     .setServiceUuid(new ParcelUuid(SERVICE_UUID))
                     .build();
             ScanSettings settings = new ScanSettings.Builder()
-                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
                     .build();
             scanning = true;
+            scanAttempts++;
             scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
             mainHandler.postDelayed(() -> {
                 if (scanning) {
@@ -225,6 +239,7 @@ final class BleButtonBridge {
                     return;
                 }
                 connected = true;
+                scanAttempts = 0;
                 recordRecent("Button pad connected");
             } catch (SecurityException error) {
                 disconnectAndRetry("Button pad setup blocked: " + safeMessage(error));
@@ -624,6 +639,11 @@ final class BleButtonBridge {
 
     private void scheduleRetry() {
         if (!active) {
+            return;
+        }
+        if (scanAttempts >= MAX_SCAN_ATTEMPTS) {
+            active = false;
+            recordRecent("Button pad search stopped; use Search again in Settings to retry");
             return;
         }
         mainHandler.removeCallbacks(this::scanOrRetry);

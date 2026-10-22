@@ -1,0 +1,11 @@
+{"seq":1,"phase":"preflight","tool":"pickpico.server_info","arguments":{},"callerAgent":"unknown (model not exposed)","outcome":"PASS","result":"samsung SM-S9110,Android16/API36,version=0.16.75,relay=connected"}
+{"seq":2,"phase":"preflight","tool":"pickpico.policy_status","arguments":{},"callerAgent":"unknown (model not exposed)","outcome":"PASS","result":"hyperMode=true,approvalMode=yolo"}
+{"seq":3,"phase":"preflight","tool":"pickpico.capability_search","arguments":{"query":"","availableOnly":false,"includeSchema":true,"limit":20},"callerAgent":"unknown (model not exposed)","outcome":"PASS","result":"schemaVersion=0.16.75,totalCandidates=58"}
+{"seq":4,"phase":"preflight","tool":"pickpico.capability_list","arguments":{},"outcome":"PASS","result":"count=58,schemaVersion=0.16.75"}
+{"seq":5,"phase":"preflight","tool":"pickpico.task_create","arguments":{"agent":"unknown (model not exposed)"},"outcome":"CLIENT_REJECTED","error":"agent pattern \\S rejected the document-required value"}
+{"seq":6,"phase":"preflight-retry","tool":"pickpico.task_create","arguments":{"agent":"GPT-5-Codex"},"outcome":"CLIENT_REJECTED","error":"agent pattern \\S rejected supplied value"}
+{"seq":7,"phase":"preflight-retry","tool":"pickpico.task_create","arguments":{"agent":"Codex"},"outcome":"CLIENT_REJECTED","error":"agent pattern \\S rejected supplied value"}
+{"seq":8,"phase":"preflight","tool":"pickpico.task_create","arguments":{"agent":null},"outcome":"CLIENT_REJECTED","error":"agent required"}
+{"seq":9,"phase":"preflight","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{}},"outcome":"CLIENT_REJECTED","error":"agent required"}
+{"seq":10,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"agent":"unknown (model not exposed)"},"outcome":"CLIENT_REJECTED","error":"agent pattern \\S rejected supplied value"}
+{"seq":11,"phase":"preflight-retry","tool":"pickpico.command_run","arguments":{"commandId":"node.info","arguments":{},"agent":"\\S"},"outcome":"CLIENT_REJECTED","error":"agent pattern \\S rejected supplied value"}

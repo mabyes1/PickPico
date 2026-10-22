@@ -1,0 +1,47 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207437494,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"name\":\"PickPico\",\"version\":\"0.16.77\",\"device\":\"samsung SM-S9110\",\"androidRelease\":\"16\",\"apiLevel\":36,\"endpoint\":\"http:\\/\\/192.168.0.15:8765\\/mcp\",\"remoteEndpoint\":\"https:\\/\\/relay.pickpico.workers.dev\\/v3\\/nodes\\/wjLVc8x8sGvNvNRzjYOhtQ\\/mcp\",\"relayStatus\":\"connected\",\"workspaceRoot\":\"\\/data\\/user\\/0\\/com.mcpocket.poc\\/files\\/workspaces\",\"uptimeSeconds\":36,\"nodeStartedAt\":\"2026-09-12T10:03:20.641437Z\",\"processStartedAt\":\"2026-09-12T10:03:20.192605Z\",\"processUptimeSeconds\":36,\"toolCallCount\":1,\"relay\":{\"connectionId\":\"053bada0-a616-48fd-8cdf-8ef3c03709d7\",\"relayConnectedAt\":\"2026-09-12T10:03:21.315393Z\",\"lastRelayHeartbeatAt\":\"2026-09-12T10:03:51.197683Z\",\"lastRelayPongAt\":\"2026-09-12T10:03:51.337075Z\",\"lastRelayDisconnectAt\":\"\",\"lastRelayDisconnectReason\":\"\",\"lastLoopbackProxyErrorAt\":\"\",\"lastLoopbackProxyErrorType\":\"\",\"lastLoopbackProxyErrorMessage\":\"\",\"lastLoopbackProxyRequestId\":\"\",\"loopbackHealthy\":true,\"reconnectAttemptCount\":0,\"reconnectBackoffAttempt\":0,\"currentNetworkType\":\"wifi\",\"socketPresent\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "name": "PickPico",
+      "version": "0.16.77",
+      "device": "samsung SM-S9110",
+      "androidRelease": "16",
+      "apiLevel": 36,
+      "endpoint": "http://192.168.0.15:8765/mcp",
+      "remoteEndpoint": "https://relay.pickpico.workers.dev/v3/nodes/wjLVc8x8sGvNvNRzjYOhtQ/mcp",
+      "relayStatus": "connected",
+      "workspaceRoot": "/data/user/0/com.mcpocket.poc/files/workspaces",
+      "uptimeSeconds": 36,
+      "nodeStartedAt": "2026-09-12T10:03:20.641437Z",
+      "processStartedAt": "2026-09-12T10:03:20.192605Z",
+      "processUptimeSeconds": 36,
+      "toolCallCount": 1,
+      "relay": {
+        "connectionId": "053bada0-a616-48fd-8cdf-8ef3c03709d7",
+        "relayConnectedAt": "2026-09-12T10:03:21.315393Z",
+        "lastRelayHeartbeatAt": "2026-09-12T10:03:51.197683Z",
+        "lastRelayPongAt": "2026-09-12T10:03:51.337075Z",
+        "lastRelayDisconnectAt": "",
+        "lastRelayDisconnectReason": "",
+        "lastLoopbackProxyErrorAt": "",
+        "lastLoopbackProxyErrorType": "",
+        "lastLoopbackProxyErrorMessage": "",
+        "lastLoopbackProxyRequestId": "",
+        "loopbackHealthy": true,
+        "reconnectAttemptCount": 0,
+        "reconnectBackoffAttempt": 0,
+        "currentNetworkType": "wifi",
+        "socketPresent": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

@@ -18,8 +18,14 @@ import java.util.UUID;
 final class AgentTaskRuntime {
     private static final int MAX_TASKS = 50;
     static final long ACTIVE_PROJECTION_LEASE_MS = 120_000L;
+    /**
+     * An unfinished task with no task update and no command from its Agent for
+     * this long is closed as {@code expired}. Agents that crash or forget to
+     * finish must not keep counting as active forever.
+     */
+    static final long TASK_IDLE_EXPIRY_MS = 600_000L;
     private static final String[] VALID_STATES = new String[] {
-            "created", "running", "blocked", "waiting_human", "completed", "failed", "cancelled"
+            "created", "running", "blocked", "waiting_human", "completed", "failed", "cancelled", "expired"
     };
 
     private final LinkedHashMap<String, JSONObject> tasks = new LinkedHashMap<>();
@@ -34,10 +40,67 @@ final class AgentTaskRuntime {
         return count;
     }
 
+    /**
+     * Record activity from {@code agent} and close idle tasks. Called for every
+     * dispatched command so an Agent that keeps working keeps its task alive
+     * even without explicit task updates.
+     */
+    synchronized void touch(String agent, long nowMs) throws JSONException {
+        int before = awakeTaskCount();
+        expireIdle(nowMs);
+        if (agent != null && !agent.isEmpty()) {
+            String at = Instant.ofEpochMilli(nowMs).toString();
+            for (JSONObject task : tasks.values())
+                if (!isTerminal(task.optString("status")) && agent.equals(task.optString("agent")))
+                    task.put("lastActivityAt", at);
+        }
+        int after = awakeTaskCount();
+        if (after != before) awakeTasksChanged.accept(after);
+    }
+
+    /** Close unfinished tasks idle for longer than {@link #TASK_IDLE_EXPIRY_MS}. */
+    synchronized boolean expireIdle(long nowMs) throws JSONException {
+        boolean changed = false;
+        for (JSONObject task : tasks.values()) {
+            if (isTerminal(task.optString("status"))) continue;
+            long last = lastActivityMs(task);
+            if (last > 0L && nowMs - last < TASK_IDLE_EXPIRY_MS) continue;
+            String at = Instant.ofEpochMilli(nowMs).toString();
+            task.put("status", "expired")
+                    .put("completedAt", at)
+                    .put("updatedAt", at)
+                    .put("leaseExpiresAt", JSONObject.NULL)
+                    .put("screenAwakeUntilTerminal", false);
+            task.getJSONArray("notes").put(new JSONObject()
+                    .put("at", at)
+                    .put("text", "Auto-expired: no task update or Agent activity for "
+                            + (TASK_IDLE_EXPIRY_MS / 60_000L) + " minutes"));
+            HomePulse.task(task);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private void expireAndNotify(long nowMs) throws JSONException {
+        if (expireIdle(nowMs)) awakeTasksChanged.accept(awakeTaskCount());
+    }
+
+    private static long lastActivityMs(JSONObject task) {
+        long last = 0L;
+        for (String key : new String[] {"updatedAt", "lastActivityAt"}) {
+            try {
+                last = Math.max(last, Instant.parse(task.optString(key, "")).toEpochMilli());
+            } catch (Exception ignored) {
+            }
+        }
+        return last;
+    }
+
     synchronized JSONObject info() throws JSONException {
+        long now = System.currentTimeMillis();
+        expireAndNotify(now);
         int active = 0;
         int stale = 0;
-        long now = System.currentTimeMillis();
         for (JSONObject task : tasks.values()) {
             String status = task.optString("status", "");
             if (holdsProjectionLease(task, now)) {
@@ -52,14 +115,16 @@ final class AgentTaskRuntime {
                 .put("taskLifecycle", true)
                 .put("taskStates", new JSONArray(VALID_STATES))
                 .put("activeProjectionLeaseMs", ACTIVE_PROJECTION_LEASE_MS)
+                .put("taskIdleExpiryMs", TASK_IDLE_EXPIRY_MS)
                 .put("retainedTasks", tasks.size())
                 .put("activeTasks", active)
                 .put("screenAwakeTasks", awakeTaskCount())
-                .put("screenAwakePolicy", "Unfinished task AND Agent activity within 3 minutes; task updates renew activity")
+                .put("screenAwakePolicy", "Open task keeps the display on for 3 minutes after the last screen-driving call (ui.*, screen.capture, app.launch, url.open); background calls never wake it")
                 .put("staleTasks", stale);
     }
 
     synchronized JSONObject create(JSONObject arguments) throws JSONException {
+        expireAndNotify(System.currentTimeMillis());
         String objective = requireText(arguments, "objective", 1, 4096);
         String title = optionalText(arguments, "title", 160);
         String agent = AgentIdentity.require(arguments);
@@ -84,7 +149,7 @@ final class AgentTaskRuntime {
 
         if (awakeTaskCount() >= MAX_TASKS)
             throw new CommandRuntime.CommandInputException("Finish or cancel an existing task before creating another");
-        task.put("screenAwakeUntilTerminal", false).put("screenAwakeIdleTimeoutMs", AgentScreenLease.IDLE_MS);
+        task.put("screenAwakeUntilTerminal", true).put("screenAwakeIdleTimeoutMs", AgentScreenLease.IDLE_MS);
         tasks.put(taskId, task);
         HomePulse.task(task);
         trim();
@@ -93,6 +158,7 @@ final class AgentTaskRuntime {
     }
 
     synchronized JSONObject update(JSONObject arguments) throws JSONException {
+        expireAndNotify(System.currentTimeMillis());
         String taskId = requireText(arguments, "taskId", 1, 128);
         JSONObject task = tasks.get(taskId);
         if (task == null) {
@@ -127,12 +193,13 @@ final class AgentTaskRuntime {
             task.put("leaseExpiresAt", now.plusMillis(ACTIVE_PROJECTION_LEASE_MS).toString());
         }
         HomePulse.task(task);
-        task.put("screenAwakeUntilTerminal", false);
+        task.put("screenAwakeUntilTerminal", !isTerminal(task.optString("status")));
         awakeTasksChanged.accept(awakeTaskCount());
         return copy(task);
     }
 
     synchronized JSONObject status(JSONObject arguments) throws JSONException {
+        expireAndNotify(System.currentTimeMillis());
         String taskId = optionalText(arguments, "taskId", 128);
         if (!taskId.isEmpty()) {
             JSONObject task = tasks.get(taskId);
@@ -173,7 +240,8 @@ final class AgentTaskRuntime {
     }
 
     private static boolean isTerminal(String state) {
-        return "completed".equals(state) || "failed".equals(state) || "cancelled".equals(state);
+        return "completed".equals(state) || "failed".equals(state)
+                || "cancelled".equals(state) || "expired".equals(state);
     }
 
     /**
@@ -183,13 +251,10 @@ final class AgentTaskRuntime {
      */
     static boolean holdsProjectionLease(JSONObject task, long now) {
         if (task == null || isTerminal(task.optString("status", ""))) return false;
-        try {
-            long updatedAt = Instant.parse(task.optString("updatedAt", "")).toEpochMilli();
-            long age = Math.max(0L, now - updatedAt);
-            return age <= ACTIVE_PROJECTION_LEASE_MS;
-        } catch (Exception ignored) {
-            return false;
-        }
+        long updatedAt = lastActivityMs(task);
+        if (updatedAt <= 0L) return false;
+        long age = Math.max(0L, now - updatedAt);
+        return age <= ACTIVE_PROJECTION_LEASE_MS;
     }
 
     private static String requireText(JSONObject arguments, String key, int min, int max) {

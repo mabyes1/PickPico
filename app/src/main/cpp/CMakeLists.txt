@@ -8,6 +8,10 @@ set_target_properties(node PROPERTIES
 
 add_library(mcpocket_node_bridge SHARED node_bridge.cpp)
 
+target_link_options(mcpocket_node_bridge PRIVATE
+        "-Wl,-z,max-page-size=16384"
+        "-Wl,-z,common-page-size=16384")
+
 target_include_directories(mcpocket_node_bridge PRIVATE
         "${NODE_MOBILE_ROOT}/include/node")
 

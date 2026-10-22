@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "exitCode": 0,
+  "timedOut": false,
+  "validationError": false,
+  "output": "uid=2000(shell) gid=2000(shell) groups=2000(shell),1004(input),1007(log),1011(adb),1015(sdcard_rw),1028(sdcard_r),1078(ext_data_rw),1079(ext_obb_rw),3001(net_bt_admin),3002(net_bt),3003(inet),3006(net_bw_stats),3009(readproc),3011(uhid),3012(readtracefs) context=u:r:shell:s0\n",
+  "isError": false,
+  "serial": "192.168.0.15:40157",
+  "outputTruncated": false,
+  "bytes": 276,
+  "workspacePath": "adb-output/adb-8163261565473853868.log",
+  "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+  "toolCallCount": 6,
+  "agent": "GPT-6"
+}

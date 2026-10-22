@@ -29,7 +29,7 @@ final class PicoOrbPanelView extends LinearLayout {
     private final TextView settings;
 
     PicoOrbPanelView(Context context) {
-        super(context);
+        super(AppLanguage.wrap(context));
         setOrientation(VERTICAL);
         setPadding(dp(12), dp(8), dp(12), dp(8));
         setElevation(dp(12));
@@ -40,7 +40,7 @@ final class PicoOrbPanelView extends LinearLayout {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.addView(status, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         close = text("×", 20, Typeface.NORMAL, Color.WHITE);
-        close.setContentDescription("Close Pico panel");
+        close.setContentDescription(getContext().getString(R.string.ui_extra_386306f929));
         close.setGravity(Gravity.CENTER);
         close.setOnClickListener(view -> { if (dismissAction != null) dismissAction.run(); });
         header.addView(close, new LayoutParams(dp(48), dp(48)));
@@ -54,7 +54,7 @@ final class PicoOrbPanelView extends LinearLayout {
         detail.setMaxLines(2);
         addView(detail);
         detail.setVisibility(GONE);
-        action = text("OPEN  →", 11, Typeface.BOLD, Color.WHITE);
+        action = text(getContext().getString(R.string.ui_extra_575e50f241), 11, Typeface.BOLD, Color.WHITE);
         action.setGravity(Gravity.CENTER);
         action.setMinHeight(dp(48));
         LinearLayout actions = new LinearLayout(context);
@@ -66,7 +66,7 @@ final class PicoOrbPanelView extends LinearLayout {
         returnParams.leftMargin = dp(16);
         actions.addView(returnAction, returnParams);
         addView(actions);
-        settings = text("Return app & text size", 11, Typeface.NORMAL, Color.LTGRAY);
+        settings = text(getContext().getString(R.string.ui_extra_076b846007), 11, Typeface.NORMAL, Color.LTGRAY);
         settings.setGravity(Gravity.CENTER);
         addView(settings, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
         settings.setOnClickListener(view -> getContext().startActivity(
@@ -89,9 +89,9 @@ final class PicoOrbPanelView extends LinearLayout {
         status.setText(String.format(
                 Locale.ROOT,
                 "●  %s",
-                PicoOrbState.label(snapshot.orbMode)));
+                PicoOrbState.label(getContext(), snapshot.orbMode)));
         status.setTextColor(accent);
-        title.setText(snapshot.activeTasks == 0 || TextUtils.isEmpty(snapshot.title) ? PicoOrbState.label(snapshot.orbMode) : snapshot.title);
+        title.setText(snapshot.activeTasks == 0 || TextUtils.isEmpty(snapshot.title) ? PicoOrbState.label(getContext(), snapshot.orbMode) : snapshot.title);
         detail.setText(detail(snapshot));
         action.setText(actionLabel(snapshot.orbMode));
         action.setBackground(PickPicoTheme.control(theme, dp(11), accent, false));
@@ -111,7 +111,7 @@ final class PicoOrbPanelView extends LinearLayout {
                 returnAction.setImageResource(android.R.drawable.ic_menu_revert);
             }
         }
-        String returnLabel = caller.available() ? "Return to " + caller.name : "No return app selected";
+        String returnLabel = caller.available() ? getContext().getString(R.string.ui_extra_2b485494ee) + caller.name : getContext().getString(R.string.ui_extra_bcb7e60b53);
         returnAction.setContentDescription(returnLabel);
         returnAction.setTooltipText(returnLabel);
         returnAction.setEnabled(caller.available());
@@ -147,14 +147,14 @@ final class PicoOrbPanelView extends LinearLayout {
         return true;
     }
 
-    private String detail(HomePulse.Snapshot snapshot) { return "View activity or return to your agent"; }
+    private String detail(HomePulse.Snapshot snapshot) { return getContext().getString(R.string.ui_extra_27f621cf47); }
 
     private String actionLabel(String mode) {
-        if (PicoOrbState.BLOCKED.equals(mode)) return "Review issue";
-        if (PicoOrbState.HUMAN_HELP.equals(mode)) return "Open help";
-        if (PicoOrbState.CONNECTING.equals(mode) || PicoOrbState.CONNECTION_ATTENTION.equals(mode)) return "View connection";
-        if (PicoOrbState.RUNNING.equals(mode) || PicoOrbState.COMPLETED.equals(mode)) return "Open Activity";
-        return "Open PickPico";
+        if (PicoOrbState.BLOCKED.equals(mode)) return getContext().getString(R.string.ui_review_issue);
+        if (PicoOrbState.HUMAN_HELP.equals(mode)) return getContext().getString(R.string.ui_extra_083ddda4bd);
+        if (PicoOrbState.CONNECTING.equals(mode) || PicoOrbState.CONNECTION_ATTENTION.equals(mode)) return getContext().getString(R.string.ui_extra_8ef81c3d5e);
+        if (PicoOrbState.RUNNING.equals(mode) || PicoOrbState.COMPLETED.equals(mode)) return getContext().getString(R.string.ui_extra_f327dd9753);
+        return getContext().getString(R.string.ui_extra_cc78a57042);
     }
 
     private TextView text(String value, float sp, int style, int color) {

@@ -1,0 +1,15 @@
+{
+  "unchanged": {
+    "files/picoadb/.android/adbkey": true,
+    "files/picoadb/.android/adbkey.pub": true,
+    "files/picoadb/.android/adb_known_hosts.pb": true,
+    "shared_prefs/mcpocket_policy.xml": true,
+    "shared_prefs/pickpico_appearance.xml": true,
+    "shared_prefs/caller_return.xml": true,
+    "shared_prefs/mcpocket_node.xml": false
+  },
+  "pairingFieldsUnchanged": {
+    "last_pair_at": true,
+    "paired": true
+  }
+}

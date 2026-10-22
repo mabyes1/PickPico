@@ -1,0 +1,52 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207290356,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"node.start\",\"description\":\"Start a workspace Node.js program\",\"category\":\"runtime\",\"risk\":\"process_start\",\"sideEffect\":true,\"tool\":\"command_run\",\"group\":\"core\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{\"entry\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":1024,\"description\":\"Workspace-relative JavaScript entry point.\"}},\"required\":[\"entry\"],\"additionalProperties\":false},\"schemaVersion\":\"0.16.76\",\"call\":{\"tool\":\"command_run\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{\"commandId\":\"node.start\",\"arguments\":{}},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "node.start",
+      "description": "Start a workspace Node.js program",
+      "category": "runtime",
+      "risk": "process_start",
+      "sideEffect": true,
+      "tool": "command_run",
+      "group": "core",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Workspace-relative JavaScript entry point."
+          }
+        },
+        "required": [
+          "entry"
+        ],
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.76",
+      "call": {
+        "tool": "command_run",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {
+          "commandId": "node.start",
+          "arguments": {}
+        },
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

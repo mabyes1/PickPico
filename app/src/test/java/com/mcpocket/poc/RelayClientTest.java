@@ -61,6 +61,46 @@ public class RelayClientTest {
         verify(handlers.constructed().get(0), times(1)).postDelayed(any(Runnable.class), anyLong());
     }
 
+    @Test public void screenOnWithoutSocketReconnectsImmediatelyInsteadOfWaitingForBackoff() throws Exception {
+        field("webSocket").set(relay, null);
+        field("reconnectAttempt").set(relay, 5);
+        invoke("probeAfterWake", new Class<?>[]{});
+        verify(handlers.constructed().get(0)).post(any(Runnable.class));
+        assertEquals(0, field("reconnectAttempt").get(relay));
+        assertEquals(1L, relay.diagnostics().getLong("wakeProbeCount"));
+        assertFalse(relay.diagnostics().getString("lastWakeProbeAt").isEmpty());
+    }
+
+    @Test public void screenOnWithSocketStillCountsTheWakeProbe() throws Exception {
+        invoke("probeAfterWake", new Class<?>[]{});
+        assertEquals(1L, relay.diagnostics().getLong("wakeProbeCount"));
+    }
+
+    @Test public void shortFuseProbePingDoesNotCountAsAPeriodicHeartbeatTick() throws Exception {
+        long[] now = {0L};
+        try (MockedStatic<android.os.SystemClock> clock = mockStatic(android.os.SystemClock.class)) {
+            clock.when(android.os.SystemClock::elapsedRealtime).thenAnswer(call -> now[0]);
+            Class<?>[] types = {WebSocket.class, long.class, boolean.class};
+
+            now[0] = 0L;
+            invoke("sendHeartbeat", types, socket, 6_000L, false);
+            verify(socket).send(contains("\"type\":\"ping\""));
+            now[0] = 500_000L;
+            field("pendingHeartbeatNonce").set(relay, null);
+            invoke("sendHeartbeat", types, socket, 6_000L, false);
+            assertEquals(0L, relay.diagnostics().getJSONObject("heartbeatGaps").getLong("maxTickGapMs"));
+
+            // Periodic ticks are what the gap tracker measures.
+            field("pendingHeartbeatNonce").set(relay, null);
+            now[0] = 1_000_000L;
+            invoke("sendHeartbeat", types, socket, 15_000L, true);
+            field("pendingHeartbeatNonce").set(relay, null);
+            now[0] = 1_500_000L;
+            invoke("sendHeartbeat", types, socket, 15_000L, true);
+            assertEquals(500_000L, relay.diagnostics().getJSONObject("heartbeatGaps").getLong("maxTickGapMs"));
+        }
+    }
+
     @Test public void oldSocketCannotDisconnectNewSocket() throws Exception {
         WebSocket old = mock(WebSocket.class);
         invoke("recover", new Class<?>[]{WebSocket.class, String.class}, old, "old close");

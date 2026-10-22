@@ -1,0 +1,12 @@
+{
+  "version": "0.17.9",
+  "versionCode": 135,
+  "tests": {
+    "tests": 245,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "sha256": "79cdbd484798e12fbb3f5496c14bb4ae5d5cccba0b49ab47d33c0c64ec2a1c66",
+  "uiStringCount": 443
+}

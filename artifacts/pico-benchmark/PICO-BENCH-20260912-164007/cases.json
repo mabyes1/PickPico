@@ -1,0 +1,44 @@
+{
+  "runId": "PICO-BENCH-20260912-164007",
+  "benchmark": "pico-behavior-benchmark-v1",
+  "startedAt": "2026-09-12T16:40:07+08:00",
+  "status": "completed_preflight_blocked",
+  "summary": {
+    "mainCases": 11,
+    "pass": 0,
+    "fail": 0,
+    "blocked": 10,
+    "notObserved": 0,
+    "notRun": 0,
+    "contractChanged": 1,
+    "executedCases": 0,
+    "passPerExecuted": "0/0",
+    "passPerAll": "0/11"
+  },
+  "preflight": {
+    "device": "samsung SM-S9110",
+    "androidRelease": "16",
+    "apiLevel": 36,
+    "installedVersion": "0.16.75",
+    "schemaVersion": "0.16.75",
+    "relayStatus": "connected",
+    "capabilityCount": 58,
+    "phoneExecutionAvailable": false,
+    "blocker": "updated connector requires an agent caller argument but rejects every supplied value with the invalid pattern \\S before dispatch"
+  },
+  "cases": [
+    {"id":"B01","status":"BLOCKED","reason":"preflight connector validation blocked phone execution"},
+    {"id":"B02","status":"BLOCKED","reason":"fixed page could not be staged or operated on phone"},
+    {"id":"B03","status":"BLOCKED","reason":"phone notification operations could not be executed"},
+    {"id":"B04","status":"BLOCKED","reason":"phone workspace operations could not be executed"},
+    {"id":"B05","status":"BLOCKED","reason":"phone process operations could not be executed"},
+    {"id":"B06","status":"BLOCKED","reason":"human.help could not be issued"},
+    {"id":"B07","status":"BLOCKED","reason":"fixed page submit flow could not be executed"},
+    {"id":"B08","status":"BLOCKED","reason":"fixed page UI could not be observed"},
+    {"id":"G01","status":"BLOCKED","reason":"malformed calls never reached the phone; not CLIENT_REJECTED and not PICO defensive behavior evidence","subcases":[{"id":"G01-a-missing-text","status":"BLOCKED"},{"id":"G01-b-text-number","status":"BLOCKED"},{"id":"G01-c-unknown-field","status":"BLOCKED"},{"id":"G01-d-dynamic-write-missing-content","status":"BLOCKED"},{"id":"G01-e-unknown-capability","status":"BLOCKED"}]},
+    {"id":"G02","status":"BLOCKED","reason":"no observationId or UI action reached the phone","subcases":[{"id":"G02-a-stale-observation","status":"BLOCKED"},{"id":"G02-b-reused-observation","status":"BLOCKED"},{"id":"G02-c-missing-path","status":"BLOCKED"},{"id":"G02-d-ambiguous-same-name","status":"BLOCKED"}]},
+    {"id":"G03","status":"CONTRACT_CHANGED","reason":"capability.list reported 58 while v1 expects 60; direct-vs-legacy execution comparison was not possible","subcases":[{"id":"G03-a-search-vs-exact-battery","status":"BLOCKED"},{"id":"G03-b-search-vs-exact-volume","status":"BLOCKED"},{"id":"G03-c-search-vs-exact-calendar-list","status":"BLOCKED"},{"id":"G03-d-search-vs-exact-clipboard","status":"BLOCKED"},{"id":"G03-e-search-vs-exact-notification-dismiss","status":"BLOCKED"},{"id":"G03-f-direct-vs-legacy-read-comparison","status":"BLOCKED"}]}
+  ],
+  "evidence": ["./phone-data/index.html","./phone-data/server.js","./calls.jsonl"],
+  "cleanup": {"phoneServerStarted":false,"phoneProcessesCreated":false,"testNotificationCreated":false,"phoneStateChanged":false,"cleanupNeeded":false}
+}

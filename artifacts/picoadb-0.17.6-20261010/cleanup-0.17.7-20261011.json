@@ -1,0 +1,51 @@
+{
+  "at": "2026-10-11T03:24:54.848Z",
+  "version": "0.17.7",
+  "screenAwake": {
+    "activeTasks": 0,
+    "activeOperations": 0,
+    "requested": false,
+    "watchdogMs": 360000,
+    "remainingWatchdogMs": 0,
+    "overlayHeld": false,
+    "wakeLockHeld": false,
+    "restoration": "Every operational command acquires screen hold at start and releases it at finish; watchdog only protects against a hung command"
+  },
+  "picoAdb": {
+    "state": "paired",
+    "paired": true,
+    "connected": false,
+    "connection": {
+      "state": "unknown",
+      "connected": false,
+      "checking": false,
+      "checkedAt": "2026-10-11T03:24:17.791328Z",
+      "error": "",
+      "serial": "192.168.0.15:41505"
+    },
+    "lastPairAt": "2026-10-08T04:34:14.676352Z",
+    "lastConnectAt": "2026-10-11T03:23:51.280514Z",
+    "lastSerial": "192.168.0.15:41505",
+    "discoveryDeadlineElapsedMs": null,
+    "engine": {
+      "enginePath": "/data/app/~~yxpCzsvDpynhQkBuGRUSyA==/com.mcpocket.poc-EwW3EdMMHxmwg_Dh3tyqbw==/lib/arm64/libadb.so",
+      "enginePresent": true,
+      "engineExecutable": true,
+      "home": "/data/user/0/com.mcpocket.poc/files/picoadb",
+      "identityCreated": true,
+      "pairedIdentityPersistent": true
+    },
+    "discovery": {
+      "discoveryStarted": false,
+      "pairingServiceType": "_adb-tls-pairing._tcp.",
+      "connectServiceType": "_adb-tls-connect._tcp.",
+      "pairingEndpoints": [],
+      "connectEndpoints": [],
+      "lastError": ""
+    },
+    "lastAction": "shell",
+    "lastError": "",
+    "lastOutput": "ADB command completed"
+  },
+  "relayStatus": "connected"
+}

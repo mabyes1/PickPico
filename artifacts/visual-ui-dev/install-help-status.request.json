@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":1789207389747,"method":"tools/call","params":{"name":"human_help_status","arguments":{"agent":"GPT-6","waitMs":25000,"requestId":"hh-0b5cfdd4-38eb-4aee-9adb-7994ffffce73"}}}

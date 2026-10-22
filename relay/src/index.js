@@ -1,16 +1,23 @@
 import { DurableObject } from "cloudflare:workers";
-import { pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
+import { deliveryAckTimeoutMs, pendingEntriesForSocket, selectHealthiestSocket } from "./socket-health.js";
 import { offlineResult } from "./offline-result.js";
+import { oauthFetch } from "./oauth.js";
+import { GRANT_HEADER, grantActive, handleNodeOAuth, cleanupOAuth } from "./oauth-node.js";
 
 // HUMAN_HELP uses a renewable human-idle lease, so its total wall-clock wait
 // can legitimately exceed one 360-second lease. This is only a transport
 // safety net; the product-level timeout is enforced by PickPico itself.
 const REQUEST_TIMEOUT_MS = 30 * 60_000;
-const HEARTBEAT_STALE_MS = 35_000;
+// Past FRESH the phone is merely late (Doze can freeze its heartbeat timer for ~1 min while the
+// socket still receives). Only past STALE do we treat the node as offline. Delivery ACK is the
+// end-to-end proof, so a late node gets a longer ACK window instead of an immediate refusal.
+const HEARTBEAT_FRESH_MS = 35_000;
+const HEARTBEAT_STALE_MS = 120_000;
 const DELIVERY_ACK_TIMEOUT_MS = 5_000;
+const LATE_NODE_DELIVERY_ACK_TIMEOUT_MS = 20_000;
 const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
-export default {
+const relay = {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") {
@@ -108,9 +115,9 @@ export default {
       });
     }
 
-    // v1/v2 remain available for existing clients. v3 is the Thin MCP public schema
-    // boundary: a small stable top-level tool set backed by dynamic capability discovery.
-    const match = url.pathname.match(/^\/(v1|v2|v3)\/nodes\/([^/]+)\/(connect|mcp|status)$/);
+    // v1/v2 remain available for existing clients. v3/v4 are Thin MCP public-schema
+    // boundaries; v4 forces clients to refresh schema after PicoADB was added.
+    const match = url.pathname.match(/^\/(v1|v2|v3|v4)\/nodes\/([^/]+)\/(connect|mcp|status)$/);
     if (!match) {
       return json({ error: "not_found" }, 404);
     }
@@ -118,7 +125,7 @@ export default {
     const apiVersion = match[1];
     const nodeId = match[2];
     const action = match[3];
-    if ((apiVersion === "v2" || apiVersion === "v3") && action !== "mcp") {
+    if ((apiVersion === "v2" || apiVersion === "v3" || apiVersion === "v4") && action !== "mcp") {
       return json({ error: "not_found" }, 404);
     }
     if (!NODE_ID_PATTERN.test(nodeId)) {
@@ -127,6 +134,13 @@ export default {
 
     const stub = env.NODE_RELAY.get(env.NODE_RELAY.idFromName(nodeId));
     return stub.fetch(request);
+  },
+};
+
+export default {
+  async fetch(request, env, ctx) {
+    const authenticated = await oauthFetch(request, env, ctx, (verified, bindings) => relay.fetch(verified, bindings));
+    return authenticated || relay.fetch(request, env);
   },
 };
 
@@ -140,8 +154,15 @@ export class NodeRelay extends DurableObject {
 
   async fetch(request) {
     const url = new URL(request.url);
+    const ownerAuth = await handleNodeOAuth(this, request);
+    if (ownerAuth) return ownerAuth;
     if (url.pathname.endsWith("/connect")) {
       return this.connectNode(request);
+    }
+    if ((url.pathname.endsWith("/status") || url.pathname.endsWith("/mcp"))
+        && request.method !== "OPTIONS"
+        && !await grantActive(this, request.headers.get(GRANT_HEADER))) {
+      return json({ error: "oauth_required" }, 401, { "Cache-Control": "no-store" });
     }
     if (url.pathname.endsWith("/status")) {
       const sockets = this.nodeSockets();
@@ -235,10 +256,12 @@ export class NodeRelay extends DurableObject {
     // Never route through a socket that has already stopped heartbeating. Among
     // healthy sockets, prefer the freshest connection and let delivery ACK be
     // the final end-to-end proof that the phone received this MCP request.
+    // A suspended phone cannot send heartbeats (its timers stop with the CPU), yet an inbound
+    // frame wakes it. So heartbeat age only ranks sockets here; it never rejects one.
     const socket = selectHealthiestSocket(
       sockets,
       (candidate) => this.socketHeartbeatAgeMs(candidate),
-      HEARTBEAT_STALE_MS,
+      Number.MAX_SAFE_INTEGER,
     );
     if (!socket) {
       let rpc;
@@ -246,11 +269,16 @@ export class NodeRelay extends DurableObject {
       return json(offlineResult(rpc, sockets.length, sockets.map(s => this.socketHeartbeatAgeMs(s))), 200, corsHeaders());
     }
 
+    const ackTimeoutMs = deliveryAckTimeoutMs(
+      this.socketHeartbeatAgeMs(socket),
+      HEARTBEAT_FRESH_MS,
+      DELIVERY_ACK_TIMEOUT_MS,
+      LATE_NODE_DELIVERY_ACK_TIMEOUT_MS,
+    );
     const body = await request.text();
     const requestId = crypto.randomUUID();
     const headers = {};
     for (const name of [
-      "authorization",
       "content-type",
       "accept",
       "mcp-protocol-version",
@@ -260,7 +288,8 @@ export class NodeRelay extends DurableObject {
       const value = request.headers.get(name);
       if (value) headers[name] = value;
     }
-    if (new URL(request.url).pathname.startsWith("/v3/")) {
+    const publicPath = new URL(request.url).pathname;
+    if (publicPath.startsWith("/v3/") || publicPath.startsWith("/v4/")) {
       headers["x-pickpico-tool-profile"] = "thin-v1";
     }
 
@@ -287,7 +316,7 @@ export class NodeRelay extends DurableObject {
           socket.close(1012, "PickPico request delivery ACK timed out");
         } catch (_) {
         }
-      }, DELIVERY_ACK_TIMEOUT_MS);
+      }, ackTimeoutMs);
       this.pending.set(requestId, { resolve, timeout, ackTimer, acked: false, socket });
     });
 
@@ -375,6 +404,10 @@ export class NodeRelay extends DurableObject {
       headers: payload.headers || {},
       body: payload.body || "",
     });
+  }
+
+  async alarm() {
+    await cleanupOAuth(this);
   }
 
   async webSocketClose(ws, code, reason) {

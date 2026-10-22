@@ -1,0 +1,270 @@
+{
+  "runId": "SURFACEVIEW-CROSSCHECK-20260912-172616",
+  "fixtureUrl": "http://127.0.0.1:34153/",
+  "createdAt": "2026-09-12T09:30:04.533Z",
+  "evidence": [
+    {
+      "label": "samsung-visible",
+      "packageName": "com.sec.android.app.sbrowser",
+      "windowTitle": "瀏覽器",
+      "observationId": "ui-415d700e-c704-4eaa-ab97-66fad9b031f1",
+      "count": 98,
+      "matchedCount": 98,
+      "truncated": false,
+      "nodeCount": 98,
+      "surfaceViews": [
+        {
+          "path": "w3786/0/0/0/0/0/1/0/0/0/0/0",
+          "depth": 10,
+          "className": "android.view.SurfaceView",
+          "packageName": "com.sec.android.app.sbrowser",
+          "viewId": "",
+          "text": "",
+          "contentDescription": "",
+          "visible": true,
+          "enabled": true,
+          "clickable": false,
+          "longClickable": false,
+          "focusable": false,
+          "focused": false,
+          "editable": false,
+          "scrollable": false,
+          "bounds": {
+            "left": 0,
+            "top": 0,
+            "right": 1080,
+            "bottom": 2340
+          },
+          "actions": [
+            {
+              "id": 4,
+              "label": ""
+            },
+            {
+              "id": 8,
+              "label": ""
+            },
+            {
+              "id": 64,
+              "label": ""
+            },
+            {
+              "id": 16908342,
+              "label": ""
+            }
+          ]
+        }
+      ],
+      "termHits": [],
+      "webLikeNodes": [],
+      "windows": [
+        {
+          "id": 3786,
+          "title": "瀏覽器",
+          "type": 1,
+          "layer": 0,
+          "active": true,
+          "focused": true,
+          "packageName": "com.sec.android.app.sbrowser"
+        },
+        {
+          "id": 3774,
+          "title": "",
+          "type": -1,
+          "layer": 4,
+          "active": false,
+          "focused": false,
+          "packageName": "com.samsung.android.sidegesturepad"
+        },
+        {
+          "id": 19,
+          "title": "",
+          "type": 3,
+          "layer": 3,
+          "active": false,
+          "focused": false,
+          "packageName": "com.sec.android.app.launcher"
+        },
+        {
+          "id": 14,
+          "title": "",
+          "type": 3,
+          "layer": 2,
+          "active": false,
+          "focused": false,
+          "packageName": "com.android.systemui"
+        },
+        {
+          "id": 3771,
+          "title": "",
+          "type": 3,
+          "layer": 1,
+          "active": false,
+          "focused": false,
+          "packageName": "com.mcpocket.poc"
+        }
+      ]
+    },
+    {
+      "label": "samsung-invisible",
+      "packageName": "com.sec.android.app.sbrowser",
+      "windowTitle": "瀏覽器",
+      "observationId": "ui-9385da0a-48f8-4b29-8d78-43602d6a88b4",
+      "count": 109,
+      "matchedCount": 109,
+      "truncated": false,
+      "nodeCount": 109,
+      "surfaceViews": [
+        {
+          "path": "w3786/0/0/0/0/0/0",
+          "depth": 5,
+          "className": "android.view.SurfaceView",
+          "packageName": "com.sec.android.app.sbrowser",
+          "viewId": "",
+          "text": "",
+          "contentDescription": "",
+          "visible": false,
+          "enabled": true,
+          "clickable": false,
+          "longClickable": false,
+          "focusable": false,
+          "focused": false,
+          "editable": false,
+          "scrollable": false,
+          "bounds": {
+            "left": 0,
+            "top": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "actions": [
+            {
+              "id": 4,
+              "label": ""
+            },
+            {
+              "id": 8,
+              "label": ""
+            },
+            {
+              "id": 64,
+              "label": ""
+            },
+            {
+              "id": 16908342,
+              "label": ""
+            }
+          ]
+        },
+        {
+          "path": "w3786/0/0/0/0/0/1/0/0/0/0/0",
+          "depth": 10,
+          "className": "android.view.SurfaceView",
+          "packageName": "com.sec.android.app.sbrowser",
+          "viewId": "",
+          "text": "",
+          "contentDescription": "",
+          "visible": true,
+          "enabled": true,
+          "clickable": false,
+          "longClickable": false,
+          "focusable": false,
+          "focused": false,
+          "editable": false,
+          "scrollable": false,
+          "bounds": {
+            "left": 0,
+            "top": 0,
+            "right": 1080,
+            "bottom": 2340
+          },
+          "actions": [
+            {
+              "id": 4,
+              "label": ""
+            },
+            {
+              "id": 8,
+              "label": ""
+            },
+            {
+              "id": 64,
+              "label": ""
+            },
+            {
+              "id": 16908342,
+              "label": ""
+            }
+          ]
+        }
+      ],
+      "termHits": [],
+      "webLikeNodes": [],
+      "windows": [
+        {
+          "id": 3786,
+          "title": "瀏覽器",
+          "type": 1,
+          "layer": 0,
+          "active": true,
+          "focused": true,
+          "packageName": "com.sec.android.app.sbrowser"
+        },
+        {
+          "id": 3774,
+          "title": "",
+          "type": -1,
+          "layer": 4,
+          "active": false,
+          "focused": false,
+          "packageName": "com.samsung.android.sidegesturepad"
+        },
+        {
+          "id": 19,
+          "title": "",
+          "type": 3,
+          "layer": 3,
+          "active": false,
+          "focused": false,
+          "packageName": "com.sec.android.app.launcher"
+        },
+        {
+          "id": 14,
+          "title": "",
+          "type": 3,
+          "layer": 2,
+          "active": false,
+          "focused": false,
+          "packageName": "com.android.systemui"
+        },
+        {
+          "id": 3771,
+          "title": "",
+          "type": 3,
+          "layer": 1,
+          "active": false,
+          "focused": false,
+          "packageName": "com.mcpocket.poc"
+        }
+      ]
+    },
+    {
+      "label": "samsung-screenshot",
+      "capture": {
+        "captured": true,
+        "width": 1080,
+        "height": 2340,
+        "mimeType": "image/jpeg",
+        "path": "captures/screen-1789205403465.jpg",
+        "sizeBytes": 155736,
+        "freshFrame": true,
+        "frameAgeMs": 0,
+        "captureMode": "accessibility",
+        "timestamp": "2026-09-12T09:30:03.471202Z",
+        "toolCallCount": 225,
+        "agent": "unknown (model not exposed)",
+        "isError": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "startedAt": "2026-10-11T03:20:54.655Z",
+  "checks": [
+    {
+      "name": "loopback exposes ADB tools",
+      "passed": true,
+      "detail": [
+        "picoadb_status",
+        "picoadb_discover",
+        "picoadb_battery_diagnostics",
+        "picoadb_shell",
+        "picoadb_exec"
+      ]
+    },
+    {
+      "name": "relay exposes ADB tools",
+      "passed": true,
+      "detail": [
+        "picoadb_status",
+        "picoadb_discover",
+        "picoadb_battery_diagnostics",
+        "picoadb_shell",
+        "picoadb_exec"
+      ]
+    },
+    {
+      "name": "ADB shell UID 2000",
+      "passed": true,
+      "detail": {
+        "success": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "validationError": false,
+        "output": "uid=2000(shell) gid=2000(shell) groups=2000(shell),1004(input),1007(log),1011(adb),1015(sdcard_rw),1028(sdcard_r),1078(ext_data_rw),1079(ext_obb_rw),3001(net_bt_admin),3002(net_bt),3003(inet),3006(net_bw_stats),3009(readproc),3011(uhid),3012(readtracefs) context=u:r:shell:s0\n",
+        "isError": false,
+        "serial": "192.168.0.15:46605",
+        "outputTruncated": false,
+        "bytes": 276,
+        "workspacePath": "adb-output/adb-5716858284270694739.log",
+        "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+        "toolCallCount": 61,
+        "agent": "GPT-6"
+      }
+    },
+    {
+      "name": "remote exit status preserved",
+      "passed": true,
+      "detail": {
+        "success": false,
+        "exitCode": 7,
+        "timedOut": false,
+        "validationError": false,
+        "output": "pico-exit-test",
+        "isError": true,
+        "serial": "192.168.0.15:46605",
+        "outputTruncated": false,
+        "bytes": 14,
+        "workspacePath": "adb-output/adb-8674643913359754079.log",
+        "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+        "toolCallCount": 62,
+        "agent": "GPT-6"
+      }
+    },
+    {
+      "name": "roundtrip path was unused",
+      "passed": true,
+      "detail": {
+        "exitCode": 1
+      }
+    },
+    {
+      "name": "push file",
+      "passed": true,
+      "detail": {
+        "success": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "validationError": false,
+        "output": "validation-0176/push source.txt: 1 file pushed, 0 skipped. 0.0 MB/s (49 bytes in 0.001s)\n",
+        "isError": false,
+        "serial": "192.168.0.15:46605",
+        "outputTruncated": false,
+        "bytes": 89,
+        "workspacePath": "adb-output/adb-6132886244645295231.log",
+        "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+        "toolCallCount": 64,
+        "agent": "GPT-6"
+      }
+    },
+    {
+      "name": "pull file",
+      "passed": true,
+      "detail": {
+        "success": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "validationError": false,
+        "output": "/data/local/tmp/pico-adb-0176-validation.txt: 1 file pulled, 0 skipped. 0.1 MB/s (49 bytes in 0.001s)\n",
+        "isError": false,
+        "serial": "192.168.0.15:46605",
+        "outputTruncated": false,
+        "bytes": 102,
+        "workspacePath": "adb-output/adb-4063347582748398419.log",
+        "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+        "toolCallCount": 65,
+        "agent": "GPT-6"
+      }
+    },
+    {
+      "name": "binary roundtrip matches SHA-256",
+      "passed": true,
+      "detail": {
+        "bytes": 49,
+        "sha256": "177c232245061d063783dea0af9d3690f0632806dcc901f83c1ea390cd6fef5f"
+      }
+    },
+    {
+      "name": "fixture package was not installed",
+      "passed": true,
+      "detail": {
+        "exitCode": 1
+      }
+    },
+    {
+      "name": "fixture APK hash",
+      "passed": true,
+      "detail": {
+        "bytes": 8538,
+        "sha256": "9e4c02d65ca8b8e22940dc519ca27c02ae9a2dc8e2098834249840858cfa28ae"
+      }
+    },
+    {
+      "name": "install APK",
+      "passed": true,
+      "detail": {
+        "success": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "validationError": false,
+        "output": "/data/user/0/com.mcpocket.poc/files/workspaces/validation-0176/pico-adb-fixture.apk: 1 file pushed, 0 skipped. 41.1 MB/s (8538 bytes in 0.000s)\nSuccess\n",
+        "isError": false,
+        "serial": "192.168.0.15:46605",
+        "outputTruncated": false,
+        "bytes": 152,
+        "workspacePath": "adb-output/adb-8559341786665270710.log",
+        "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+        "toolCallCount": 67,
+        "agent": "GPT-6"
+      }
+    },
+    {
+      "name": "package installed in Android",
+      "passed": true,
+      "detail": {
+        "success": true,
+        "exitCode": 0
+      }
+    },
+    {
+      "name": "remove only fixture package",
+      "passed": true,
+      "detail": {
+        "success": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "validationError": false,
+        "output": "Success\n",
+        "isError": false,
+        "serial": "192.168.0.15:46605",
+        "outputTruncated": false,
+        "bytes": 8,
+        "workspacePath": "adb-output/adb-7584910674878336362.log",
+        "localWorkingDirectory": "/data/user/0/com.mcpocket.poc/files/workspaces",
+        "toolCallCount": 69,
+        "agent": "GPT-6"
+      }
+    },
+    {
+      "name": "fixture no longer installed",
+      "passed": true,
+      "detail": {
+        "exitCode": 1
+      }
+    },
+    {
+      "name": "remove roundtrip fixture from device",
+      "passed": true,
+      "detail": {
+        "success": true
+      }
+    },
+    {
+      "name": "pairing preserved",
+      "passed": true,
+      "detail": {
+        "paired": true,
+        "lastPairAt": "2026-10-08T04:34:14.676352Z"
+      }
+    }
+  ],
+  "before": {
+    "paired": true,
+    "connected": false,
+    "lastPairAt": "2026-10-08T04:34:14.676352Z",
+    "connection": {
+      "state": "disconnected",
+      "connected": false,
+      "checking": false,
+      "checkedAt": "2026-10-11T03:20:55.109993Z",
+      "error": "",
+      "serial": "192.168.0.15:46451"
+    }
+  },
+  "after": {
+    "paired": true,
+    "connected": true,
+    "lastPairAt": "2026-10-08T04:34:14.676352Z",
+    "connection": {
+      "state": "connected",
+      "connected": true,
+      "checking": false,
+      "checkedAt": "2026-10-11T03:21:01.564432Z",
+      "error": "",
+      "serial": "192.168.0.15:46605"
+    }
+  },
+  "success": true,
+  "finishedAt": "2026-10-11T03:21:01.567Z"
+}

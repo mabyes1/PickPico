@@ -1,0 +1,84 @@
+--------- beginning of system
+10-21 10:51:10.260  3303  3594 D AdbService: setAdbEnabled(true), mIsAdbUsbEnabled=false, mIsAdbWifiEnabled=false, transportType=1
+10-21 10:51:10.261  3303  3594 D AdbService: Enabling ADBd Wifi property
+10-21 10:51:10.285  3303  3594 D AdbService: Acquired multicast lock
+10-21 10:51:10.299  3303  3594 D AdbService: Broadcasting enable = true, type = 1
+10-21 10:51:10.302  3303  3594 D AdbDebuggingManager: Expecting tls port from ADB Wifi connection poller
+10-21 10:51:10.302  3303  3594 D AdbService: Enabling ADBd Wifi property
+10-21 10:51:10.303  3303  3594 I AdbDebuggingManager: adb start wireless adb
+--------- beginning of main
+10-21 10:51:10.333  4193  4193 I adbd    : persist.adb.watchdog set to ''
+10-21 10:51:10.333  4193  4193 I adbd    : persist.sys.test_harness set to ''
+10-21 10:51:10.333  4193  4193 I adbd    : adb watchdog timeout set to 600 seconds
+10-21 10:51:10.333  4193  4193 I adbd    : adbd_auth detected v=2 (max_handled=3)
+10-21 10:51:10.333  4193  4193 I adbd    : wifi_init: Starting property observer thread
+10-21 10:51:10.333  4193  4193 I adbd    : adbd started
+10-21 10:51:10.334  4193  4210 I adbd    : opening control endpoint /dev/usb-ffs/adb/ep0
+10-21 10:51:10.336  4193  4209 I adbd    : Waiting for persist.adb.tls_server.enable=1
+10-21 10:51:10.336  4193  4209 I adbd    : persist.adb.tls_server.enable changed to 1
+10-21 10:51:10.336  4193  4209 I adbd    : adbwifi started on port 39615
+10-21 10:51:10.336  4193  4209 I adbd    : TlsServer running on port 39615
+10-21 10:51:10.336  4193  4209 I adbd    : adb wifi started on port 39615
+10-21 10:51:10.336  4193  4209 I adbd    : Sending TLS port to framework via system property '39615'
+10-21 10:51:10.336  4193  4209 I adbd    : Waiting for persist.adb.tls_server.enable=0
+10-21 10:51:10.356  3303  4195 D AdbDebuggingManager: Received tls port from poller =39615
+10-21 10:51:10.604  3303  2562 D AdbDebuggingManager: Creating socket
+10-21 10:51:10.605  3303  3594 D AdbDebuggingManager: adbd socket connected
+10-21 10:51:10.605  4193  4208 I adbd    : adbd_auth: received a new framework connection
+10-21 10:51:10.605  3303  3594 D AdbDebuggingManager: Expecting tls port from ADB Wifi connection poller
+10-21 10:51:10.605  4193  4208 I adbd    : adbd_auth: received new framework fd 19 (current = -1)
+10-21 10:51:10.606  3303  4247 D AdbDebuggingManager: Received tls port from poller =39615
+10-21 10:51:10.792  4193  4211 I adbd    : jdwp connection from 25687
+10-21 10:51:11.042  4193  4211 I adbd    : jdwp connection from 6200
+10-21 10:51:11.042  4193  4211 I adbd    : jdwp connection from 24187
+10-21 10:51:11.042  4193  4211 I adbd    : jdwp connection from 15424
+10-21 10:51:11.043  4193  4211 I adbd    : jdwp connection from 12612
+10-21 10:51:11.043  4193  4211 I adbd    : jdwp connection from 13995
+10-21 10:51:11.043  4193  4211 I adbd    : jdwp connection from 1471
+10-21 10:51:11.043  4193  4211 I adbd    : jdwp connection from 11903
+10-21 10:51:11.338  4193  4213 W adbd    : timed out while waiting for FUNCTIONFS_BIND, trying again
+10-21 10:51:11.338  4193  4213 I adbd    : UsbFfs: connection terminated: monitor thread finished
+10-21 10:51:11.375  4193  4210 I adbd    : opening control endpoint /dev/usb-ffs/adb/ep0
+10-21 10:51:11.384  4193  4193 I adbd    : New TLS connection [fd=30]
+10-21 10:51:11.484  4193  4193 I adbd    : New TLS connection [fd=32]
+10-21 10:51:11.484  4193  4193 I adbd    : New TLS connection [fd=33]
+10-21 10:51:11.487  4193  4310 I adbd    : [server]: Initializing adbwifi TlsConnection
+10-21 10:51:11.487  4193  4310 I adbd    : adbd_auth: loading keys from /data/misc/adb/adb_keys
+10-21 10:51:11.488  4193  4310 I adbd    : fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+10-21 10:51:11.489  4193  4310 I adbd    : fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+10-21 10:51:11.489  4193  4310 E adbd    : Invalid base64 key 
+10-21 10:51:11.489  4193  4310 I adbd    : [server]: Starting adbwifi tls handshake
+10-21 10:51:11.496  4193  4311 I adbd    : [server]: Initializing adbwifi TlsConnection
+10-21 10:51:11.496  4193  4311 I adbd    : adbd_auth: loading keys from /data/misc/adb/adb_keys
+10-21 10:51:11.497  4193  4311 I adbd    : fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+10-21 10:51:11.497  4193  4311 I adbd    : fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+10-21 10:51:11.497  4193  4311 E adbd    : Invalid base64 key 
+10-21 10:51:11.497  4193  4311 I adbd    : [server]: Starting adbwifi tls handshake
+10-21 10:51:11.497  4193  4304 I adbd    : [server]: Initializing adbwifi TlsConnection
+10-21 10:51:11.499  4193  4304 I adbd    : adbd_auth: loading keys from /data/misc/adb/adb_keys
+10-21 10:51:11.499  4193  4304 I adbd    : fingerprint=[B43BBF2C11399F345B532DACB74A8D5646BF6A5AFD7EF1CC915EC8AF71EBC7DC]
+10-21 10:51:11.499  4193  4304 I adbd    : fingerprint=[0C86CA1D16C50064F56DFF439AF9D47037E1C048DAF134EF41B3318139943883]
+10-21 10:51:11.499  4193  4304 E adbd    : Invalid base64 key 
+10-21 10:51:11.499  4193  4304 I adbd    : [server]: Starting adbwifi tls handshake
+10-21 10:51:11.505  4193  4310 I adbd    : adbd_auth: loading keys from /data/misc/adb/adb_keys
+10-21 10:51:11.505  4193  4310 I adbd    : [server]: Handshake succeeded.
+10-21 10:51:11.505  4193  4193 I adbd    : adbd_wifi_secure_connect: connected host-32
+10-21 10:51:11.505  4193  4208 I adbd    : adbd_auth: marking framework writable
+10-21 10:51:11.505  4193  4208 I adbd    : adbd_auth: sending packet: WE
+10-21 10:51:11.506  3303  2562 D AdbDebuggingManager: Recv packet: WE
+10-21 10:51:11.506  3303  2562 D AdbDebuggingManager: Received WIFI TLS connected key message: QAAAAP8dpW0BHimVgMipUqLu9sul3SqyVNtp0PM5KJJzJ1ddSv1rUUQy/WAh7ZLYU5Z9JNIerclsj5ZbV/cn3nnM6d6/4anMPD3ZsGN6wYpe5gmd+Fr8FGAQ2bc0CUtt1KpWuh3Tj4j8MrrJ1TrdmgU39snaZdUK4tINrTzfvypYX1Ta99MQ68F6lxVGX3PIBgvSMyg43uN5rpRJu+8+aVC7A/ApQZOVf/ZDBWDKSfeX8uDIXD100A3o/Cevwknc5nmqJWFZf9yOlabcVKqPd+y7X7+cj4s0CGXLVfK2D/LmEbojQ5zZaAqvqWmFBHYATlJNtc9Fn5tH9MjI2boS5YHsUH/wW5e0LOdP5W5ZVcpI8zerRnOOYhrKEZQaaHJ3xx0YwkIyULbpLqQBK82thbNl5CGN+OEfmmq2Khlisg4P9j/K4SsNCT3i1MRDX2TFkS08GkD78QPSZGqs2PYHUX+HjaTZRARm+4asnAUBMin3+pOPfnDoeTkEF7Q1ULw5jRPmqq7hJCLbmnrVbYTmpkVVcYK9EMZqIUBWZEiPrKZmoAqYcUoFJiM8W+rkV1HQsjROhhi+hiKtenQcd23GTBSpOAkpBfA1f9mJKmUxUImZfn4VpT+ETCc1VYvtd43x4DWNVspMcNE0cjhQ8g4df7P6APf5athOBgwHY0nlkMlCHDLUh+sxVQEAAQA= u0_a376@localhost
+10-21 10:51:11.518  4193  4311 I adbd    : adbd_auth: loading keys from /data/misc/adb/adb_keys
+10-21 10:51:11.519  4193  4311 I adbd    : [server]: Handshake succeeded.
+10-21 10:51:11.520  4193  4193 I adbd    : adbd_wifi_secure_connect: connected host-33
+10-21 10:51:11.520  4193  4208 I adbd    : adbd_auth: marking framework writable
+10-21 10:51:11.520  4193  4208 I adbd    : adbd_auth: sending packet: WE
+10-21 10:51:11.520  3303  2562 D AdbDebuggingManager: Recv packet: WE
+10-21 10:51:11.520  3303  2562 D AdbDebuggingManager: Received WIFI TLS connected key message: QAAAAG1Oz5abFOdiBMj/bktFD4oijORbzXZnveGjnqxBmu9cbWoUSy5QHIq6j/U5roK3KtS4f/P1HMk3WASAS4UZ8ey9XMnx4fCUc5HX55bjC5EwGDDNY7kqiPiXygy3QF7wEEo/KDopmjDLeXum9tZmR6L9GYpRVAbncDpvbIxH6vlC8/ic643++sTleor8qZ7VhLTpmOhTd3V1MLo3AV05CLmdko8lV/f3Xui666UY+s56kPZe68Uy0lhsKk5n5UmOZ0VtL5YCKBrwcwmnAh7EiRnlVyYqc4Dz0Bg3uAQKnD7+9QYFUSxtSUbliiYtU9A5Irnut94ZTaTgAx7CAY+9Y3rFTa6nulBfviVs93iyGQoI9FhLkYNxkBelb5aGvg8j6fz+YVujBVyISN9y3LF+pzj6nImzPHFFe3d5+iht4LOhEiqmlkJKF/e/2V3LVLrxYhscISRAGYh1HrWPX7Uis/OMnUI4KDLRLXcS4amu282Ms8Txa7VbppcgpvcWfyCMjuR751Je5QifX/4I2yklYdM1BclrDyiRSdlT3xgIG6uKNFbqbEBJZVigzWvllIekROcvVW+OA1eiMUx3yYv8HrizeA4sgMBwQzFs0Vd8aicxqYgSbqj/Sum7zaQjWj5W6ChmKkjrUULIEZCDK5MBls3O9ufz7htX8t5Xx4iBtzs2x8PMIgEAAQA= ken@KENBRAIN
+10-21 10:51:11.524  4193  4304 I adbd    : adbd_auth: loading keys from /data/misc/adb/adb_keys
+10-21 10:51:11.525  4193  4304 I adbd    : [server]: Handshake succeeded.
+10-21 10:51:11.525  4193  4193 I adbd    : adbd_wifi_secure_connect: connected host-30
+10-21 10:51:11.526  4193  4208 I adbd    : adbd_auth: marking framework writable
+10-21 10:51:11.526  4193  4208 I adbd    : adbd_auth: sending packet: WE
+10-21 10:51:11.526  3303  2562 D AdbDebuggingManager: Recv packet: WE
+10-21 10:51:11.526  3303  2562 D AdbDebuggingManager: Received WIFI TLS connected key message: QAAAAG1Oz5abFOdiBMj/bktFD4oijORbzXZnveGjnqxBmu9cbWoUSy5QHIq6j/U5roK3KtS4f/P1HMk3WASAS4UZ8ey9XMnx4fCUc5HX55bjC5EwGDDNY7kqiPiXygy3QF7wEEo/KDopmjDLeXum9tZmR6L9GYpRVAbncDpvbIxH6vlC8/ic643++sTleor8qZ7VhLTpmOhTd3V1MLo3AV05CLmdko8lV/f3Xui666UY+s56kPZe68Uy0lhsKk5n5UmOZ0VtL5YCKBrwcwmnAh7EiRnlVyYqc4Dz0Bg3uAQKnD7+9QYFUSxtSUbliiYtU9A5Irnut94ZTaTgAx7CAY+9Y3rFTa6nulBfviVs93iyGQoI9FhLkYNxkBelb5aGvg8j6fz+YVujBVyISN9y3LF+pzj6nImzPHFFe3d5+iht4LOhEiqmlkJKF/e/2V3LVLrxYhscISRAGYh1HrWPX7Uis/OMnUI4KDLRLXcS4amu282Ms8Txa7VbppcgpvcWfyCMjuR751Je5QifX/4I2yklYdM1BclrDyiRSdlT3xgIG6uKNFbqbEBJZVigzWvllIekROcvVW+OA1eiMUx3yYv8HrizeA4sgMBwQzFs0Vd8aicxqYgSbqj/Sum7zaQjWj5W6ChmKkjrUULIEZCDK5MBls3O9ufz7htX8t5Xx4iBtzs2x8PMIgEAAQA= ken@KENBRAIN
+10-21 10:51:11.560  4193  4193 I adbd    : adbd service requested 'shell,v2,TERM=dumb:export ANDROID_LOG_TAGS=''; exec logcat '-d' '-t' '3000' '-s' 'AdbService' 'AdbDebuggingManager' 'adbd''

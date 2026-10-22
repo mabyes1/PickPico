@@ -50,7 +50,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Locale;
 
-public final class HumanHelpActivity extends Activity {
+public final class HumanHelpActivity extends LocalizedActivity {
     static final String EXTRA_CONFIRM_BLE_VOICE = "confirm_ble_voice";
     static final String EXTRA_BLE_VOICE_PATH = "ble_voice_path";
     static final String EXTRA_BLE_VOICE_TRANSCRIPT = "ble_voice_transcript";
@@ -112,7 +112,7 @@ public final class HumanHelpActivity extends Activity {
         }
         reload();
         if (request == null) {
-            Toast.makeText(this, "Human-help request not found", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_extra_f2d520d627), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -235,9 +235,9 @@ public final class HumanHelpActivity extends Activity {
 
         LinearLayout pauseCopy = new LinearLayout(this);
         pauseCopy.setOrientation(LinearLayout.VERTICAL);
-        TextView pauseTitle = text(approvalRequest ? "AI needs approval" : "AI paused", 15, Typeface.BOLD);
+        TextView pauseTitle = text(approvalRequest ? getString(R.string.ui_extra_46258f6dbc) : getString(R.string.ui_extra_b7d25c3c92), 15, Typeface.BOLD);
         pauseTitle.setTextColor(primaryTextColor());
-        TextView pauseSubtitle = text("Your input is required.", 11, Typeface.NORMAL);
+        TextView pauseSubtitle = text(getString(R.string.ui_extra_e6688f2ddc), 11, Typeface.NORMAL);
         pauseSubtitle.setTextColor(secondaryTextColor());
         pauseCopy.addView(pauseTitle);
         pauseCopy.addView(pauseSubtitle);
@@ -264,7 +264,7 @@ public final class HumanHelpActivity extends Activity {
         taskIcon.setBackground(PickPicoTheme.control(
                 theme, dp(10), PickPicoTheme.accentB(theme), true));
         requestTitleRow.addView(taskIcon, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        TextView title = text(request.optString("title", "AI needs your help"), 23, Typeface.BOLD);
+        TextView title = text(request.optString("title", getString(R.string.ui_extra_e982def1af)), 23, Typeface.BOLD);
         title.setTextColor(primaryTextColor());
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -280,7 +280,7 @@ public final class HumanHelpActivity extends Activity {
 
         String additionalNotes = request.optString("additionalNotes", "").trim();
         if (!additionalNotes.isEmpty()) {
-            TextView notesLabel = text("Additional notes from AI", 13, Typeface.NORMAL);
+            TextView notesLabel = text(getString(R.string.ui_extra_35fabd891f), 13, Typeface.NORMAL);
             notesLabel.setTextColor(secondaryTextColor());
             notesLabel.setPadding(0, dp(16), 0, dp(7));
             requestCard.addView(notesLabel);
@@ -301,12 +301,12 @@ public final class HumanHelpActivity extends Activity {
         detailsContainer = new LinearLayout(this);
         detailsContainer.setOrientation(LinearLayout.VERTICAL);
         detailsContainer.setVisibility(detailsExpanded ? View.VISIBLE : View.GONE);
-        TextView detailsHeading = text("DETAILS", 11, Typeface.BOLD);
+        TextView detailsHeading = text(getString(R.string.ui_extra_9120423983), 11, Typeface.BOLD);
         detailsHeading.setTextColor(PickPicoTheme.accentB(theme));
         detailsHeading.setLetterSpacing(.12f);
         detailsHeading.setPadding(dp(2), dp(12), 0, dp(8));
         detailsContainer.addView(detailsHeading);
-        TextView detailsIntro = text("Add context, a note, or an image when the Agent needs more information.", 12, Typeface.NORMAL);
+        TextView detailsIntro = text(getString(R.string.ui_extra_c256d9bd28), 12, Typeface.NORMAL);
         detailsIntro.setTextColor(secondaryTextColor());
         detailsIntro.setPadding(dp(2), 0, dp(2), dp(10));
         detailsContainer.addView(detailsIntro);
@@ -315,12 +315,12 @@ public final class HumanHelpActivity extends Activity {
         if (request.optBoolean("allowTextReply", true)) {
             LinearLayout replyCard = glassCard();
             replyCard.setOrientation(LinearLayout.VERTICAL);
-            TextView replyLabel = cardTitle("Add a note (optional)");
+            TextView replyLabel = cardTitle(getString(R.string.ui_extra_c9414f7e6b));
             replyCard.addView(replyLabel);
             replyInput = new EditText(this);
             replyInput.setHint(approvalRequest
-                    ? "Optional note for the Agent…"
-                    : "Type a message to AI…");
+                    ? getString(R.string.ui_extra_e8056001a1)
+                    : getString(R.string.ui_extra_f804d60449));
             replyInput.setTextSize(16);
             replyInput.setTextColor(primaryTextColor());
             replyInput.setHintTextColor(PickPicoTheme.dim(theme));
@@ -353,10 +353,10 @@ public final class HumanHelpActivity extends Activity {
             LinearLayout attachmentCard = glassCard();
             attachmentCard.setPadding(dp(12), dp(9), dp(12), dp(10));
             attachmentCard.setOrientation(LinearLayout.VERTICAL);
-            TextView attachmentTitle = text("Add an image · optional", 13, Typeface.NORMAL);
+            TextView attachmentTitle = text(getString(R.string.ui_extra_7da8c7087f), 13, Typeface.NORMAL);
             attachmentTitle.setTextColor(secondaryTextColor());
             attachmentCard.addView(attachmentTitle);
-            attachmentStatus = text("No images attached", 11, Typeface.NORMAL);
+            attachmentStatus = text(getString(R.string.ui_extra_e828e6e82d), 11, Typeface.NORMAL);
             attachmentStatus.setTextColor(secondaryTextColor());
             attachmentStatus.setPadding(0, dp(3), 0, dp(7));
             attachmentCard.addView(attachmentStatus);
@@ -365,13 +365,13 @@ public final class HumanHelpActivity extends Activity {
             imageButtons.setOrientation(LinearLayout.HORIZONTAL);
 
             uploadButton = new Button(this);
-            uploadButton.setText("Upload image");
+            uploadButton.setText(getString(R.string.ui_extra_f35dec5f75));
             styleUtilityButton(uploadButton);
             uploadButton.setOnClickListener(v -> pickImage());
             imageButtons.addView(uploadButton, new LinearLayout.LayoutParams(0, dp(42), 1f));
 
             cameraButton = new Button(this);
-            cameraButton.setText("Take photo");
+            cameraButton.setText(getString(R.string.ui_extra_7ebd5d4c91));
             styleUtilityButton(cameraButton);
             cameraButton.setOnClickListener(v -> requestCamera());
             LinearLayout.LayoutParams cameraParams = new LinearLayout.LayoutParams(0, dp(42), 1f);
@@ -402,21 +402,21 @@ public final class HumanHelpActivity extends Activity {
                 () -> submit(approveAction));
         addCompactActionButton(phoneActionsContainer, "×", rejectAction, 1,
                 () -> submit(rejectAction));
-        addCompactActionButton(phoneActionsContainer, "🎙", "Voice", 2,
+        addCompactActionButton(phoneActionsContainer, "🎙", getString(R.string.ui_extra_3091c8446f), 2,
                 this::startVoiceReply);
-        detailsButton = addCompactActionButton(phoneActionsContainer, "≡", "Details", 3,
+        detailsButton = addCompactActionButton(phoneActionsContainer, "≡", getString(R.string.ui_extra_dc3decbb93), 3,
                 () -> setDetailsExpanded(!detailsExpanded));
         actionContainer.addView(phoneActionsContainer, actionRowParams());
 
         dockActionsContainer = new LinearLayout(this);
         dockActionsContainer.setOrientation(LinearLayout.VERTICAL);
         dockActionsContainer.setPadding(dp(10), dp(7), dp(10), dp(7));
-        TextView dockTitle = text("●  PICO DOCK CONNECTED", 12, Typeface.BOLD);
+        TextView dockTitle = text(getString(R.string.ui_extra_3cd46e950e), 12, Typeface.BOLD);
         dockTitle.setTextColor(PickPicoTheme.GREEN);
         dockTitle.setGravity(android.view.Gravity.CENTER);
         dockActionsContainer.addView(dockTitle);
         TextView dockMapping = text(
-                approveAction + "   ·   " + rejectAction + "   ·   Voice   ·   Details",
+                approveAction + "   ·   " + rejectAction + getString(R.string.ui_extra_c888ab1ad8),
                 12,
                 Typeface.NORMAL);
         dockMapping.setTextColor(secondaryTextColor());
@@ -424,7 +424,7 @@ public final class HumanHelpActivity extends Activity {
         dockMapping.setPadding(0, dp(5), 0, dp(7));
         dockActionsContainer.addView(dockMapping);
         Button usePhone = new Button(this);
-        usePhone.setText("Use phone controls");
+        usePhone.setText(getString(R.string.ui_extra_d623d3887b));
         styleUtilityButton(usePhone);
         usePhone.setOnClickListener(v -> {
             phoneControlsOverride = true;
@@ -543,7 +543,7 @@ public final class HumanHelpActivity extends Activity {
     private void submit(String action, String text) {
         try {
             HumanHelpStore.complete(this, requestId, action, text);
-            Toast.makeText(this, "Sent to Agent", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ui_extra_47a7097872), Toast.LENGTH_SHORT).show();
             finish();
         } catch (Exception error) {
             Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
@@ -573,7 +573,7 @@ public final class HumanHelpActivity extends Activity {
                     }
                 })
                 .setNeutralButton("重錄", (dialog, which) -> discardBleVoice(attachmentPath, true))
-                .setNegativeButton("取消", (dialog, which) -> discardBleVoice(attachmentPath, false))
+                .setNegativeButton(getString(R.string.ui_cancel), (dialog, which) -> discardBleVoice(attachmentPath, false))
                 .setOnCancelListener(dialog -> discardBleVoice(attachmentPath, false))
                 .show();
     }
@@ -622,7 +622,7 @@ public final class HumanHelpActivity extends Activity {
                     .putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri)
                     .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             if (intent.resolveActivity(getPackageManager()) == null) {
-                Toast.makeText(this, "No camera app available", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, getString(R.string.ui_extra_2ec46e92c9), Toast.LENGTH_LONG).show();
                 return;
             }
             startActivityForResult(intent, REQUEST_CAMERA);
@@ -666,19 +666,19 @@ public final class HumanHelpActivity extends Activity {
                 pendingCameraUri = null;
             }
         } catch (Exception error) {
-            Toast.makeText(this, "Image failed: " + error.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_extra_6dc279ba73) + error.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
     private void addImage(Uri uri, String source) throws Exception {
         Bitmap bitmap = decodeScaled(uri);
         if (bitmap == null) {
-            throw new IOException("Unable to decode image");
+            throw new IOException(getString(R.string.ui_extra_350c9e9192));
         }
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 82, bytes)) {
-                throw new IOException("Unable to compress image");
+                throw new IOException(getString(R.string.ui_extra_cfd84dded8));
             }
             HumanHelpStore.addJpegAttachment(
                     this,
@@ -804,8 +804,8 @@ public final class HumanHelpActivity extends Activity {
         int max = request.optInt("maxImages", 3);
         if (attachmentStatus != null) {
             setTextIfChanged(attachmentStatus, count == 0
-                    ? "No images attached"
-                    : count + " / " + max + " image(s) attached");
+                    ? getString(R.string.ui_extra_e828e6e82d)
+                    : count + " / " + max + getString(R.string.ui_extra_8b461f9c52));
         }
         if (uploadButton != null) {
             uploadButton.setEnabled(waiting && count < max);
@@ -851,11 +851,11 @@ public final class HumanHelpActivity extends Activity {
         TextView back = text("‹", 38, Typeface.NORMAL);
         back.setTextColor(primaryTextColor());
         back.setGravity(android.view.Gravity.CENTER);
-        back.setContentDescription("Back");
+        back.setContentDescription(getString(R.string.ui_extra_b52b36b726));
         back.setOnClickListener(v -> finish());
         header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(44)));
 
-        TextView heading = text(approvalRequest ? "APPROVAL" : "H U M A N   H E L P", 17, Typeface.BOLD);
+        TextView heading = text(approvalRequest ? getString(R.string.ui_extra_97efc8640f) : getString(R.string.ui_extra_4644b5262c), 17, Typeface.BOLD);
         heading.setTextColor(primaryTextColor());
         heading.setGravity(android.view.Gravity.CENTER);
         header.addView(heading, new LinearLayout.LayoutParams(0, dp(44), 1f));
@@ -864,7 +864,7 @@ public final class HumanHelpActivity extends Activity {
         header.addView(balance, new LinearLayout.LayoutParams(dp(42), dp(44)));
         wrapper.addView(header);
 
-        TextView subtitle = text("AI is paused · waiting for you", 13, Typeface.NORMAL);
+        TextView subtitle = text(getString(R.string.ui_extra_d20150227f), 13, Typeface.NORMAL);
         subtitle.setTextColor(secondaryTextColor());
         subtitle.setGravity(android.view.Gravity.CENTER);
         wrapper.addView(subtitle);
@@ -935,10 +935,10 @@ public final class HumanHelpActivity extends Activity {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your reply to the Agent")
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.ui_extra_67e1442d0b))
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
         if (intent.resolveActivity(getPackageManager()) == null) {
-            Toast.makeText(this, "Voice input is not available on this phone", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.ui_extra_520f7ef562), Toast.LENGTH_LONG).show();
             return;
         }
         startActivityForResult(intent, REQUEST_VOICE_REPLY);
@@ -947,7 +947,7 @@ public final class HumanHelpActivity extends Activity {
     private void showVoiceReplyConfirmation(String transcript) {
         String safeTranscript = transcript == null ? "" : transcript.trim();
         if (safeTranscript.isEmpty()) {
-            Toast.makeText(this, "沒有辨識到文字，請重新錄音", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.voice_empty), Toast.LENGTH_LONG).show();
             startVoiceReply();
             return;
         }
@@ -958,12 +958,12 @@ public final class HumanHelpActivity extends Activity {
         panel.setPadding(dp(22), dp(20), dp(22), dp(16));
         panel.setBackground(PickPicoTheme.strongGlass(theme, dp(24)));
 
-        TextView kicker = text("VOICE REPLY", 10, Typeface.BOLD);
+        TextView kicker = text(getString(R.string.ui_extra_64cc7c9c45), 10, Typeface.BOLD);
         kicker.setTextColor(PickPicoTheme.accentB(theme));
         kicker.setLetterSpacing(.12f);
         panel.addView(kicker);
 
-        TextView title = text("辨識結果正確嗎？", 21, Typeface.BOLD);
+        TextView title = text(getString(R.string.voice_review), 21, Typeface.BOLD);
         title.setTextColor(primaryTextColor());
         title.setPadding(0, dp(8), 0, dp(12));
         panel.addView(title);
@@ -977,7 +977,7 @@ public final class HumanHelpActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        TextView hint = text("確認後才會傳給 Agent。", 12, Typeface.NORMAL);
+        TextView hint = text(getString(R.string.voice_confirm), 12, Typeface.NORMAL);
         hint.setTextColor(secondaryTextColor());
         hint.setPadding(0, dp(10), 0, dp(14));
         panel.addView(hint);
@@ -985,16 +985,16 @@ public final class HumanHelpActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button retry = voiceReviewButton("不正確，重錄", PickPicoTheme.BLUE);
+        Button retry = voiceReviewButton(getString(R.string.voice_retry), PickPicoTheme.BLUE);
         actions.addView(retry, new LinearLayout.LayoutParams(0, dp(50), 1f));
 
-        Button send = voiceReviewButton("正確，傳送", PickPicoTheme.GREEN);
+        Button send = voiceReviewButton(getString(R.string.voice_send), PickPicoTheme.GREEN);
         LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(0, dp(50), 1f);
         sendParams.setMarginStart(dp(9));
         actions.addView(send, sendParams);
         panel.addView(actions);
 
-        TextView cancel = text("取消", 13, Typeface.BOLD);
+        TextView cancel = text(getString(R.string.ui_cancel), 13, Typeface.BOLD);
         cancel.setTextColor(secondaryTextColor());
         cancel.setGravity(android.view.Gravity.CENTER);
         cancel.setPadding(0, dp(13), 0, 0);

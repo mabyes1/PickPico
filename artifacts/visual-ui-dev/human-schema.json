@@ -1,0 +1,91 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207182985,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"human.help\",\"description\":\"Ask the nearby human for one step\",\"category\":\"interaction\",\"risk\":\"human_interaction\",\"sideEffect\":true,\"tool\":\"human_help\",\"group\":\"core\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{\"wait\":{\"type\":\"boolean\",\"default\":false,\"description\":\"False returns requestId immediately. Legacy dynamic calls default to waiting.\"},\"title\":{\"type\":\"string\",\"maxLength\":160,\"default\":\"AI needs your help\"},\"instruction\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000},\"actions\":{\"type\":\"array\",\"maxItems\":6,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":80}},\"allowTextReply\":{\"type\":\"boolean\",\"default\":true},\"allowImages\":{\"type\":\"boolean\",\"default\":true},\"maxImages\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":3,\"default\":3},\"idleTimeoutSeconds\":{\"type\":\"integer\",\"enum\":[120,180,360],\"description\":\"Renewable human-idle timeout. Choose 120s for a quick nearby action, 180s for normal help, or 360s for a task that may require moving, taking a photo, or finding something. Human activity resets this timer.\",\"default\":180}},\"required\":[\"instruction\"],\"additionalProperties\":false},\"schemaVersion\":\"0.16.76\",\"call\":{\"tool\":\"human_help\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "human.help",
+      "description": "Ask the nearby human for one step",
+      "category": "interaction",
+      "risk": "human_interaction",
+      "sideEffect": true,
+      "tool": "human_help",
+      "group": "core",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "wait": {
+            "type": "boolean",
+            "default": false,
+            "description": "False returns requestId immediately. Legacy dynamic calls default to waiting."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "default": "AI needs your help"
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "actions": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "allowTextReply": {
+            "type": "boolean",
+            "default": true
+          },
+          "allowImages": {
+            "type": "boolean",
+            "default": true
+          },
+          "maxImages": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "default": 3
+          },
+          "idleTimeoutSeconds": {
+            "type": "integer",
+            "enum": [
+              120,
+              180,
+              360
+            ],
+            "description": "Renewable human-idle timeout. Choose 120s for a quick nearby action, 180s for normal help, or 360s for a task that may require moving, taking a photo, or finding something. Human activity resets this timer.",
+            "default": 180
+          }
+        },
+        "required": [
+          "instruction"
+        ],
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.76",
+      "call": {
+        "tool": "human_help",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {},
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

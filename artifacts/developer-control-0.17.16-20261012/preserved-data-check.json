@@ -1,0 +1,8 @@
+{
+  "adb_identity_and_pairing_keys_unchanged": true,
+  "pairing_fields_unchanged": true,
+  "appearance_unchanged": true,
+  "caller_return_unchanged": true,
+  "control_policy_unchanged": true,
+  "pico_orb_y_position_changed": true
+}

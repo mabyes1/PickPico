@@ -1,0 +1,105 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1789207438132,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"id\":\"ui.type\",\"description\":\"Type via a UI selector or the focused input connection\",\"category\":\"ui\",\"risk\":\"ui_action\",\"sideEffect\":true,\"tool\":\"ui_type\",\"group\":\"hyper\",\"state\":\"available\",\"available\":true,\"inputSchema\":{\"type\":\"object\",\"properties\":{\"observationId\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":100,\"description\":\"Selector\\/global actions: latest ui_inspect observationId. Point\\/swipe\\/focused-input: latest screen_capture observationId, valid for one action within 60s. Observe again after each action.\"},\"selector\":{\"type\":\"object\",\"minProperties\":1,\"properties\":{\"path\":{\"type\":\"string\",\"maxLength\":512,\"description\":\"Tree path returned by ui.inspect, for example 0\\/2\\/1.\"},\"viewId\":{\"type\":\"string\",\"maxLength\":512},\"text\":{\"type\":\"string\",\"maxLength\":2048},\"contentDescription\":{\"type\":\"string\",\"maxLength\":2048},\"className\":{\"type\":\"string\",\"maxLength\":512},\"instance\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100,\"default\":0}},\"additionalProperties\":false},\"focused\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Use the visually focused input connection without a selector, Android 13+. Capture after focusing; requires screen observationId and textMode, disallows append.\"},\"textMode\":{\"type\":\"string\",\"enum\":[\"insert\",\"replace\"],\"description\":\"Focused input only: insert at cursor\\/selection, or replace all field text. Verify after dispatch; editor acceptance is not guaranteed.\"},\"text\":{\"type\":\"string\",\"maxLength\":8192},\"append\":{\"type\":\"boolean\",\"default\":false}},\"required\":[\"text\",\"observationId\"],\"additionalProperties\":false},\"schemaVersion\":\"0.16.77\",\"call\":{\"tool\":\"ui_type\",\"requiredCallerArguments\":[\"agent\"],\"arguments\":{},\"template\":true},\"isError\":false}"
+      }
+    ],
+    "structuredContent": {
+      "id": "ui.type",
+      "description": "Type via a UI selector or the focused input connection",
+      "category": "ui",
+      "risk": "ui_action",
+      "sideEffect": true,
+      "tool": "ui_type",
+      "group": "hyper",
+      "state": "available",
+      "available": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "observationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Selector/global actions: latest ui_inspect observationId. Point/swipe/focused-input: latest screen_capture observationId, valid for one action within 60s. Observe again after each action."
+          },
+          "selector": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+              "path": {
+                "type": "string",
+                "maxLength": 512,
+                "description": "Tree path returned by ui.inspect, for example 0/2/1."
+              },
+              "viewId": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "contentDescription": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "className": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "instance": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "default": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "focused": {
+            "type": "boolean",
+            "default": false,
+            "description": "Use the visually focused input connection without a selector, Android 13+. Capture after focusing; requires screen observationId and textMode, disallows append."
+          },
+          "textMode": {
+            "type": "string",
+            "enum": [
+              "insert",
+              "replace"
+            ],
+            "description": "Focused input only: insert at cursor/selection, or replace all field text. Verify after dispatch; editor acceptance is not guaranteed."
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "append": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "text",
+          "observationId"
+        ],
+        "additionalProperties": false
+      },
+      "schemaVersion": "0.16.77",
+      "call": {
+        "tool": "ui_type",
+        "requiredCallerArguments": [
+          "agent"
+        ],
+        "arguments": {},
+        "template": true
+      },
+      "isError": false
+    },
+    "isError": false
+  }
+}

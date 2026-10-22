@@ -12,6 +12,7 @@ final class McpocketPolicySettings {
     static final String KEY_HYPER_MODE = "hyper_mode";
     static final String KEY_APPROVAL_MODE = "approval_mode";
     static final String KEY_PICO_ORB_ENABLED = "pico_orb_enabled";
+    static final String KEY_BUTTON_PAD_ENABLED = "button_pad_enabled";
     private static final String KEY_PICO_ORB_SIDE = "pico_orb_side";
     private static final String KEY_PICO_ORB_Y_RATIO = "pico_orb_y_ratio";
 
@@ -36,6 +37,14 @@ final class McpocketPolicySettings {
 
     static void setPicoOrbEnabled(Context context, boolean enabled) {
         preferences(context).edit().putBoolean(KEY_PICO_ORB_ENABLED, enabled).apply();
+    }
+
+    static boolean isButtonPadEnabled(Context context) {
+        return preferences(context).getBoolean(KEY_BUTTON_PAD_ENABLED, false);
+    }
+
+    static void setButtonPadEnabled(Context context, boolean enabled) {
+        preferences(context).edit().putBoolean(KEY_BUTTON_PAD_ENABLED, enabled).apply();
     }
 
     static String picoOrbSide(Context context) {
